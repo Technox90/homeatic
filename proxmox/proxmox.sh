@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V122
+# PROXMOX MODULARER KOMPLETT-INSTALLER V123
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -37,6 +37,7 @@ set -Eeuo pipefail
 #   V120: Einzelne VM/LXC-Löschbestätigungen nur noch über die numerische Gast-ID
 #   V121: Destruktive Textbestätigungen gekürzt: KOMPLETT NEU -> NEU, PROXMOX AUF NULL -> NULL
 #   V122: Pi-hole Exporter ohne hart codierten /app-Pfad; Start über Image-CMD + BIND_ADDR/PORT
+#   V123: Dashboard-Webdienst mit 30-s-Readiness-Test, DB-unabhängigem /api/info und automatischer Fehlerdiagnose
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -739,7 +740,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V122"
+TUI_TITLE="PROXMOX INSTALLER V123"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1112,7 +1113,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 122" \
+                    --title "HAUPTMENÜ · Version 123" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8618,7 +8619,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V122",
+    "installer_version": "V123",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9092,7 +9093,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V122 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V123 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -13904,13 +13905,51 @@ PYDB
     systemctl enable --now nginx
     systemctl restart nginx
 
-    sleep 2
+    # V123: Gunicorn kann bei einem frischen Start etwas länger benötigen.
+    # /api/info ist DB-unabhängig und eignet sich deshalb als echter
+    # Prozess-/HTTP-Readiness-Test. Erst danach werden Messdaten geprüft.
+    local dashboard_api_ready=0
+    local dashboard_api_try=0
 
     echo
-    echo "Dashboard API-Test:"
-    curl -fsS "http://127.0.0.1:${APP_PORT}/api/current" >/dev/null && \
-        ok "Sensor-API liefert Messwerte." || \
-        warn "API liefert noch keine Daten. Logs prüfen."
+    echo "Dashboard API-Starttest:"
+
+    for dashboard_api_try in {1..30}; do
+        if curl -fsS --max-time 2 \
+            "http://127.0.0.1:${APP_PORT}/api/info" \
+            >/dev/null 2>&1; then
+            dashboard_api_ready=1
+            break
+        fi
+
+        sleep 1
+    done
+
+    if (( dashboard_api_ready == 0 )); then
+        warn "Dashboard-Webdienst ist auf Port ${APP_PORT} nicht erreichbar."
+        echo
+        echo "----- systemctl status pve-sensor-web.service -----"
+        systemctl status pve-sensor-web.service --no-pager -l || true
+        echo
+        echo "----- journalctl pve-sensor-web.service -----"
+        journalctl -u pve-sensor-web.service -n 80 --no-pager || true
+        echo
+        echo "----- Listener Port ${APP_PORT} -----"
+        ss -lntp 2>/dev/null | grep -E ":${APP_PORT}([[:space:]]|$)" || true
+        die "Dashboard-Webdienst konnte innerhalb von 30 Sekunden nicht gestartet werden."
+    fi
+
+    ok "Dashboard-Webdienst antwortet auf 127.0.0.1:${APP_PORT}."
+
+    echo
+    echo "Dashboard Messdaten-Test:"
+    if curl -fsS --max-time 3 \
+        "http://127.0.0.1:${APP_PORT}/api/current" \
+        >/dev/null 2>&1; then
+        ok "Sensor-API liefert Messwerte."
+    else
+        warn "Web-API läuft, aber die erste Messung ist noch nicht verfügbar."
+    fi
 
     ok "Dashboard: http://${DASHBOARD_IP}:${DASHBOARD_PORT}/"
 

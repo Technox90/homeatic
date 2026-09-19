@@ -1,6 +1,19 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V123
+-----------------
+- Dashboard-Startprüfung gehärtet.
+- Der bisherige feste "sleep 2" wurde durch einen Readiness-Test mit bis zu 30 Sekunden Wartezeit ersetzt.
+- Für den Starttest wird jetzt "/api/info" verwendet; dieser Endpoint ist unabhängig von der Messdatenbank und trennt einen echten Webdienst-/Gunicorn-Fehler von noch fehlenden Messwerten.
+- "/api/current" wird anschließend separat als Messdaten-Test geprüft.
+- Wenn Port 9105 nach 30 Sekunden nicht erreichbar ist, zeigt der Installer automatisch:
+  * systemctl status pve-sensor-web.service
+  * die letzten 80 Journal-Zeilen des Dienstes
+  * den Listener-Status für Port 9105
+- Bei einem echten Webdienst-Startfehler bricht die Dashboard-Installation nun kontrolliert ab, statt nur mit einer Warnung weiterzulaufen.
+- Hintergrund: Bei einem Testlauf trat direkt nach dem Start "curl: (7) Failed to connect to 127.0.0.1 port 9105" auf.
+
 20.09.2026 – V122
 -----------------
 - Pi-hole Exporter Startfehler behoben: OCI runtime konnte "/app/pihole-exporter" nicht finden.
