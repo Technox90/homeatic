@@ -1,0 +1,7 @@
+# Eigene lokale Pi-hole DNS-Einträge
+# Format:
+# <IP-Adresse> <Hostname>
+#
+# Beispiel:
+# 192.168.178.100 pve.lan
+# 192.168.178.103 pihole.lan
