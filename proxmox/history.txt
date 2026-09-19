@@ -1,6 +1,14 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V120
+-----------------
+- Einzelne Löschbestätigungen für VMs/LXC vereinfacht.
+- In "VM / LXC verwalten" muss zum Löschen nur noch die numerische VM-/CT-ID eingegeben werden, z. B. "105".
+- Bei einem ID-Konflikt während einer Installation gilt dieselbe Bestätigung: nur die betroffene ID eingeben.
+- Die zusätzliche Eingabe "LOESCHEN <ID>" wurde entfernt.
+- Sicherheitsbestätigungen für globale/destruktive Funktionen wie "KOMPLETT NEU" und "PROXMOX AUF NULL" bleiben unverändert erhalten.
+
 20.09.2026 – V119
 -----------------
 - Fehler behoben: "proxmox.sh: line 11669: $4: unbound variable" beim Docker-Setup des Paperless-LXC.

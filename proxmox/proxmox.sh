@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V119
+# PROXMOX MODULARER KOMPLETT-INSTALLER V120
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -34,6 +34,7 @@ set -Eeuo pipefail
 #   V117: PVE-UPS-Verfügbarkeitsfunktion vor Optimal-Preflight verschoben; Version im Hauptmenü sichtbar
 #   V118: Versionsanzeige im Hauptmenü ergänzt; Installer-Version zentral auf V118 angehoben
 #   V119: Docker-LXC Bootstrap quoting gehärtet; awk/sed/printf lösen kein set -u/$4 mehr aus
+#   V120: Einzelne VM/LXC-Löschbestätigungen nur noch über die numerische Gast-ID
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -736,7 +737,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V119"
+TUI_TITLE="PROXMOX INSTALLER V120"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1109,7 +1110,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 119" \
+                    --title "HAUPTMENÜ · Version 120" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -1636,9 +1637,9 @@ manage_guests() {
 
         echo
         echo "${RED}ACHTUNG:${RESET} $kind $id${name:+ ($name)} inklusive virtueller Datenträger wird gelöscht."
-        read -rp "Zur Bestätigung exakt 'LOESCHEN $id' eingeben: " confirm
+        read -rp "Zur Bestätigung exakt die ID '$id' eingeben: " confirm
 
-        if [[ "$confirm" == "LOESCHEN $id" ]]; then
+        if [[ "$confirm" == "$id" ]]; then
             destroy_guest "$id"
         else
             warn "Nicht gelöscht."
@@ -4289,8 +4290,8 @@ resolve_guest_id() {
         case "$choice" in
             1)
                 local confirm
-                read -rp "Zur Bestätigung exakt 'LOESCHEN $id' eingeben: " confirm
-                if [[ "$confirm" == "LOESCHEN $id" ]]; then
+                read -rp "Zur Bestätigung exakt die ID '$id' eingeben: " confirm
+                if [[ "$confirm" == "$id" ]]; then
                     destroy_guest "$id"
                     RESOLVED_ID="$id"
                     return 0
@@ -8615,7 +8616,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V119",
+    "installer_version": "V120",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9089,7 +9090,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V119 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V120 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
