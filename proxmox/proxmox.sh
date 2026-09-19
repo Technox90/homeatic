@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V123
+# PROXMOX MODULARER KOMPLETT-INSTALLER V124
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -38,6 +38,7 @@ set -Eeuo pipefail
 #   V121: Destruktive Textbestätigungen gekürzt: KOMPLETT NEU -> NEU, PROXMOX AUF NULL -> NULL
 #   V122: Pi-hole Exporter ohne hart codierten /app-Pfad; Start über Image-CMD + BIND_ADDR/PORT
 #   V123: Dashboard-Webdienst mit 30-s-Readiness-Test, DB-unabhängigem /api/info und automatischer Fehlerdiagnose
+#   V124: Dashboard systemd-NAMESPACE-Fix; /var/lib/pve-sensor-dashboard-web wird vor jedem Webdienst-Start angelegt
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -740,7 +741,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V123"
+TUI_TITLE="PROXMOX INSTALLER V124"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1113,7 +1114,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 123" \
+                    --title "HAUPTMENÜ · Version 124" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8619,7 +8620,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V123",
+    "installer_version": "V124",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9093,7 +9094,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V123 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V124 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11980,6 +11981,7 @@ install_dashboard() {
     local STATIC_DIR="${APP_DIR}/static"
     local CONTROL_DIR="/etc/pve-sensor-dashboard"
     local CONTROL_HASH="${CONTROL_DIR}/control.hash"
+    local WEB_DATA_DIR="/var/lib/pve-sensor-dashboard-web"
     local APP_PORT="9105"
     local POWER_HELPER="/usr/local/sbin/pve-sensor-powerctl"
     local SUDOERS_FILE="/etc/sudoers.d/pve-sensor-dashboard"
@@ -12056,7 +12058,10 @@ EOF
         rm -rf "$APP_DIR"
     fi
 
-    mkdir -p "$APP_DIR" "$DATA_DIR" "$STATIC_DIR" "$CONTROL_DIR"
+    # V124: WEB_DATA_DIR muss bereits VOR dem Start von pve-sensor-web
+    # existieren. Ein vorhandenes systemd-Drop-in verwendet diesen Pfad als
+    # ReadWritePaths; fehlt er, bricht systemd mit status=226/NAMESPACE ab.
+    mkdir -p "$APP_DIR" "$DATA_DIR" "$STATIC_DIR" "$CONTROL_DIR" "$WEB_DATA_DIR"
 
     if ! id -u pve-monitor >/dev/null 2>&1; then
         useradd --system --home-dir "$APP_DIR" --shell /usr/sbin/nologin pve-monitor
@@ -12064,6 +12069,9 @@ EOF
 
     chown root:pve-monitor "$DATA_DIR" "$CONTROL_DIR"
     chmod 750 "$DATA_DIR" "$CONTROL_DIR"
+
+    chown pve-monitor:pve-monitor "$WEB_DATA_DIR"
+    chmod 700 "$WEB_DATA_DIR"
 
     # -------------------------------------------------------------------------
     # Collector
@@ -23383,10 +23391,14 @@ install_dashboard_settings_write_paths() {
 
     mkdir -p \
         "$dropin_dir" \
+        /var/lib/pve-sensor-dashboard-web \
         /opt/pve-sensor-dashboard/static \
         /etc/pve-sensor-dashboard \
         /etc/nginx/sites-available \
         /etc/nginx/sites-enabled
+
+    chown pve-monitor:pve-monitor /var/lib/pve-sensor-dashboard-web
+    chmod 700 /var/lib/pve-sensor-dashboard-web
 
     cat > "$dropin" <<'EOF'
 [Service]

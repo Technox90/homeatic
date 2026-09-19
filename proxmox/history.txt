@@ -1,6 +1,17 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V124
+-----------------
+- Dashboard systemd-NAMESPACE-Fehler behoben.
+- Fehlerbild: pve-sensor-web.service startete in einer Restart-Schleife mit "status=226/NAMESPACE".
+- Ursache: Das systemd-Drop-in erlaubte Schreibzugriff auf "/var/lib/pve-sensor-dashboard-web", der Ordner existierte beim Basis-Dashboard-Start jedoch noch nicht.
+- systemd konnte dadurch die Mount-Namespace nicht aufbauen und startete Gunicorn überhaupt nicht.
+- "/var/lib/pve-sensor-dashboard-web" wird jetzt bereits in install_dashboard() vor dem ersten Start des Webdienstes angelegt.
+- Besitzer/Rechte werden direkt auf "pve-monitor:pve-monitor" und 0700 gesetzt.
+- install_dashboard_settings_write_paths() legt denselben Pfad nun ebenfalls selbst an und korrigiert Besitzer/Rechte.
+- Der V123-Readiness-Test bleibt bestehen und erkennt zusätzliche Startprobleme weiterhin automatisch.
+
 20.09.2026 – V123
 -----------------
 - Dashboard-Startprüfung gehärtet.
