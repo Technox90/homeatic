@@ -3,7 +3,7 @@
 # <IP-Adresse> <Hostname>
 #
 # Beispiel:
-192.168.178.1 fritzbox
+192.168.178.1   fritzbox
 192.168.178.100 pve.lan
 192.168.178.101 homeassistant.lan
 192.168.178.102 paperless.lan
