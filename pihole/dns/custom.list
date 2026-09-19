@@ -8,9 +8,9 @@
 192.168.178.101 homeassistant.lan
 192.168.178.102 paperless.lan
 192.168.178.103 pihole.lan
-192.168.178.104 NetAlert.lan
-192.168.178.105 Uptime.lan
-192.168.178.106 PDF.lan
+192.168.178.104 netalert.lan
+192.168.178.105 uptime.lan
+192.168.178.106 pdf.lan
 192.168.178.107 speedtest.lan
-192.168.178.108 Scrutiny.lan
+192.168.178.108 scrutiny.lan
 192.168.178.109 ups.lan
