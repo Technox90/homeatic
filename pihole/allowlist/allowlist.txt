@@ -1,0 +1,2 @@
+# Eigene Pi-hole-Allowlist
+# Eine Domain pro Zeile.
