@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V116**
+Installationskandidat: **V117**
 
 Geplante Hauptdatei:
 
@@ -92,3 +92,8 @@ Ab **V116** wird die Proxmox-Repository-Normalisierung auf **pve-no-subscription
 ## Fresh-Install-Fix V116
 
 Auf einem frisch installierten Proxmox VE wird zuerst die Repository-Konfiguration auf **pve-no-subscription** normalisiert. Erst nach einem erfolgreichen APT-Preflight wird der Proxmox-Auto-Updater installiert. Dadurch schlägt der erste Start nicht mehr an den standardmäßig aktiven Enterprise-Repositories mit HTTP 401 fehl.
+
+
+## PVE-UPS-Preflight-Fix V117
+
+Der PVE-UPS-Verfügbarkeitscheck wird jetzt definiert, bevor der Optimal-Preflight ihn aufruft. Damit tritt auf einem frischen Proxmox kein `community_pve_ups_available: command not found` mehr auf.

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V116
+# PROXMOX MODULARER KOMPLETT-INSTALLER V117
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -31,6 +31,7 @@ set -Eeuo pipefail
 #   V113: Pi-hole Exporter v1.2.0 im Pi-hole-LXC; Prometheus-Scrape + Healthchecks + Passwort-Sync
 #   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
 #   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
+#   V117: PVE-UPS-Verfügbarkeitsfunktion vor Optimal-Preflight definiert; command-not-found auf Fresh-Install behoben
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -733,7 +734,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V116"
+TUI_TITLE="PROXMOX INSTALLER V117"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
 
 ensure_tui() {
@@ -8612,7 +8613,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V116",
+    "installer_version": "V117",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9086,7 +9087,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V116 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V117 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -10206,6 +10207,31 @@ selected_guest_disk_sum_v107() {
     printf '%s\n' "$total"
 }
 
+# -----------------------------------------------------------------------------
+# Community-Scripts Status / Verfügbarkeit
+# -----------------------------------------------------------------------------
+
+community_pve_ups_available() {
+    local page=""
+    local page_url="https://community-scripts.org/scripts/pve-ups"
+    local script_url="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/pve-ups.sh"
+
+    page="$(curl -fsSL --connect-timeout 10 --max-time 20 "$page_url" 2>/dev/null || true)"
+
+    if [[ -n "$page" ]] && grep -Eqi \
+        'currently not available|being checked by the maintainers' <<<"$page"; then
+        return 1
+    fi
+
+    # V95: Die Status-Webseite ist nur ein zusätzlicher Schutz.
+    # Ist sie temporär nicht erreichbar, entscheidet die tatsächliche
+    # Erreichbarkeit des offiziellen Community-Scripts. So wird PVE-UPS
+    # bei einem Komplett-Neu-Lauf nicht nur wegen eines Website-Fehlers
+    # unnötig übersprungen.
+    curl -fsSL --connect-timeout 10 --max-time 20 \
+        "$script_url" -o /dev/null 2>/dev/null
+}
+
 optimal_network_preflight_v107() {
     header "OPTIMALE INSTALLATION · NETZWERK-/HOST-PREFLIGHT"
 
@@ -10487,31 +10513,6 @@ reject_reserved_guest_id() {
     if [[ "$guest_id" == "100" ]]; then
         die "VM-/CT-ID 100 ist reserviert und wird nicht vergeben. Bitte ID 101 oder höher verwenden."
     fi
-}
-
-# -----------------------------------------------------------------------------
-# Community-Scripts Status / Verfügbarkeit
-# -----------------------------------------------------------------------------
-
-community_pve_ups_available() {
-    local page=""
-    local page_url="https://community-scripts.org/scripts/pve-ups"
-    local script_url="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/pve-ups.sh"
-
-    page="$(curl -fsSL --connect-timeout 10 --max-time 20 "$page_url" 2>/dev/null || true)"
-
-    if [[ -n "$page" ]] && grep -Eqi \
-        'currently not available|being checked by the maintainers' <<<"$page"; then
-        return 1
-    fi
-
-    # V95: Die Status-Webseite ist nur ein zusätzlicher Schutz.
-    # Ist sie temporär nicht erreichbar, entscheidet die tatsächliche
-    # Erreichbarkeit des offiziellen Community-Scripts. So wird PVE-UPS
-    # bei einem Komplett-Neu-Lauf nicht nur wegen eines Website-Fehlers
-    # unnötig übersprungen.
-    curl -fsSL --connect-timeout 10 --max-time 20 \
-        "$script_url" -o /dev/null 2>/dev/null
 }
 
 # -----------------------------------------------------------------------------
