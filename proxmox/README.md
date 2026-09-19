@@ -87,3 +87,8 @@ Die Datei `pihole/dns/custom.list` bleibt separat für lokale DNS-Einträge vorg
 ## Fresh-PVE / Enterprise-Repository
 
 Ab **V116** wird die Proxmox-Repository-Normalisierung auf **pve-no-subscription** vollständig durchgeführt, bevor der Auto-Updater Pakete nachinstallieren darf. Damit läuft auf einer frischen Proxmox-Installation kein frühes `apt-get update` mehr gegen die standardmäßig aktiven Enterprise-Repositories.
+
+
+## Fresh-Install-Fix V116
+
+Auf einem frisch installierten Proxmox VE wird zuerst die Repository-Konfiguration auf **pve-no-subscription** normalisiert. Erst nach einem erfolgreichen APT-Preflight wird der Proxmox-Auto-Updater installiert. Dadurch schlägt der erste Start nicht mehr an den standardmäßig aktiven Enterprise-Repositories mit HTTP 401 fehl.
