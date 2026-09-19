@@ -1,6 +1,21 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V122
+-----------------
+- Pi-hole Exporter Startfehler behoben: OCI runtime konnte "/app/pihole-exporter" nicht finden.
+- Ursache: Das Image "ekofr/pihole-exporter:v1.2.0" verwendet WORKDIR "/root/" und startet intern per CMD "./pihole-exporter"; der Installer überschrieb dies fälschlich mit dem nicht vorhandenen absoluten Pfad "/app/pihole-exporter".
+- Die Compose-Konfiguration überschreibt weder entrypoint noch command des Images mehr.
+- Exporter-Konfiguration erfolgt jetzt ausschließlich über die vom Projekt unterstützten Environment-Variablen:
+  * PIHOLE_PROTOCOL
+  * PIHOLE_HOSTNAME
+  * PIHOLE_PORT
+  * PIHOLE_PASSWORD
+  * BIND_ADDR
+  * PORT
+- Der Exporter wird weiterhin auf die Pi-hole-IP und Port 9617 gebunden.
+- Dadurch bleibt die Konfiguration robuster gegenüber Änderungen am internen WORKDIR/Binärpfad des Docker-Images.
+
 20.09.2026 – V121
 -----------------
 - Bestätigung für "KOMPLETT NEU" verkürzt: Statt "KOMPLETT NEU" muss nur noch "NEU" eingegeben werden.

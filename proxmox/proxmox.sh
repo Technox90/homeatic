@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V121
+# PROXMOX MODULARER KOMPLETT-INSTALLER V122
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -36,6 +36,7 @@ set -Eeuo pipefail
 #   V119: Docker-LXC Bootstrap quoting gehärtet; awk/sed/printf lösen kein set -u/$4 mehr aus
 #   V120: Einzelne VM/LXC-Löschbestätigungen nur noch über die numerische Gast-ID
 #   V121: Destruktive Textbestätigungen gekürzt: KOMPLETT NEU -> NEU, PROXMOX AUF NULL -> NULL
+#   V122: Pi-hole Exporter ohne hart codierten /app-Pfad; Start über Image-CMD + BIND_ADDR/PORT
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -738,7 +739,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V121"
+TUI_TITLE="PROXMOX INSTALLER V122"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1111,7 +1112,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 121" \
+                    --title "HAUPTMENÜ · Version 122" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8617,7 +8618,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V121",
+    "installer_version": "V122",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9091,7 +9092,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V121 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V122 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15385,13 +15386,8 @@ services:
       PIHOLE_HOSTNAME: "127.0.0.1"
       PIHOLE_PORT: "80"
       PIHOLE_PASSWORD: "${PIHOLE_PASS}"
-    entrypoint:
-      - "/app/pihole-exporter"
-    command:
-      - "-bind_addr"
-      - "${PIHOLE_IP}"
-      - "-port"
-      - "9617"
+      BIND_ADDR: "${PIHOLE_IP}"
+      PORT: "9617"
 EOF
 
     pct push \
