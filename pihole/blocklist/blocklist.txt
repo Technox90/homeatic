@@ -1,0 +1,2 @@
+# Eigene Pi-hole-Blocklist
+# Eine Domain pro Zeile.
