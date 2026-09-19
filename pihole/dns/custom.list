@@ -3,10 +3,14 @@
 # <IP-Adresse> <Hostname>
 #
 # Beispiel:
+192.168.178.1 fritzbox
 192.168.178.100 pve.lan
 192.168.178.101 homeassistant.lan
 192.168.178.102 paperless.lan
 192.168.178.103 pihole.lan
-192.168.178.101 homeassistant
-192.168.178.102 paperless
-192.168.178.103 pihole
+192.168.178.104 NetAlert.lan
+192.168.178.105 Uptime.lan
+192.168.178.106 PDF.lan
+192.168.178.107 speedtest.lan
+192.168.178.108 Scrutiny.lan
+192.168.178.109 ups.lan
