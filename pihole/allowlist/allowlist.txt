@@ -1,2 +1,191 @@
-# Eigene Pi-hole-Allowlist
-# Eine Domain pro Zeile.
+###########################################
+# TOBI'S WHITELIST
+# Beschreibung: Domains die trotz Blocklisten erlaubt bleiben sollen.
+# Quelle: Eigene Erfahrungen + Empfehlungen
+# Stand: 2025-07-09
+###########################################
+
+###########################################
+# WINDOWS / MICROSOFT DIENSTE
+###########################################
+dns.msftncsi.com              # Windows Netzwerkstatusprüfung (NCSI)
+activation.sls.microsoft.com  # Windows Aktivierung / Lizenzserver
+officecdn.microsoft.com       # Office Updates
+windowsupdate.microsoft.com   # Windows Update-Dienste
+update.microsoft.com
+windowsupdate.com
+microsoftonline.com           # MS-Logins/OneDrive
+teams.microsoft.com           # Microsoft Teams
+time.windows.com              # Windows NTP Zeitserver
+
+###########################################
+# ZEITSERVER (NTP)
+###########################################
+pool.ntp.org                  # Öffentliche NTP-Zeitserver
+time.google.com               # Google NTP
+time.apple.com                # Apple NTP
+time.nist.gov                 # US offizieller NTP
+
+###########################################
+# SMARTTV / SAMSUNG / FIRETV
+###########################################
+api.samsungcloud.com
+ocsp.samsungcloudsolution.net
+www.samsungcloud.com
+config.samsungcloud.com
+log-config.samsungcloudsolution.net
+time.samsungcloudsolution.net
+device-metrics-us.amazon.com  # FireTV & Echo Basisfunktion
+softwareupdates.amazon.com    # FireTV Updates
+
+###########################################
+# STREAMING / ENTERTAINMENT
+###########################################
+# Netflix
+api-global.netflix.com
+ipv4_1.csi.netflix.com
+ichnaea.netflix.com
+nrdp.nccp.netflix.com
+
+# Crunchyroll
+crunchyroll.com
+www.crunchyroll.com
+static.crunchyroll.com
+api.crunchyroll.com
+vrv.co
+
+# Spotify
+apresolve.spotify.com
+
+# Twitch (optional)
+twitch.tv
+static.twitchcdn.net
+usher.ttvnw.net
+
+###########################################
+# SHOPPING / AMAZON
+###########################################
+www.amazon.de
+www.amazon.com
+fls-eu.amazon.com            # Amazon Tracking/Warenkorb
+images-na.ssl-images-amazon.com # Produktbilder CDN
+
+###########################################
+# SHOPPING / EBAY
+###########################################
+www.ebay.de
+www.ebay.com
+signin.ebay.de
+signin.ebay.com
+pages.ebay.com
+ir.ebaystatic.com
+srx.ebay.de
+
+###########################################
+# ZAHLUNG / PAYPAL (optional)
+###########################################
+www.paypal.com
+api.paypal.com
+
+###########################################
+# GAMING / KONSOLE
+###########################################
+# Playstation
+playstation.net
+playstation.com
+pscdn.co                     # Playstation CDN für Spiele/Patches
+psnprofiles.com              # PSN Community (optional)
+
+# Steam
+steampowered.com
+store.steampowered.com
+cdn.steampowered.com
+steamcommunity.com
+api.steampowered.com
+
+# Blizzard / Battle.net
+battle.net
+blzstatic.com
+
+# Teamspeak
+ts3dns.com
+teamspeak.com
+backup.teamspeak.com
+
+###########################################
+# HARDWARE & DIENSTTOOLS
+###########################################
+# Corsair
+corsair.com
+api.corsair.com               # iCUE Verbindungen
+
+# Streamdeck / Elgato
+elgato.com
+api.elgato.com
+cdn.elgato.com
+
+# Nvidia
+nvidia.com
+gfwsl.geforce.com
+telemetry.gfe.nvidia.com      # Nvidia Experience Basis-Telemetrie (nur wenn nötig)
+
+###########################################
+# NAS / SERVER / LOKAL
+###########################################
+synology.com
+global.download.synology.com
+fritz.box
+myfritz.net
+
+###########################################
+# DEV / GITHUB
+###########################################
+github.com
+api.github.com
+raw.githubusercontent.com
+assets-cdn.github.com
+
+###########################################
+# DISCORD (optional)
+###########################################
+discord.com
+cdn.discordapp.com
+status.discord.com
+
+###########################################
+# GOOGLE ANDROID / PLAY SERVICES
+###########################################
+play.googleapis.com
+android.clients.google.com
+mtalk.google.com
+
+###########################################
+# APPLE PUSH / OTA
+###########################################
+guzzoni.apple.com             # Siri
+init-p01st.push.apple.com     # Apple Push
+
+###########################################
+# SUCHMASCHINE / DUCKDUCKGO
+###########################################
+duckduckgo.com
+api.duckduckgo.com
+improving.duckduckgo.com
+duck.com
+
+###########################################
+# KI / GEMINI / BARD
+###########################################
+gemini.google.com
+bard.google.com
+
+###########################################
+# KI / OPENAI / CHATGPT
+###########################################
+openai.com
+api.openai.com
+chat.openai.com
+
+###########################################
+# ENDE DER LISTE
+###########################################
