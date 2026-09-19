@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V118**
+Installationskandidat: **V117**
 
 Geplante Hauptdatei:
 
@@ -121,3 +121,10 @@ Die Zertifikate werden in die HAOS-SSL-Ablage geschrieben und in die bestehende 
 ## Dashboard-Fix V118
 
 Nach einem vollständigen Dashboard-Reset erzeugt der Installer automatisch einen neuen Steuer-Code, falls kein vorbereiteter Code mehr im Shell-Kontext vorhanden ist. Der Code wird anschließend wie gewohnt unter `/home/passwd/` gesichert.
+
+
+## Pi-hole Exporter Fix V117
+
+Der Pi-hole Exporter `ekofr/pihole-exporter:v1.2.0` wird mit seinem eigenen Docker-Image-CMD gestartet. Der zuvor gesetzte Pfad `/app/pihole-exporter` war für v1.2.0 falsch; das Image startet sein Binary aus `/root/pihole-exporter`. Bind-Adresse und Port werden jetzt über `BIND_ADDR` und `PORT` gesetzt.
+
+Zusätzlich wurde die PVE-UPS-Verfügbarkeitsfunktion vor den Optimal-Preflight verschoben, damit der Preflight sie auf einem frischen Lauf bereits kennt.

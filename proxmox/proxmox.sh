@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V118
+# PROXMOX MODULARER KOMPLETT-INSTALLER V117
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -31,8 +31,7 @@ set -Eeuo pipefail
 #   V113: Pi-hole Exporter v1.2.0 im Pi-hole-LXC; Prometheus-Scrape + Healthchecks + Passwort-Sync
 #   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
 #   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
-#   V117: PVE-UPS-Preflight-Reihenfolge korrigiert; Docker-LXC-Installationsskript quote-sicher gemacht
-#   V118: Dashboard-Steuer-Code-Fallback nach Komplett-Reset; fehlender Code wird sicher neu erzeugt
+#   V117: Pi-hole Exporter v1.2.0 nutzt das Image-CMD; falscher /app-Pfad entfernt; PVE-UPS Preflight-Reihenfolge korrigiert
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -735,7 +734,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V118"
+TUI_TITLE="PROXMOX INSTALLER V117"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
 
 ensure_tui() {
@@ -8614,7 +8613,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V118",
+    "installer_version": "V117",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9088,7 +9087,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V118 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V117 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -10210,7 +10209,8 @@ selected_guest_disk_sum_v107() {
 
 # -----------------------------------------------------------------------------
 # Community-Scripts Status / Verfügbarkeit
-# V117: Muss vor dem Optimal-Preflight definiert sein.
+# V117: Muss vor optimal_network_preflight_v107 definiert sein, weil der
+# Preflight die Funktion bereits aufruft.
 # -----------------------------------------------------------------------------
 
 community_pve_ups_available() {
@@ -10233,6 +10233,7 @@ community_pve_ups_available() {
     curl -fsSL --connect-timeout 10 --max-time 20 \
         "$script_url" -o /dev/null 2>/dev/null
 }
+
 
 
 optimal_network_preflight_v107() {
@@ -10517,7 +10518,6 @@ reject_reserved_guest_id() {
         die "VM-/CT-ID 100 ist reserviert und wird nicht vergeben. Bitte ID 101 oder höher verwenden."
     fi
 }
-
 
 # -----------------------------------------------------------------------------
 # Generische Einstellungen für zusätzliche Docker-LXC
@@ -11665,78 +11665,73 @@ prepare_lxc_template() {
 
 install_docker_in_ct() {
     local ctid="$1"
-    local docker_install_script=""
 
-    # V117:
-    # Das komplette CT-Skript wird über ein *quoted heredoc* als Literal gebaut.
-    # Dadurch werden $1/$4/${...}, awk-Ausdrücke und einfache Anführungszeichen
-    # niemals versehentlich vom Proxmox-Host expandiert.
-    docker_install_script="$(cat <<'__DOCKER_CT_INSTALL__'
-set -Eeuo pipefail
-export DEBIAN_FRONTEND=noninteractive
+    pct exec "$ctid" -- bash -lc '
+        set -Eeuo pipefail
+        export DEBIAN_FRONTEND=noninteractive
 
-ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
-if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 4096 )); then
-    echo "FEHLER: Für Debian + Docker werden vor der Installation mindestens 4 GB freier Root-Speicher verlangt." >&2
-    df -hT / >&2 || true
-    exit 1
-fi
+        ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
+        if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 4096 )); then
+            echo "FEHLER: Für Debian + Docker werden vor der Installation mindestens 4 GB freier Root-Speicher verlangt." >&2
+            df -hT / >&2 || true
+            exit 1
+        fi
 
-mkdir -p \
-    /var/cache/apt/archives/partial \
-    /var/lib/apt/lists/partial
+        mkdir -p \
+            /var/cache/apt/archives/partial \
+            /var/lib/apt/lists/partial
 
-cat > /etc/apt/apt.conf.d/90-persistent-installer-cache <<'EOF'
+        cat > /etc/apt/apt.conf.d/90-persistent-installer-cache <<EOF
 APT::Keep-Downloaded-Packages "true";
 Binary::apt::APT::Keep-Downloaded-Packages "true";
 EOF
 
-apt-get update
-apt-get install -y ca-certificates curl gnupg locales
+        apt-get update
+        apt-get install -y ca-certificates curl gnupg locales
 
-sed -i \
-    -e "s/^# *de_DE.UTF-8 UTF-8/de_DE.UTF-8 UTF-8/" \
-    -e "s/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/" \
-    /etc/locale.gen
+        sed -i \
+            -e "s/^# *de_DE.UTF-8 UTF-8/de_DE.UTF-8 UTF-8/" \
+            -e "s/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/" \
+            /etc/locale.gen
 
-locale-gen de_DE.UTF-8 en_US.UTF-8
-update-locale LANG=de_DE.UTF-8 LANGUAGE=de_DE:de LC_ALL=de_DE.UTF-8
+        locale-gen de_DE.UTF-8 en_US.UTF-8
+        update-locale LANG=de_DE.UTF-8 LANGUAGE=de_DE:de LC_ALL=de_DE.UTF-8
 
-install -m 0755 -d /etc/apt/keyrings
+        install -m 0755 -d /etc/apt/keyrings
 
-[[ -s /mnt/docker-image-cache/docker.asc ]] || {
-    echo "FEHLER: Docker Repository-Key fehlt im Cache."
-    exit 1
-}
+        [[ -s /mnt/docker-image-cache/docker.asc ]] || {
+            echo "FEHLER: Docker Repository-Key fehlt im Cache."
+            exit 1
+        }
 
-cp -f /mnt/docker-image-cache/docker.asc /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
+        cp -f /mnt/docker-image-cache/docker.asc /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
 
-. /etc/os-release
+        . /etc/os-release
 
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" \
-    > /etc/apt/sources.list.d/docker.list
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" \
+            > /etc/apt/sources.list.d/docker.list
 
-apt-get update
-apt-get install -y \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
-    docker-buildx-plugin \
-    docker-compose-plugin
+        apt-get update
+        apt-get install -y \
+            docker-ce \
+            docker-ce-cli \
+            containerd.io \
+            docker-buildx-plugin \
+            docker-compose-plugin
 
-systemctl enable --now docker
-timedatectl set-timezone Europe/Berlin || true
+        systemctl enable --now docker
+        timedatectl set-timezone Europe/Berlin || true
 
-ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
-if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 3072 )); then
-    echo "FEHLER: Nach der Docker-Installation sind weniger als 3 GB auf / frei." >&2
-    echo "Die Root-Disk des LXC ist zu klein; Docker-Images werden NICHT geladen." >&2
-    df -hT / >&2 || true
-    exit 1
-fi
+        ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
+        if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 3072 )); then
+            echo "FEHLER: Nach der Docker-Installation sind weniger als 3 GB auf / frei." >&2
+            echo "Die Root-Disk des LXC ist zu klein; Docker-Images werden NICHT geladen." >&2
+            df -hT / >&2 || true
+            exit 1
+        fi
 
-cat > /usr/local/sbin/docker-cache-pull <<'EOS'
+        cat > /usr/local/sbin/docker-cache-pull <<'"'"'EOS'"'"'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -11745,6 +11740,8 @@ CACHE_DIR="/mnt/docker-image-cache"
 
 cd "$COMPOSE_DIR"
 
+# Syntax/Interpolation der Compose-Datei prüfen, bevor Registry oder Runtime
+# verändert werden. Ein Fehler bricht hier eindeutig ab.
 docker compose config -q
 
 ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
@@ -11821,11 +11818,8 @@ else
 fi
 EOS
 
-chmod 755 /usr/local/sbin/docker-cache-pull
-__DOCKER_CT_INSTALL__
-)"
-
-    pct exec "$ctid" -- bash -lc "$docker_install_script"
+        chmod 755 /usr/local/sbin/docker-cache-pull
+    '
 }
 
 create_docker_app_lxc() {
@@ -13661,19 +13655,8 @@ HTML
     # Steuer-Code / Power Helper
     # -------------------------------------------------------------------------
 
-    # V118 · Self-Healing:
-    # Nach einem vollständigen Dashboard-Reset wurde control.hash absichtlich
-    # gelöscht. Falls der zuvor vorbereitete Klartext-Code nicht mehr im
-    # aktuellen Shell-Kontext vorhanden ist, erzeugen wir sicher einen neuen
-    # Code, statt die komplette Optimal-Installation abzubrechen.
-    if [[ ! -f "$CONTROL_HASH" && -z "${CONTROL_CODE:-}" ]]; then
-        CONTROL_CODE="$(openssl rand -hex 8)"
-        DASHBOARD_CODE_FOR_FILE="$CONTROL_CODE"
-        warn "Dashboard-Steuer-Code war nach dem Reset nicht verfügbar; neuer Code wurde automatisch erzeugt."
-    fi
-
-    if [[ -n "${CONTROL_CODE:-}" || ! -f "$CONTROL_HASH" ]]; then
-        [[ -n "${CONTROL_CODE:-}" ]] || die "Dashboard-Steuer-Code konnte nicht erzeugt werden."
+    if [[ -n "$CONTROL_CODE" || ! -f "$CONTROL_HASH" ]]; then
+        [[ -n "$CONTROL_CODE" ]] || die "Kein Steuer-Code vorhanden."
 
         CONTROL_CODE_ENV="$CONTROL_CODE" python3 <<'PYHASH' > "$CONTROL_HASH"
 import os
@@ -15394,13 +15377,8 @@ services:
       PIHOLE_HOSTNAME: "127.0.0.1"
       PIHOLE_PORT: "80"
       PIHOLE_PASSWORD: "${PIHOLE_PASS}"
-    entrypoint:
-      - "/app/pihole-exporter"
-    command:
-      - "-bind_addr"
-      - "${PIHOLE_IP}"
-      - "-port"
-      - "9617"
+      BIND_ADDR: "${PIHOLE_IP}"
+      PORT: "9617"
 EOF
 
     pct push \
