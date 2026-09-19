@@ -1,1 +1,23 @@
-Verfolgung der änderungen
+Verfolgung der Änderungen
+==========================
+
+20.09.2026 – V119
+-----------------
+- Fehler behoben: "proxmox.sh: line 11669: $4: unbound variable" beim Docker-Setup des Paperless-LXC.
+- Ursache: Der äußere Aufruf "bash -lc '...'" wurde durch einfache Quotes innerhalb von awk/sed/printf vorzeitig beendet.
+  Dadurch wertete der Haupt-Installer unter "set -u" unter anderem das awk-Feld "$4" als eigenes, nicht gesetztes Script-Argument aus.
+- install_docker_in_ct() übergibt das Container-Script jetzt als literales Heredoc "NODEZERO_DOCKER_CT_V119" an "bash -lc".
+- Das eingebettete Script /usr/local/sbin/docker-cache-pull verwendet wieder ein normales literales <<'EOS'-Heredoc.
+- Dadurch bleiben awk-, sed-, tr- und printf-Ausdrücke vollständig im LXC-Kontext und werden nicht vom äußeren Proxmox-Installer interpretiert.
+- Installer-Version von V118 auf V119 aktualisiert:
+  * Hauptheader
+  * TUI_TITLE / TUI_BACKTITLE
+  * Hauptmenü-Versionsanzeige
+  * Setup-Profil installer_version
+  * Secret-Index
+- Der zuvor bereits erfolgreich erstellte LXC war nicht die Ursache; der Abbruch erfolgte erst beim Docker-Bootstrap im Container.
+
+19.09.2026 – V118
+-----------------
+- Versionsanzeige im Hauptmenü ergänzt.
+- Installer-Version zentral auf V118 angehoben.

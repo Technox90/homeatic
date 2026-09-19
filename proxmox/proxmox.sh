@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V118
+# PROXMOX MODULARER KOMPLETT-INSTALLER V119
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -33,6 +33,7 @@ set -Eeuo pipefail
 #   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
 #   V117: PVE-UPS-Verfügbarkeitsfunktion vor Optimal-Preflight verschoben; Version im Hauptmenü sichtbar
 #   V118: Versionsanzeige im Hauptmenü ergänzt; Installer-Version zentral auf V118 angehoben
+#   V119: Docker-LXC Bootstrap quoting gehärtet; awk/sed/printf lösen kein set -u/$4 mehr aus
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -735,8 +736,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V118"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V118"
+TUI_TITLE="PROXMOX INSTALLER V119"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1108,7 +1109,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 118" \
+                    --title "HAUPTMENÜ · Version 119" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8614,7 +8615,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V118",
+    "installer_version": "V119",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9088,7 +9089,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V118 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V119 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11666,7 +11667,10 @@ prepare_lxc_template() {
 install_docker_in_ct() {
     local ctid="$1"
 
-    pct exec "$ctid" -- bash -lc '
+    # V119: Remote-Script als literal heredoc an bash -lc übergeben.
+    # Dadurch können awk/sed/printf im Container normale einfache Quotes
+    # enthalten, ohne den äußeren Installer-String vorzeitig zu beenden.
+    pct exec "$ctid" -- bash -lc "$(cat <<'NODEZERO_DOCKER_CT_V119'
         set -Eeuo pipefail
         export DEBIAN_FRONTEND=noninteractive
 
@@ -11731,7 +11735,7 @@ EOF
             exit 1
         fi
 
-        cat > /usr/local/sbin/docker-cache-pull <<'"'"'EOS'"'"'
+        cat > /usr/local/sbin/docker-cache-pull <<'EOS'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -11819,7 +11823,8 @@ fi
 EOS
 
         chmod 755 /usr/local/sbin/docker-cache-pull
-    '
+NODEZERO_DOCKER_CT_V119
+)"
 }
 
 create_docker_app_lxc() {
