@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V117**
+Installationskandidat: **V118**
 
 Geplante Hauptdatei:
 
@@ -116,3 +116,8 @@ Die Zertifikate werden in die HAOS-SSL-Ablage geschrieben und in die bestehende 
 
 - PVE-UPS-Verfügbarkeitsprüfung wird vor dem Optimal-Preflight definiert und kann deshalb auf einem frischen Lauf sicher aufgerufen werden.
 - Docker-Installation in LXCs verwendet ein quoted heredoc. Dadurch werden awk-Ausdrücke wie `$4` und andere Shell-Variablen nicht mehr versehentlich vom Proxmox-Host expandiert.
+
+
+## Dashboard-Fix V118
+
+Nach einem vollständigen Dashboard-Reset erzeugt der Installer automatisch einen neuen Steuer-Code, falls kein vorbereiteter Code mehr im Shell-Kontext vorhanden ist. Der Code wird anschließend wie gewohnt unter `/home/passwd/` gesichert.

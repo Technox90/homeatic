@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V117
+# PROXMOX MODULARER KOMPLETT-INSTALLER V118
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -32,6 +32,7 @@ set -Eeuo pipefail
 #   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
 #   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
 #   V117: PVE-UPS-Preflight-Reihenfolge korrigiert; Docker-LXC-Installationsskript quote-sicher gemacht
+#   V118: Dashboard-Steuer-Code-Fallback nach Komplett-Reset; fehlender Code wird sicher neu erzeugt
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -734,7 +735,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V117"
+TUI_TITLE="PROXMOX INSTALLER V118"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
 
 ensure_tui() {
@@ -8613,7 +8614,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V117",
+    "installer_version": "V118",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9087,7 +9088,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V117 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V118 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -13660,8 +13661,19 @@ HTML
     # Steuer-Code / Power Helper
     # -------------------------------------------------------------------------
 
-    if [[ -n "$CONTROL_CODE" || ! -f "$CONTROL_HASH" ]]; then
-        [[ -n "$CONTROL_CODE" ]] || die "Kein Steuer-Code vorhanden."
+    # V118 · Self-Healing:
+    # Nach einem vollständigen Dashboard-Reset wurde control.hash absichtlich
+    # gelöscht. Falls der zuvor vorbereitete Klartext-Code nicht mehr im
+    # aktuellen Shell-Kontext vorhanden ist, erzeugen wir sicher einen neuen
+    # Code, statt die komplette Optimal-Installation abzubrechen.
+    if [[ ! -f "$CONTROL_HASH" && -z "${CONTROL_CODE:-}" ]]; then
+        CONTROL_CODE="$(openssl rand -hex 8)"
+        DASHBOARD_CODE_FOR_FILE="$CONTROL_CODE"
+        warn "Dashboard-Steuer-Code war nach dem Reset nicht verfügbar; neuer Code wurde automatisch erzeugt."
+    fi
+
+    if [[ -n "${CONTROL_CODE:-}" || ! -f "$CONTROL_HASH" ]]; then
+        [[ -n "${CONTROL_CODE:-}" ]] || die "Dashboard-Steuer-Code konnte nicht erzeugt werden."
 
         CONTROL_CODE_ENV="$CONTROL_CODE" python3 <<'PYHASH' > "$CONTROL_HASH"
 import os
