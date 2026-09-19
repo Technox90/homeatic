@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V118**
+Installationskandidat: **V117**
 
 Geplante Hauptdatei:
 
@@ -110,3 +110,9 @@ https://192.168.178.101
 ```
 
 Die Zertifikate werden in die HAOS-SSL-Ablage geschrieben und in die bestehende wöchentliche TLS-Erneuerung des Installers aufgenommen. Die lokale NodeZero-CA muss auf Clients einmalig als vertrauenswürdige Stamm-CA importiert werden, damit der Browser keine Zertifikatswarnung anzeigt.
+
+
+## Fresh-Install-Fixes V117
+
+- PVE-UPS-Verfügbarkeitsprüfung wird vor dem Optimal-Preflight definiert und kann deshalb auf einem frischen Lauf sicher aufgerufen werden.
+- Docker-Installation in LXCs verwendet ein quoted heredoc. Dadurch werden awk-Ausdrücke wie `$4` und andere Shell-Variablen nicht mehr versehentlich vom Proxmox-Host expandiert.
