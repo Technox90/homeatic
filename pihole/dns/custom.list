@@ -3,5 +3,10 @@
 # <IP-Adresse> <Hostname>
 #
 # Beispiel:
-# 192.168.178.100 pve.lan
-# 192.168.178.103 pihole.lan
+192.168.178.100 pve.lan
+192.168.178.101 homeassistant.lan
+192.168.178.102 paperless.lan
+192.168.178.103 pihole.lan
+192.168.178.101 homeassistant
+192.168.178.102 paperless
+192.168.178.103 pihole
