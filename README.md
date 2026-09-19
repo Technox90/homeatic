@@ -74,3 +74,43 @@ Bei der Pi-hole-Installation werden automatisch diese Standardlisten angelegt:
 Die Dateien unter `pihole/` können unabhängig vom Installer gepflegt und versioniert werden.
 
 > **Wichtig:** Vor produktiven Änderungen immer Backups anlegen. Besonders die Reset- und Optimal-Modi des Proxmox-Installers können vorhandene VMs/LXC löschen oder neu aufbauen.
+
+## Hardware-Anforderungen
+
+Die offiziellen Proxmox-VE-Anforderungen sind bewusst sehr allgemein gehalten. Für diesen Installer sind die Anforderungen höher, weil je nach Auswahl mehrere VMs/LXC, Docker-Dienste, Monitoring und lokale KI gleichzeitig betrieben werden.
+
+### Proxmox VE – offizielle Basis
+
+Laut Proxmox werden für einen produktiven Host unter anderem empfohlen:
+
+- 64-Bit Intel-/AMD-CPU mit Intel VT bzw. AMD-V
+- mindestens **2 GB RAM für Proxmox VE selbst**, zusätzlich RAM für die Gäste
+- schneller, möglichst redundanter Storage; SSDs werden empfohlen
+- mindestens Gigabit-Ethernet
+- für PCIe-Passthrough zusätzlich Intel VT-d bzw. AMD-Vi
+- bei ZFS oder Ceph zusätzlicher RAM-Bedarf
+
+Quelle: https://www.proxmox.com/de/produkte/proxmox-virtual-environment/systemanforderungen
+
+### Realistisch für diesen Installer
+
+Der feste **Optimal-Stack** ist aktuell mit insgesamt ungefähr **61 vCPU**, **80 GB maximalem Gast-RAM** und **286 GB virtueller Root-Disk** konfiguriert. vCPU dürfen überbucht werden; die Zahl entspricht daher nicht der benötigten Anzahl physischer CPU-Kerne. LXC-RAM ist ebenfalls ein Limit und wird nicht dauerhaft vollständig belegt.
+
+| Einsatz | CPU | RAM | Storage | Einschätzung |
+|---|---:|---:|---:|---|
+| Kleine Auswahl / Testbetrieb | 4 Kerne / 8 Threads | 16–32 GB | 256–500 GB SSD | Für einzelne Dienste, nicht für den kompletten Optimal-Stack |
+| Voller Optimal-Stack – Untergrenze | 8 Kerne / 16 Threads | 64 GB | mindestens 500 GB SSD | Funktioniert bei moderater Last, wenig Reserve |
+| **Empfohlen für den kompletten Stack** | **12 Kerne / 24 Threads** | **96 GB** | **1 TB SSD/NVMe** | Gute Reserve für Paperless/Ollama, HA und Monitoring |
+| Komfortabel / Erweiterbar | 16+ Kerne / 32+ Threads | 128 GB+ | 2 TB SSD/NVMe | Für zusätzliche VMs, größere Datenmengen und Snapshots |
+
+### Weitere Empfehlungen
+
+- **Storage:** NVMe ist ideal; eine gute SATA-SSD reicht für ein Homelab ebenfalls aus.
+- **Freier Speicher:** Für den Optimal-Stack prüft der Installer vor dem Löschen/Neuaufbau auf rund **315 GB freien VM/LXC-Speicher**.
+- **NAS:** Paperless-Daten können auf ein externes NAS ausgelagert werden; das reduziert den lokalen Datenverbrauch deutlich.
+- **Netzwerk:** 1 Gbit/s reicht grundsätzlich. **2,5 Gbit/s** ist sinnvoll, wenn NAS, Backups oder große Dateien häufig übertragen werden.
+- **Backups:** Eine einzelne SSD ist keine Redundanz. Für wichtige Daten sollte ein separates NAS oder Proxmox Backup Server verwendet werden.
+- **ZFS/Ceph:** Bei Nutzung dieser Storage-Systeme zusätzlichen RAM einplanen; die obigen Werte beziehen sich primär auf einen klassischen einzelnen Proxmox-Host mit lokalem VM/LXC-Storage.
+
+> Die Angaben sind bewusst praxisnah und keine offiziellen Mindestanforderungen von Proxmox. Je mehr optionale Dienste oder zusätzliche VMs installiert werden, desto mehr CPU, RAM und Storage sollten eingeplant werden.
+
