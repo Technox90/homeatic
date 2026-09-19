@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V114**
+Installationskandidat: **V115**
 
 Geplante Hauptdatei:
 
@@ -29,14 +29,41 @@ proxmox.sh
 - getrennte Passwort-/Token-/Secret-Dateien unter `/home/passwd/`
 - finale Healthchecks
 
-## Start
+## Installation
+
+Am einfachsten direkt auf dem Proxmox-Host als `root` ausführen:
+
+```bash
+curl -fsSL https://link.2mycloud.de/proxmox -o /root/proxmox.sh && chmod +x /root/proxmox.sh && /root/proxmox.sh
+```
+
+Der Kurzlink verweist auf die aktuelle RAW-Version aus diesem Repository:
+
+```text
+https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh
+```
+
+Optional kann vor der Ausführung geprüft werden, ob wirklich das Shell-Skript geliefert wird:
+
+```bash
+curl -fsSL https://link.2mycloud.de/proxmox | head
+```
+
+Die ersten Zeilen sollten mit folgendem Shebang beginnen:
+
+```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+```
+
+Alternativ nach einem manuellen Download:
 
 ```bash
 chmod +x proxmox.sh
 ./proxmox.sh
 ```
 
-> Achtung: Reset- und Optimal-Modi können vorhandene VMs/LXC löschen.
+> **Achtung:** Reset- und Optimal-Modi können vorhandene VMs/LXC löschen. Vor produktiver Nutzung Backups prüfen.
 
 ## Pi-hole Standardlisten
 
