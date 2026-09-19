@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V115**
+Installationskandidat: **V116**
 
 Geplante Hauptdatei:
 
@@ -82,3 +82,8 @@ Bei der Pi-hole-Installation werden automatisch genau diese vier Listen als Abon
 Anschließend führt der Installer ein `pihole -g` aus, damit die Listen sofort geladen werden.
 
 Die Datei `pihole/dns/custom.list` bleibt separat für lokale DNS-Einträge vorgesehen.
+
+
+## Fresh-PVE / Enterprise-Repository
+
+Ab **V116** wird die Proxmox-Repository-Normalisierung auf **pve-no-subscription** vollständig durchgeführt, bevor der Auto-Updater Pakete nachinstallieren darf. Damit läuft auf einer frischen Proxmox-Installation kein frühes `apt-get update` mehr gegen die standardmäßig aktiven Enterprise-Repositories.

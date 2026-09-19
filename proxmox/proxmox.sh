@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V115
+# PROXMOX MODULARER KOMPLETT-INSTALLER V116
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -30,6 +30,7 @@ set -Eeuo pipefail
 #   V112: ungültige Dateien aus APT sources.list.d werden gesichert/entfernt; Script relokalisiert sich sicher aus APT-Verzeichnis
 #   V113: Pi-hole Exporter v1.2.0 im Pi-hole-LXC; Prometheus-Scrape + Healthchecks + Passwort-Sync
 #   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
+#   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -732,7 +733,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V115"
+TUI_TITLE="PROXMOX INSTALLER V116"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
 
 ensure_tui() {
@@ -6833,8 +6834,12 @@ __AUTO_UPDATER_INSTALLER__
     rm -f "$installer"
 }
 
-# Wird bei jedem Start des Master-Installers aktualisiert.
-install_proxmox_auto_updater
+# V116:
+# Der Auto-Updater darf hier NICHT gestartet werden. Auf einem frischen
+# Proxmox-Host sind standardmäßig noch Enterprise-Repositories aktiv und der
+# eingebettete Installer benötigt ggf. Pakete (z. B. jq). Sein apt-get update
+# würde sonst vor dem No-Subscription-Preflight mit HTTP 401 abbrechen.
+# Der Aufruf erfolgt deshalb erst im Startup-Preflight weiter unten.
 
 
 # -----------------------------------------------------------------------------
@@ -8607,7 +8612,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V115",
+    "installer_version": "V116",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9081,7 +9086,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V115 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V116 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9165,6 +9170,11 @@ disable_unused_ceph_repositories_v97
 # Subscription-Popup/Nag-Removal ebenfalls sofort beim Scriptstart aktivieren
 # und updatefest über den vorhandenen DPkg-Hook halten.
 ensure_no_subscription_after_zero_v72
+
+# V116: Erst jetzt darf der Auto-Updater installiert/aktualisiert werden.
+# Zu diesem Zeitpunkt sind Enterprise/PVE-Test deaktiviert, pve-no-subscription
+# ist aktiv und ein apt-get update wurde bereits erfolgreich durchgeführt.
+install_proxmox_auto_updater
 
 ensure_tui
 
@@ -15009,7 +15019,7 @@ ON CONFLICT(address,type) DO UPDATE SET
     comment=excluded.comment,
     date_modified=cast(strftime('%s','now') as int);
 
--- Veralteten Technox90/projekte-Allowlist-Eintrag bei Upgrades entfernen.
+-- Alten, früher verwendeten Technox90/projekte-Eintrag entfernen.
 DELETE FROM adlist
 WHERE address = '${OLD_ALLOW_TOBI}'
   AND type = 1;
