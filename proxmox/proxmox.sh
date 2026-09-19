@@ -31,7 +31,7 @@ set -Eeuo pipefail
 #   V113: Pi-hole Exporter v1.2.0 im Pi-hole-LXC; Prometheus-Scrape + Healthchecks + Passwort-Sync
 #   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
 #   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
-#   V117: Pi-hole Exporter v1.2.0 nutzt das Image-CMD; falscher /app-Pfad entfernt; PVE-UPS Preflight-Reihenfolge korrigiert
+#   V117: PVE-UPS-Verfügbarkeitsfunktion vor Optimal-Preflight verschoben; Version im Hauptmenü sichtbar
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -735,7 +735,7 @@ run_install_step() {
 
 TUI_AVAILABLE=0
 TUI_TITLE="PROXMOX INSTALLER V117"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V117"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -10208,9 +10208,9 @@ selected_guest_disk_sum_v107() {
 }
 
 # -----------------------------------------------------------------------------
-# Community-Scripts Status / Verfügbarkeit
-# V117: Muss vor optimal_network_preflight_v107 definiert sein, weil der
-# Preflight die Funktion bereits aufruft.
+# V117 · Community-Scripts Status / Verfügbarkeit
+# Muss VOR optimal_network_preflight_v107 definiert sein, weil Bash
+# Funktionsnamen beim tatsächlichen Aufruf bereits kennen muss.
 # -----------------------------------------------------------------------------
 
 community_pve_ups_available() {
@@ -10233,8 +10233,6 @@ community_pve_ups_available() {
     curl -fsSL --connect-timeout 10 --max-time 20 \
         "$script_url" -o /dev/null 2>/dev/null
 }
-
-
 
 optimal_network_preflight_v107() {
     header "OPTIMALE INSTALLATION · NETZWERK-/HOST-PREFLIGHT"
@@ -10518,6 +10516,7 @@ reject_reserved_guest_id() {
         die "VM-/CT-ID 100 ist reserviert und wird nicht vergeben. Bitte ID 101 oder höher verwenden."
     fi
 }
+
 
 # -----------------------------------------------------------------------------
 # Generische Einstellungen für zusätzliche Docker-LXC
@@ -11444,7 +11443,7 @@ fi
     "IP" "$HA_IP" \
     "CPU / RAM" "${HA_CORES} / $((HA_MEMORY / 1024)) GB" \
     "Disk" "${HA_DISK} GB" \
-    "Web" "http://${HA_IP}:8123/"
+    "Web (HAOS nativ)" "http://${HA_IP}:8123/"
 
 if (( INSTALL_PAPERLESS )); then
     if (( PAPERLESS_EXTERNAL_STORAGE )); then
@@ -14541,8 +14540,9 @@ PY
     echo "Statische IP:"
     echo "  $HA_IP"
     echo
-    echo "Home Assistant Weboberfläche:"
+    echo "Home Assistant Weboberfläche (HAOS nativ):"
     echo "  http://${HA_IP}:8123/"
+    echo "  Hinweis: HAOS nutzt nativ Port 8123; HTTPS/443 benötigt einen Reverse Proxy."
     echo
 
     echo "Warte kurz auf die Netzwerkschnittstelle ..."
@@ -15377,8 +15377,13 @@ services:
       PIHOLE_HOSTNAME: "127.0.0.1"
       PIHOLE_PORT: "80"
       PIHOLE_PASSWORD: "${PIHOLE_PASS}"
-      BIND_ADDR: "${PIHOLE_IP}"
-      PORT: "9617"
+    entrypoint:
+      - "/app/pihole-exporter"
+    command:
+      - "-bind_addr"
+      - "${PIHOLE_IP}"
+      - "-port"
+      - "9617"
 EOF
 
     pct push \
@@ -42919,7 +42924,7 @@ fi
 ui_section "Weboberflächen"
 
 (( INSTALL_DASHBOARD )) && ui_kv "Dashboard" "https://${DASHBOARD_IP}/ · HTTP → HTTPS"
-(( INSTALL_HA )) && ui_kv "Home Assistant" "http://${HA_IP}:8123/"
+(( INSTALL_HA )) && ui_kv "Home Assistant" "http://${HA_IP}:8123/ · HAOS nativ"
 (( INSTALL_PAPERLESS )) && ui_kv "Paperless" "https://${PAPERLESS_IP}/"
 (( INSTALL_PIHOLE )) && ui_kv "Pi-hole" "http://${PIHOLE_IP}/admin"
 (( INSTALL_NETALERTX )) && ui_kv "NetAlertX" "https://${NETALERTX_IP}/"

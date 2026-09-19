@@ -128,3 +128,10 @@ Nach einem vollständigen Dashboard-Reset erzeugt der Installer automatisch eine
 Der Pi-hole Exporter `ekofr/pihole-exporter:v1.2.0` wird mit seinem eigenen Docker-Image-CMD gestartet. Der zuvor gesetzte Pfad `/app/pihole-exporter` war für v1.2.0 falsch; das Image startet sein Binary aus `/root/pihole-exporter`. Bind-Adresse und Port werden jetzt über `BIND_ADDR` und `PORT` gesetzt.
 
 Zusätzlich wurde die PVE-UPS-Verfügbarkeitsfunktion vor den Optimal-Preflight verschoben, damit der Preflight sie auf einem frischen Lauf bereits kennt.
+
+
+## PVE-UPS-Preflight V117
+
+Die PVE-UPS-Verfügbarkeitsprüfung wird jetzt vor dem Optimal-Stack-Preflight definiert. Dadurch kann der Pflichtcheck vor dem Guest-Reset auf einem frischen Proxmox korrekt ausgeführt werden.
+
+Home Assistant OS wird im Installer ausdrücklich als native Weboberfläche auf `http://<HA-IP>:8123/` ausgewiesen. HTTPS/443 erfordert bei HAOS einen separaten Reverse Proxy.
