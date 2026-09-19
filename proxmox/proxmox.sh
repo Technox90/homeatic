@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V114
+# PROXMOX MODULARER KOMPLETT-INSTALLER V115
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -29,7 +29,7 @@ set -Eeuo pipefail
 #   V111: OpenRGB-AppImage Runtime-Fix für headless Proxmox (libEGL/libGL), Runtime-Preflight vor systemd-Start
 #   V112: ungültige Dateien aus APT sources.list.d werden gesichert/entfernt; Script relokalisiert sich sicher aus APT-Verzeichnis
 #   V113: Pi-hole Exporter v1.2.0 im Pi-hole-LXC; Prometheus-Scrape + Healthchecks + Passwort-Sync
-#   V114: Pi-hole GitHub-Quellen auf Technox90/homeatic umgestellt; eigene Block-/Allowlist + DNS-Sync
+#   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -732,7 +732,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V114"
+TUI_TITLE="PROXMOX INSTALLER V115"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
 
 ensure_tui() {
@@ -8607,7 +8607,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V114",
+    "installer_version": "V115",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9081,7 +9081,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V114 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V115 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -14884,16 +14884,14 @@ DB="/opt/pihole/etc-pihole/gravity.db"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="/opt/pihole/etc-pihole/gravity.db.pre-v82-${STAMP}"
 
-TECHNOX_PIHOLE_BASE="https://raw.githubusercontent.com/Technox90/homeatic/main/pihole"
 BLOCK_PRO="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt"
 BLOCK_TIF="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.txt"
-BLOCK_TOBI="${TECHNOX_PIHOLE_BASE}/blocklist/blocklist.txt"
-ALLOW_TOBI="${TECHNOX_PIHOLE_BASE}/allowlist/allowlist.txt"
+ALLOW_TOBI="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/allowlist/allowlist.txt"
 ALLOW_REFERRAL="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/whitelist-referral-native.txt"
-DNS_TOBI="${TECHNOX_PIHOLE_BASE}/dns/custom.list"
+OLD_ALLOW_TOBI="https://raw.githubusercontent.com/Technox90/projekte/refs/heads/main/tobi-whitelist"
 
 echo "============================================================"
-echo " PI-HOLE STANDARDLISTEN / HOMEATIC"
+echo " PI-HOLE STANDARDLISTEN V115"
 echo "============================================================"
 echo
 
@@ -14984,26 +14982,9 @@ INSERT INTO adlist (
     type
 )
 VALUES (
-    '${BLOCK_TOBI}',
-    1,
-    'V114 · Technox90 Homeatic Blocklist',
-    0
-)
-ON CONFLICT(address,type) DO UPDATE SET
-    enabled=1,
-    comment=excluded.comment,
-    date_modified=cast(strftime('%s','now') as int);
-
-INSERT INTO adlist (
-    address,
-    enabled,
-    comment,
-    type
-)
-VALUES (
     '${ALLOW_TOBI}',
     1,
-    'V114 · Technox90 Homeatic Allowlist',
+    'V115 · Technox90 Homeatic Allowlist',
     1
 )
 ON CONFLICT(address,type) DO UPDATE SET
@@ -15027,6 +15008,11 @@ ON CONFLICT(address,type) DO UPDATE SET
     enabled=1,
     comment=excluded.comment,
     date_modified=cast(strftime('%s','now') as int);
+
+-- Veralteten Technox90/projekte-Allowlist-Eintrag bei Upgrades entfernen.
+DELETE FROM adlist
+WHERE address = '${OLD_ALLOW_TOBI}'
+  AND type = 1;
 
 COMMIT;
 SQL
@@ -15054,53 +15040,6 @@ if ! docker exec pihole pihole -g; then
 fi
 
 echo
-echo "Synchronisiere lokale DNS-Einträge aus Technox90/homeatic ..."
-DNS_TMP="/tmp/technox-homeatic-custom.list"
-CUSTOM_LIST="/opt/pihole/etc-pihole/custom.list"
-BEGIN_MARKER="# BEGIN MANAGED: Technox90/homeatic pihole/dns/custom.list"
-END_MARKER="# END MANAGED: Technox90/homeatic pihole/dns/custom.list"
-
-if curl -fsSL --retry 3 --connect-timeout 10 "$DNS_TOBI" -o "$DNS_TMP"; then
-    # Nur echte HOSTS-Zeilen übernehmen; Kommentare/Leerzeilen im GitHub-File
-    # bleiben Dokumentation und landen nicht in Pi-hole.
-    DNS_FILTERED="/tmp/technox-homeatic-custom.filtered"
-    awk 'NF >= 2 && $1 !~ /^#/ { print }' "$DNS_TMP" > "$DNS_FILTERED"
-
-    CUSTOM_TMP="/tmp/custom.list.v114"
-    if [[ -f "$CUSTOM_LIST" ]]; then
-        awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" '
-            $0 == begin { skip=1; next }
-            $0 == end   { skip=0; next }
-            !skip       { print }
-        ' "$CUSTOM_LIST" > "$CUSTOM_TMP"
-    else
-        : > "$CUSTOM_TMP"
-    fi
-
-    {
-        echo "$BEGIN_MARKER"
-        cat "$DNS_FILTERED"
-        echo "$END_MARKER"
-    } >> "$CUSTOM_TMP"
-
-    install -o 1000 -g 1000 -m 0640 "$CUSTOM_TMP" "$CUSTOM_LIST"
-    rm -f "$DNS_TMP" "$DNS_FILTERED" "$CUSTOM_TMP"
-
-    # custom.list wird von Pi-hole als lokale DNS-Liste eingelesen.
-    # Neustart garantiert, dass die verwalteten GitHub-Einträge aktiv werden.
-    docker restart pihole >/dev/null
-    for i in $(seq 1 30); do
-        docker ps --format '{{.Names}}' | grep -qx pihole && break
-        sleep 1
-    done
-    echo "Lokale DNS-Einträge synchronisiert: $DNS_TOBI"
-else
-    echo "WARNUNG: GitHub-DNS-Datei konnte nicht geladen werden: $DNS_TOBI"
-    echo "Pi-hole läuft weiter; vorhandene lokale DNS-Einträge bleiben unverändert."
-    rm -f "$DNS_TMP" 2>/dev/null || true
-fi
-
-echo
 echo "============================================================"
 echo " EINGETRAGENE LISTEN"
 echo "============================================================"
@@ -15122,7 +15061,6 @@ docker exec pihole pihole-FTL sqlite3 -header -column -ni \
      WHERE address IN (
        '${BLOCK_PRO}',
        '${BLOCK_TIF}',
-       '${BLOCK_TOBI}',
        '${ALLOW_TOBI}',
        '${ALLOW_REFERRAL}'
      )
@@ -15143,7 +15081,7 @@ __PIHOLE_STANDARDLISTEN_V82__
 
     if pct exec "$ct_id" -- bash "$ct_script"; then
         pct exec "$ct_id" -- rm -f "$ct_script" 2>/dev/null || true
-        ok "Pi-hole Block-/Allowlisten und lokale DNS-Einträge eingerichtet."
+        ok "Pi-hole Block- und Allowlisten V115 eingetragen."
     else
         warn "Pi-hole Standardlisten konnten nicht vollständig eingerichtet werden."
         warn "CT-Skript bleibt zur Diagnose erhalten: $ct_script"
@@ -15517,9 +15455,7 @@ EOF
     echo "Pi-hole Standardlisten:"
     echo "  BLOCK · HaGeZi Pro"
     echo "  BLOCK · HaGeZi TIF"
-    echo "  BLOCK · Technox90 Homeatic Blocklist"
     echo "  ALLOW · Technox90 Homeatic Allowlist"
-    echo "  DNS   · Technox90 Homeatic custom.list"
     echo "  ALLOW · HaGeZi Referral Native"
     echo
 
@@ -15590,12 +15526,10 @@ EOF
     echo "  pihole-language DE"
     echo "  pihole-language EN"
     echo
-    echo "Standardlisten / GitHub-Sync:"
+    echo "Standardlisten V115:"
     echo "  BLOCK · HaGeZi Pro"
     echo "  BLOCK · HaGeZi TIF"
-    echo "  BLOCK · Technox90 Homeatic Blocklist"
     echo "  ALLOW · Technox90 Homeatic Allowlist"
-    echo "  DNS   · Technox90 Homeatic custom.list"
     echo "  ALLOW · HaGeZi Referral Native"
 }
 

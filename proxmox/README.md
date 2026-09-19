@@ -38,13 +38,20 @@ chmod +x proxmox.sh
 
 > Achtung: Reset- und Optimal-Modi können vorhandene VMs/LXC löschen.
 
+## Pi-hole Standardlisten
 
-## Pi-hole GitHub-Synchronisation
+Bei der Pi-hole-Installation werden automatisch genau diese vier Listen als Abonnements in Pi-hole angelegt:
 
-Der Installer verwendet die Dateien aus diesem Repository:
+### Blocklisten
 
-- `pihole/blocklist/blocklist.txt`
-- `pihole/allowlist/allowlist.txt`
-- `pihole/dns/custom.list`
+- `https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt`
+- `https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/tif.txt`
 
-Die lokalen DNS-Einträge werden bei der Pi-hole-Installation in einen verwalteten Bereich der `custom.list` übernommen. Bereits vorhandene Einträge außerhalb dieses Bereichs bleiben erhalten.
+### Allowlisten
+
+- `https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/allowlist/allowlist.txt`
+- `https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/whitelist-referral-native.txt`
+
+Anschließend führt der Installer ein `pihole -g` aus, damit die Listen sofort geladen werden.
+
+Die Datei `pihole/dns/custom.list` bleibt separat für lokale DNS-Einträge vorgesehen.
