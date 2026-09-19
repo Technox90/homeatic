@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V117**
+Installationskandidat: **V118**
 
 Geplante Hauptdatei:
 
@@ -97,3 +97,16 @@ Auf einem frisch installierten Proxmox VE wird zuerst die Repository-Konfigurati
 ## PVE-UPS-Preflight-Fix V117
 
 Der PVE-UPS-Verfügbarkeitscheck wird jetzt definiert, bevor der Optimal-Preflight ihn aufruft. Damit tritt auf einem frischen Proxmox kein `community_pve_ups_available: command not found` mehr auf.
+
+
+## Home-Assistant-HTTPS V118
+
+Home Assistant OS wird bereits vor dem ersten Boot mit einem von der NodeZero Local-CA signierten Zertifikat vorbereitet und direkt auf **Port 443/TLS** konfiguriert.
+
+Standard-Aufruf:
+
+```text
+https://192.168.178.101
+```
+
+Die Zertifikate werden in die HAOS-SSL-Ablage geschrieben und in die bestehende wöchentliche TLS-Erneuerung des Installers aufgenommen. Die lokale NodeZero-CA muss auf Clients einmalig als vertrauenswürdige Stamm-CA importiert werden, damit der Browser keine Zertifikatswarnung anzeigt.

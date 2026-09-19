@@ -12,7 +12,7 @@ Dieses Repository bündelt meine Home-Assistant-, Proxmox- und Pi-hole-Konfigura
 
 Der Proxmox-Bereich enthält meinen modularen Komplett-Installer für Proxmox VE. Er kann unter anderem Home Assistant, Paperless-ngx + Ollama, Pi-hole + Unbound, NetAlertX, Uptime Kuma, Caddy, Prometheus, Grafana, PVE-UPS, EMQX und weitere Dienste installieren und konfigurieren.
 
-Aktueller Installationskandidat: **V117**
+Aktueller Installationskandidat: **V118**
 
 ### Schnellinstallation
 
@@ -114,3 +114,8 @@ Der feste **Optimal-Stack** ist aktuell mit insgesamt ungefähr **61 vCPU**, **8
 
 > Die Angaben sind bewusst praxisnah und keine offiziellen Mindestanforderungen von Proxmox. Je mehr optionale Dienste oder zusätzliche VMs installiert werden, desto mehr CPU, RAM und Storage sollten eingeplant werden.
 
+
+
+### Home Assistant HTTPS
+
+Home Assistant wird vom Installer direkt auf **HTTPS-Port 443** vorbereitet. Bei der Standard-IP ist die Weboberfläche anschließend unter `https://192.168.178.101` erreichbar. Das Zertifikat wird von der lokalen NodeZero-CA signiert.

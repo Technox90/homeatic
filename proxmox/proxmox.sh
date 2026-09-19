@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V117
+# PROXMOX MODULARER KOMPLETT-INSTALLER V118
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -32,6 +32,7 @@ set -Eeuo pipefail
 #   V115: Pi-hole Standardlisten fest integriert: HaGeZi Pro/TIF + Homeatic/HaGeZi Allowlisten
 #   V116: Auto-Updater erst nach No-Subscription/APT-Preflight installieren; Fresh-PVE Enterprise-401 behoben
 #   V117: PVE-UPS-Verfügbarkeitsfunktion vor Optimal-Preflight definiert; command-not-found auf Fresh-Install behoben
+#   V118: Home Assistant direkt per HTTPS auf Port 443 mit NodeZero Local-CA; URL https://<HA-IP>/
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -734,7 +735,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V117"
+TUI_TITLE="PROXMOX INSTALLER V118"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer"
 
 ensure_tui() {
@@ -6219,6 +6220,117 @@ restore_pihole_language() {
 # Home Assistant OS
 # -----------------------------------------------------------------------------
 
+# V118: Home Assistant OS wird bereits VOR dem ersten Boot für direktes HTTPS
+# auf Port 443 vorbereitet. Das Zertifikat wird von der persistenten NodeZero
+# Local-CA signiert und enthält die statische HA-IP als SAN. Home Assistant
+# migriert die HTTP-YAML-Einstellungen ab Core 2026.8 in seinen Storage.
+inject_home_assistant_https_v118() {
+    local image="$1"
+    local ip="$2"
+    local hostname="homeassistant"
+    local tls_dir=""
+    local cert=""
+    local key=""
+    local fullchain=""
+    local config_file=""
+    local data_part=""
+
+    tls_dir="$(mktemp -d /tmp/haos-tls-v118.XXXXXX)"
+
+    read_issued_cert_pair_v68 \
+        "$ip" \
+        "$hostname" \
+        "$tls_dir" \
+        cert \
+        key
+
+    fullchain="${tls_dir}/fullchain.pem"
+    config_file="${tls_dir}/configuration.yaml"
+
+    # Leaf + lokale CA. Die CA muss auf Clients einmalig als vertrauenswürdig
+    # importiert werden, damit Browser keine Zertifikatswarnung anzeigen.
+    cat "$cert" "$LOCAL_CA_CERT" > "$fullchain"
+    chmod 644 "$fullchain"
+
+    cat > "$config_file" <<EOF
+default_config:
+
+http:
+  server_port: 443
+  ssl_certificate: /ssl/fullchain.pem
+  ssl_key: /ssl/privkey.pem
+EOF
+    chmod 644 "$config_file"
+
+    data_part="$(
+        guestfish --ro -a "$image" <<'EOF' 2>/dev/null
+run
+findfs-label hassos-data
+EOF
+    )"
+    data_part="$(printf '%s\n' "$data_part" | tail -n1 | tr -d '\r')"
+
+    [[ -n "$data_part" && "$data_part" == /dev/* ]] || {
+        rm -rf "$tls_dir"
+        die "HAOS Daten-Partition 'hassos-data' wurde für HTTPS nicht gefunden."
+    }
+
+    guestfish --rw -a "$image" <<EOF
+run
+mount $data_part /
+mkdir-p /supervisor
+mkdir-p /supervisor/homeassistant
+mkdir-p /supervisor/ssl
+upload $fullchain /supervisor/ssl/fullchain.pem
+upload $key /supervisor/ssl/privkey.pem
+upload $LOCAL_CA_CERT /supervisor/ssl/nodezero-local-ca.crt
+upload $config_file /supervisor/homeassistant/configuration.yaml
+chmod 0644 /supervisor/ssl/fullchain.pem
+chmod 0600 /supervisor/ssl/privkey.pem
+chmod 0644 /supervisor/ssl/nodezero-local-ca.crt
+chmod 0644 /supervisor/homeassistant/configuration.yaml
+umount-all
+EOF
+
+    rm -rf "$tls_dir"
+    ok "Home Assistant HTTPS-Bootstrap injiziert: https://${ip}/"
+}
+
+cleanup_home_assistant_http_yaml_v118() {
+    local vmid="$1"
+    local store=""
+
+    # Ab Home Assistant 2026.8 werden HTTP-Einstellungen in .storage/http
+    # verwaltet. Sobald die Migration sichtbar ist und Port/TLS stimmen,
+    # entfernen wir nur den temporären Bootstrap-http:-Block, damit keine
+    # dauerhafte YAML-Deprecated-Reparatur übrig bleibt.
+    for _ in $(seq 1 90); do
+        if timeout 10 qm guest cmd "$vmid" ping >/dev/null 2>&1; then
+            store="$(
+                qga_output "$vmid" sh -lc \
+                    'cat /mnt/data/supervisor/homeassistant/.storage/http 2>/dev/null || true' \
+                    || true
+            )"
+
+            if [[ -n "$store" ]] && jq -e '
+                ((.data.stable.server_port // .data.server_port // 0) == 443) and
+                ((.data.stable.ssl_certificate // .data.ssl_certificate // "") == "/ssl/fullchain.pem") and
+                ((.data.stable.ssl_key // .data.ssl_key // "") == "/ssl/privkey.pem")
+            ' <<<"$store" >/dev/null 2>&1; then
+                timeout 30 qm guest exec "$vmid" -- sh -lc \
+                    'printf "default_config:\n" > /mnt/data/supervisor/homeassistant/configuration.yaml' \
+                    >/dev/null 2>&1 || true
+                ok "Home Assistant HTTP-Konfiguration wurde in .storage/http migriert; Bootstrap-YAML bereinigt."
+                return 0
+            fi
+        fi
+        sleep 2
+    done
+
+    warn "Home Assistant: HTTP-Storage-Migration noch nicht bestätigt; Bootstrap-YAML bleibt sicherheitshalber erhalten."
+    return 0
+}
+
 qga_output() {
     local vmid="$1"
     shift
@@ -8613,7 +8725,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V117",
+    "installer_version": "V118",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9001,7 +9113,7 @@ show_installer_info() {
 
     info_text+="WEB / TLS\n"
     info_text+="  verwaltete App-UIs werden soweit geeignet über HTTP 80 -> HTTPS 443 geführt\n"
-    info_text+="  Proxmox bleibt nativ HTTPS 8006 · Home Assistant nativ 8123\n"
+    info_text+="  Proxmox bleibt nativ HTTPS 8006 · Home Assistant direkt HTTPS 443\n"
     info_text+="  PBS bleibt nativ HTTPS 8007 · NPM nutzt nativ 80/443 + Admin 81\n"
     info_text+="  Caddy bleibt als eigener Reverse-Proxy-Dienst auf seinem vorgesehenen Listener\n"
     info_text+="  Pulse/PVE-UPS/Semaphore/Pocket ID/Prometheus/PVE Exporter/Grafana/Gatus/Homepage: HTTPS 443\n"
@@ -9087,7 +9199,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V117 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V118 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11440,7 +11552,7 @@ fi
     "IP" "$HA_IP" \
     "CPU / RAM" "${HA_CORES} / $((HA_MEMORY / 1024)) GB" \
     "Disk" "${HA_DISK} GB" \
-    "Web" "http://${HA_IP}:8123/"
+    "Web" "https://${HA_IP}/"
 
 if (( INSTALL_PAPERLESS )); then
     if (( PAPERLESS_EXTERNAL_STORAGE )); then
@@ -14350,7 +14462,7 @@ install_home_assistant() {
     echo "Statische IP:      $HA_CIDR"
     echo "Gateway:            $GATEWAY"
     echo "DNS:                $HA_DNS"
-    echo "Web:                http://${HA_IP}:8123/"
+    echo "Web:                https://${HA_IP}/"
 
     if [[ ! -s "$cache_image" ]]; then
         if [[ ! -s "$cache_xz" ]]; then
@@ -14441,6 +14553,10 @@ EOF
 
     rm -f "$network_file"
 
+    echo
+    echo "Injiziere Home Assistant HTTPS-Konfiguration (Port 443) ..."
+    inject_home_assistant_https_v118 "$image" "$HA_IP"
+
     qm create "$HA_ID" \
         --name homeassistant \
         --ostype l26 \
@@ -14455,7 +14571,7 @@ EOF
         --net0 "virtio,bridge=${BRIDGE}" \
         --onboot 1 \
         --agent enabled=1 \
-        --description "Home Assistant OS ${haos} | static-ip=${HA_IP} | web=http://${HA_IP}:8123/"
+        --description "Home Assistant OS ${haos} | static-ip=${HA_IP} | web=https://${HA_IP}/"
 
     qm set "$HA_ID" \
         --efidisk0 "${DISK_STORAGE}:0,efitype=4m,pre-enrolled-keys=0"
@@ -14538,7 +14654,7 @@ PY
     echo "  $HA_IP"
     echo
     echo "Home Assistant Weboberfläche:"
-    echo "  http://${HA_IP}:8123/"
+    echo "  https://${HA_IP}/"
     echo
 
     echo "Warte kurz auf die Netzwerkschnittstelle ..."
@@ -14558,9 +14674,19 @@ PY
         warn "HAOS bootet noch. Der erste Start kann mehrere Minuten dauern."
     fi
 
+    register_managed_tls_service_v88 \
+        "haos" \
+        "$HA_ID" \
+        "Home Assistant" \
+        "$HA_IP" \
+        "homeassistant"
+
+    cleanup_home_assistant_http_yaml_v118 "$HA_ID" || true
+
     echo
     echo "Weboberfläche:"
-    echo "  http://${HA_IP}:8123/"
+    echo "  https://${HA_IP}/"
+    echo "Port: 443 · direktes TLS in Home Assistant"
 }
 
 
@@ -16356,7 +16482,7 @@ if os.environ.get("HAS_HA") == "1":
     add(
         "homeassistant",
         "Home Assistant",
-        f"http://{ha_ip}/" if ha_ip else "http://homeassistant.local/",
+        f"https://{ha_ip}/" if ha_ip else "https://homeassistant.local/",
     )
 
 ip = os.environ.get("PAPERLESS_IP", "")
@@ -27456,8 +27582,8 @@ EOS
 
 # V88 · verwaltete TLS-Zertifikate automatisch erneuern.
 # Die lokale CA bleibt unter /home/Data persistent. Alle vom Installer verwalteten
-# nginx-Endpunkte werden registriert und wöchentlich geprüft. Zertifikate werden
-# 45 Tage vor Ablauf erneuert und nginx anschließend ohne Downtime neu geladen.
+# HTTPS-Endpunkte (nginx, HAOS, PBS, Dashboard) werden registriert und wöchentlich geprüft. Zertifikate werden
+# 45 Tage vor Ablauf erneuert und der jeweilige Dienst anschließend sauber neu geladen/gestartet.
 install_managed_tls_renewer_v88() {
     ensure_local_ca_v65
 
@@ -27553,6 +27679,44 @@ while IFS=$'\t' read -r kind id label ip hostname; do
         pct exec "$id" -- chown root:backup /etc/proxmox-backup/proxy.pem /etc/proxmox-backup/proxy.key
         pct exec "$id" -- systemctl reload proxmox-backup-proxy >/dev/null 2>&1
         logger -t proxmox-master-tls "renewed PBS native certificate (${ip}:8007)"
+
+    elif [[ "$kind" == "haos" ]]; then
+        [[ "$id" =~ ^[0-9]+$ ]] || continue
+        qm config "$id" >/dev/null 2>&1 || continue
+        qm status "$id" 2>/dev/null | grep -q 'status: running' || continue
+        timeout 15 qm guest cmd "$id" ping >/dev/null 2>&1 || continue
+
+        current_cert="$(
+            timeout 30 qm guest exec "$id" --output-format json -- \
+                sh -lc 'cat /mnt/data/supervisor/ssl/fullchain.pem 2>/dev/null || true' \
+                2>/dev/null | jq -r '."out-data" // empty' 2>/dev/null || true
+        )"
+
+        if [[ -n "$current_cert" ]] && \
+           openssl x509 -checkend "$CHECKEND" -noout \
+               < <(printf '%s\n' "$current_cert") >/dev/null 2>&1; then
+            continue
+        fi
+
+        tmp="$(mktemp -d /tmp/haos-tls-renew.XXXXXX)"
+        issue_cert "$ip" "$hostname" "$tmp"
+        cat "$tmp/service.crt" "$CA_CERT" > "$tmp/fullchain.pem"
+
+        cert_b64="$(base64 -w0 "$tmp/fullchain.pem")"
+        key_b64="$(base64 -w0 "$tmp/service.key")"
+        ca_b64="$(base64 -w0 "$CA_CERT")"
+
+        timeout 60 qm guest exec "$id" -- sh -lc \
+            "mkdir -p /mnt/data/supervisor/ssl; \
+             printf '%s' '$cert_b64' | base64 -d > /mnt/data/supervisor/ssl/fullchain.pem; \
+             printf '%s' '$key_b64' | base64 -d > /mnt/data/supervisor/ssl/privkey.pem; \
+             printf '%s' '$ca_b64' | base64 -d > /mnt/data/supervisor/ssl/nodezero-local-ca.crt; \
+             chmod 0644 /mnt/data/supervisor/ssl/fullchain.pem /mnt/data/supervisor/ssl/nodezero-local-ca.crt; \
+             chmod 0600 /mnt/data/supervisor/ssl/privkey.pem; \
+             ha core restart" >/dev/null 2>&1 || { rm -rf "$tmp"; continue; }
+
+        rm -rf "$tmp"
+        logger -t proxmox-master-tls "renewed Home Assistant certificate (${ip}:443)"
 
     elif [[ "$kind" == "host-dashboard" ]]; then
         cert="/etc/pve-sensor-dashboard/dashboard.crt"
@@ -42272,7 +42436,7 @@ final_install_validation_v107() {
 
     if (( INSTALL_HA )); then
         final_vm_check_v107 "Home Assistant" "$HA_ID" || failures=$((failures+1))
-        final_http_check_v107 "Home Assistant" "http://${HA_IP}:8123/" 150 || failures=$((failures+1))
+        final_http_check_v107 "Home Assistant" "https://${HA_IP}/" 150 || failures=$((failures+1))
     fi
 
     if (( INSTALL_PAPERLESS )); then
@@ -42792,8 +42956,8 @@ OVERVIEW_FILE="/root/PROXMOX-MODULAR-INSTALL-CREDENTIALS.txt"
         echo "=================================================="
         echo "VM-ID: $HA_ID"
         echo "IP: $HA_IP"
-        echo "URL: http://${HA_IP}:8123/"
-        echo "Port: 8123"
+        echo "URL: https://${HA_IP}/"
+        echo "Port: 443 (HTTPS)"
         echo "System-Disk: ${HA_DISK} GB"
         echo "Login wird innerhalb Home Assistant angelegt."
         echo
@@ -42920,7 +43084,7 @@ fi
 ui_section "Weboberflächen"
 
 (( INSTALL_DASHBOARD )) && ui_kv "Dashboard" "https://${DASHBOARD_IP}/ · HTTP → HTTPS"
-(( INSTALL_HA )) && ui_kv "Home Assistant" "http://${HA_IP}:8123/"
+(( INSTALL_HA )) && ui_kv "Home Assistant" "https://${HA_IP}/"
 (( INSTALL_PAPERLESS )) && ui_kv "Paperless" "https://${PAPERLESS_IP}/"
 (( INSTALL_PIHOLE )) && ui_kv "Pi-hole" "http://${PIHOLE_IP}/admin"
 (( INSTALL_NETALERTX )) && ui_kv "NetAlertX" "https://${NETALERTX_IP}/"
