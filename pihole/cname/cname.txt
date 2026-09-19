@@ -1,2 +1,8 @@
 # Eigene Pi-hole CNAME-Zuordnungen
 # Hier später die gewünschten Einträge dokumentieren.
+# Alias                 Ziel
+proxmox.lan             pve.lan
+ha.lan                  homeassistant.lan
+dashboard.lan           pve.lan
+paperless               paperless.lan
+pihole                  pihole.lan
