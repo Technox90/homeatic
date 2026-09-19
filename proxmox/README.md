@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V117**
+Installationskandidat: **V118**
 
 Geplante Hauptdatei:
 
@@ -135,3 +135,8 @@ Zusätzlich wurde die PVE-UPS-Verfügbarkeitsfunktion vor den Optimal-Preflight 
 Die PVE-UPS-Verfügbarkeitsprüfung wird jetzt vor dem Optimal-Stack-Preflight definiert. Dadurch kann der Pflichtcheck vor dem Guest-Reset auf einem frischen Proxmox korrekt ausgeführt werden.
 
 Home Assistant OS wird im Installer ausdrücklich als native Weboberfläche auf `http://<HA-IP>:8123/` ausgewiesen. HTTPS/443 erfordert bei HAOS einen separaten Reverse Proxy.
+
+
+## Versionsanzeige im Hauptmenü
+
+Die aktuell ausgeführte Installer-Version wird im Whiptail-Hauptmenü direkt im Dialograhmen angezeigt, z. B. **HAUPTMENÜ · Version 118**.
