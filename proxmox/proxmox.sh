@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V120
+# PROXMOX MODULARER KOMPLETT-INSTALLER V121
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -35,6 +35,7 @@ set -Eeuo pipefail
 #   V118: Versionsanzeige im Hauptmenü ergänzt; Installer-Version zentral auf V118 angehoben
 #   V119: Docker-LXC Bootstrap quoting gehärtet; awk/sed/printf lösen kein set -u/$4 mehr aus
 #   V120: Einzelne VM/LXC-Löschbestätigungen nur noch über die numerische Gast-ID
+#   V121: Destruktive Textbestätigungen gekürzt: KOMPLETT NEU -> NEU, PROXMOX AUF NULL -> NULL
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -737,7 +738,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V120"
+TUI_TITLE="PROXMOX INSTALLER V121"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1110,7 +1111,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 120" \
+                    --title "HAUPTMENÜ · Version 121" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -1663,8 +1664,8 @@ delete_all_lxc_and_managed_ha() {
     show_guests
 
     local confirm
-    read -rp "Zur Bestätigung exakt 'KOMPLETT NEU' eingeben: " confirm
-    [[ "$confirm" == "KOMPLETT NEU" ]] || {
+    read -rp "Zur Bestätigung exakt 'NEU' eingeben: " confirm
+    [[ "$confirm" == "NEU" ]] || {
         warn "Kompletter Neuaufbau abgebrochen."
         return 1
     }
@@ -2128,9 +2129,9 @@ proxmox_zero_v72() {
     show_guests
 
     local confirm=""
-    read -rp "Zur Bestätigung exakt 'PROXMOX AUF NULL' eingeben: " confirm
+    read -rp "Zur Bestätigung exakt 'NULL' eingeben: " confirm
 
-    if [[ "$confirm" != "PROXMOX AUF NULL" ]]; then
+    if [[ "$confirm" != "NULL" ]]; then
         warn "Proxmox-Auf-Null wurde abgebrochen."
         return 1
     fi
@@ -8616,7 +8617,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V120",
+    "installer_version": "V121",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9090,7 +9091,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V120 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V121 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"

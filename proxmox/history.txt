@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V121
+-----------------
+- Bestätigung für "KOMPLETT NEU" verkürzt: Statt "KOMPLETT NEU" muss nur noch "NEU" eingegeben werden.
+- Bestätigung für "PROXMOX AUF NULL" verkürzt: Statt "PROXMOX AUF NULL" muss nur noch "NULL" eingegeben werden.
+- Menübezeichnungen und Funktionsnamen bleiben unverändert; geändert wurde ausschließlich die erforderliche Texteingabe zur Bestätigung.
+
 20.09.2026 – V120
 -----------------
 - Einzelne Löschbestätigungen für VMs/LXC vereinfacht.
