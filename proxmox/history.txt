@@ -1,6 +1,23 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V126
+-----------------
+- Pi-hole Standardlisten-Import repariert.
+- Ursache: Das SQL wurde mit "docker exec" ohne "-i" an SQLite übergeben. Dadurch konnte der SQLite-Prozess erfolgreich starten, obwohl die SQL-INSERTs nicht über STDIN ankamen.
+- Der Import verwendet jetzt "docker exec -i" und hält STDIN für das SQL offen.
+- Nach dem Import wird zwingend geprüft, ob alle vier vorgesehenen Abonnements tatsächlich in gravity.db vorhanden sind:
+  * BLOCK · HaGeZi Pro
+  * BLOCK · HaGeZi TIF
+  * ALLOW · Technox90 Homeatic Allowlist
+  * ALLOW · HaGeZi Referral Native
+- Erst nach erfolgreicher 4/4-Prüfung wird "pihole -g" ausgeführt.
+- Lokale Pi-hole-DNS-Einträge werden jetzt aus "pihole/dns/custom.list" im Repository übernommen.
+- Lokale CNAME-Einträge werden aus "pihole/cname/cname.txt" übernommen und über die Pi-hole-v6-Konfiguration "dns.cnameRecords" gesetzt.
+- Pi-hole wird nach dem lokalen DNS-/CNAME-Import neu gestartet.
+- DNS- und CNAME-Auflösung werden anschließend mit echten DNS-Abfragen gegen 127.0.0.1 geprüft.
+- Im Optimalmodus führen fehlgeschlagene Standardlisten oder lokale DNS-/CNAME-Einträge jetzt zu einem kontrollierten Abbruch statt zu einer bloßen Warnung.
+
 20.09.2026 – V125
 -----------------
 - PVE-UPS-Proxmox-API-Berechtigungen auf den gewünschten Standard umgestellt:

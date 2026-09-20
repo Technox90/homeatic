@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V125
+# PROXMOX MODULARER KOMPLETT-INSTALLER V126
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -40,6 +40,7 @@ set -Eeuo pipefail
 #   V123: Dashboard-Webdienst mit 30-s-Readiness-Test, DB-unabhängigem /api/info und automatischer Fehlerdiagnose
 #   V124: Dashboard systemd-NAMESPACE-Fix; /var/lib/pve-sensor-dashboard-web wird vor jedem Webdienst-Start angelegt
 #   V125: PVE-UPS Standardprofil aus PDF + Proxmox Benutzer pve-ups@pve, Token pve-ups, Rolle UPSPower
+#   V126: Pi-hole Listenimport mit docker exec -i + Verifikation; lokale DNS-/CNAME-Einträge aus GitHub
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -742,7 +743,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V125"
+TUI_TITLE="PROXMOX INSTALLER V126"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1115,7 +1116,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 125" \
+                    --title "HAUPTMENÜ · Version 126" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8621,7 +8622,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V125",
+    "installer_version": "V126",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9095,7 +9096,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V125 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V126 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15089,16 +15090,33 @@ WHERE address = '${OLD_ALLOW_TOBI}'
 COMMIT;
 SQL
 
-docker cp "$SQL_FILE" pihole:/tmp/pihole-standardlisten-v82.sql
-
-docker exec pihole \
+# V126: docker exec muss STDIN mit -i offen halten. Ohne -i konnte SQLite
+# erfolgreich starten, ohne die SQL-INSERTs tatsächlich zu erhalten.
+docker exec -i pihole \
     pihole-FTL sqlite3 -ni /etc/pihole/gravity.db \
     < "$SQL_FILE"
 
-rm -f "$SQL_FILE"
-docker exec pihole rm -f /tmp/pihole-standardlisten-v82.sql 2>/dev/null || true
+LIST_COUNT="$(
+    docker exec pihole \
+        pihole-FTL sqlite3 -ni /etc/pihole/gravity.db \
+        "SELECT COUNT(*) FROM adlist
+         WHERE (address='${BLOCK_PRO}' AND type=0)
+            OR (address='${BLOCK_TIF}' AND type=0)
+            OR (address='${ALLOW_TOBI}' AND type=1)
+            OR (address='${ALLOW_REFERRAL}' AND type=1);" \
+        2>/dev/null |
+    tr -d '[:space:]'
+)"
 
-echo "Listen eingetragen."
+if [[ "$LIST_COUNT" != "4" ]]; then
+    echo "FEHLER: Standardlisten wurden nicht vollständig in gravity.db eingetragen."
+    echo "Erwartet: 4 · Gefunden: ${LIST_COUNT:-0}"
+    exit 1
+fi
+
+rm -f "$SQL_FILE"
+
+echo "Listen eingetragen und verifiziert (4/4)."
 echo
 echo "Aktualisiere Gravity ..."
 echo
@@ -15156,6 +15174,162 @@ __PIHOLE_STANDARDLISTEN_V82__
         ok "Pi-hole Block- und Allowlisten V115 eingetragen."
     else
         warn "Pi-hole Standardlisten konnten nicht vollständig eingerichtet werden."
+        warn "CT-Skript bleibt zur Diagnose erhalten: $ct_script"
+        return 1
+    fi
+}
+
+install_pihole_local_dns_v126() {
+    local ct_id="${1:-$PH_ID}"
+    local host_script="/tmp/pihole-local-dns-v126-${ct_id}.sh"
+    local ct_script="/root/pihole-local-dns-v126.sh"
+
+    cat > "$host_script" <<'__PIHOLE_LOCAL_DNS_V126__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+DNS_URL="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/dns/custom.list"
+CNAME_URL="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/cname/cname.txt"
+
+DNS_TARGET="/opt/pihole/etc-pihole/custom.list"
+DNS_TMP="/tmp/pihole-custom.list"
+CNAME_TMP="/tmp/pihole-cname.txt"
+
+echo "============================================================"
+echo " PI-HOLE LOKALE DNS-/CNAME-EINTRÄGE V126"
+echo "============================================================"
+echo
+
+docker ps --format '{{.Names}}' | grep -qx pihole || {
+    echo "FEHLER: Docker-Container 'pihole' läuft nicht."
+    exit 1
+}
+
+curl -fsSL --retry 3 --connect-timeout 10 "$DNS_URL" -o "$DNS_TMP"
+curl -fsSL --retry 3 --connect-timeout 10 "$CNAME_URL" -o "$CNAME_TMP"
+
+DNS_COUNT="$(
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF >= 2 { count++ }
+        END { print count+0 }
+    ' "$DNS_TMP"
+)"
+
+(( DNS_COUNT > 0 )) || {
+    echo "FEHLER: Keine lokalen DNS-Einträge aus $DNS_URL geladen."
+    exit 1
+}
+
+install -m 0644 "$DNS_TMP" "$DNS_TARGET"
+
+declare -a CNAME_ITEMS=()
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    [[ -n "${line//[[:space:]]/}" ]] || continue
+
+    read -r alias target extra <<< "$line"
+
+    [[ -n "${alias:-}" && -n "${target:-}" && -z "${extra:-}" ]] || {
+        echo "FEHLER: Ungültige CNAME-Zeile: $line"
+        exit 1
+    }
+
+    [[ "$alias" =~ ^[A-Za-z0-9._-]+$ && "$target" =~ ^[A-Za-z0-9._-]+$ ]] || {
+        echo "FEHLER: Ungültiger CNAME: $alias -> $target"
+        exit 1
+    }
+
+    CNAME_ITEMS+=("\"${alias},${target}\"")
+done < "$CNAME_TMP"
+
+(( ${#CNAME_ITEMS[@]} > 0 )) || {
+    echo "FEHLER: Keine CNAME-Einträge aus $CNAME_URL geladen."
+    exit 1
+}
+
+CNAME_JSON="[$(IFS=,; echo "${CNAME_ITEMS[*]}")]"
+
+docker exec pihole \
+    pihole-FTL --config dns.cnameRecords "$CNAME_JSON"
+
+CNAME_ALIAS="$(
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF >= 2 { print $1; exit }
+    ' "$CNAME_TMP"
+)"
+CNAME_TARGET="$(
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF >= 2 { print $2; exit }
+    ' "$CNAME_TMP"
+)"
+
+rm -f "$DNS_TMP" "$CNAME_TMP"
+
+docker restart pihole >/dev/null
+
+DNS_HOST="$(
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF >= 2 { print $2; exit }
+    ' "$DNS_TARGET"
+)"
+DNS_IP="$(
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        NF >= 2 { print $1; exit }
+    ' "$DNS_TARGET"
+)"
+
+READY=0
+for _ in $(seq 1 30); do
+    if dig +short "$DNS_HOST" @127.0.0.1 +time=2 2>/dev/null | grep -Fxq "$DNS_IP"; then
+        READY=1
+        break
+    fi
+    sleep 2
+done
+
+(( READY == 1 )) || {
+    echo "FEHLER: Lokaler DNS-Eintrag $DNS_HOST -> $DNS_IP ist nach dem Neustart nicht auflösbar."
+    docker logs --tail 80 pihole 2>/dev/null || true
+    exit 1
+}
+
+CNAME_RESULT="$(
+    dig +short CNAME "$CNAME_ALIAS" @127.0.0.1 +time=2 2>/dev/null |
+    head -n1 |
+    sed 's/[.]$//'
+)"
+
+[[ "$CNAME_RESULT" == "$CNAME_TARGET" ]] || {
+    echo "FEHLER: CNAME $CNAME_ALIAS -> $CNAME_TARGET wurde nicht korrekt aktiviert."
+    echo "Antwort: ${CNAME_RESULT:-<leer>}"
+    exit 1
+}
+
+echo "Lokale DNS-Einträge: $DNS_COUNT"
+echo "CNAME-Einträge: ${#CNAME_ITEMS[@]}"
+echo "DNS-Test: $DNS_HOST -> $DNS_IP [OK]"
+echo "CNAME-Test: $CNAME_ALIAS -> $CNAME_TARGET [OK]"
+__PIHOLE_LOCAL_DNS_V126__
+
+    chmod +x "$host_script"
+
+    pct push \
+        "$ct_id" \
+        "$host_script" \
+        "$ct_script"
+
+    rm -f "$host_script"
+
+    if pct exec "$ct_id" -- bash "$ct_script"; then
+        pct exec "$ct_id" -- rm -f "$ct_script" 2>/dev/null || true
+        ok "Pi-hole lokale DNS- und CNAME-Einträge aus GitHub übernommen."
+    else
+        warn "Pi-hole lokale DNS-/CNAME-Einträge konnten nicht vollständig eingerichtet werden."
         warn "CT-Skript bleibt zur Diagnose erhalten: $ct_script"
         return 1
     fi
@@ -15527,7 +15701,22 @@ EOF
     echo
 
     if ! install_pihole_standard_lists_v82 "$PH_ID"; then
+        if (( OPTIMAL_INSTALL )); then
+            die "Pi-hole Standardlisten konnten im Optimalmodus nicht eingerichtet werden."
+        fi
         warn "Pi-hole läuft weiter; die Listen können später erneut importiert werden."
+    fi
+
+    echo
+    echo "Pi-hole lokale DNS-/CNAME-Einträge:"
+    echo "  Quelle DNS:   Technox90/homeatic · pihole/dns/custom.list"
+    echo "  Quelle CNAME: Technox90/homeatic · pihole/cname/cname.txt"
+
+    if ! install_pihole_local_dns_v126 "$PH_ID"; then
+        if (( OPTIMAL_INSTALL )); then
+            die "Pi-hole lokale DNS-/CNAME-Einträge konnten im Optimalmodus nicht eingerichtet werden."
+        fi
+        warn "Pi-hole läuft weiter; lokale DNS-/CNAME-Einträge können später erneut importiert werden."
     fi
 
     if pct exec "$PH_ID" -- \
