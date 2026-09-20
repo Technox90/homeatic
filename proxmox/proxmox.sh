@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V135
+# PROXMOX MODULARER KOMPLETT-INSTALLER V136
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -50,6 +50,7 @@ set -Eeuo pipefail
 #   V133: bestehende Dashboard-Installationen auf Theme-UI/API migrieren; Einstellungen/GitHub direkt sichtbar
 #   V134: Dashboard-Footer wieder unten; bestehende bekannte Web-CTs beim Update automatisch als fehlende Links ergänzen
 #   V135: Paperless HTTPS-Reverse-Proxy/CSRF-Konfiguration repariert; bestehende Paperless-CTs automatisch migrieren
+#   V136: Paperless allauth Client-IP hinter nginx korrigiert; X-Real-IP statt HTTP_X_REAL_IP
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -752,8 +753,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V135"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V135"
+TUI_TITLE="PROXMOX INSTALLER V136"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V136"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1125,7 +1126,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 135" \
+                    --title "HAUPTMENÜ · Version 136" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8640,7 +8641,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V135",
+    "installer_version": "V136",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9114,7 +9115,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V135 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V136 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15170,7 +15171,7 @@ services:
       PAPERLESS_URL: "https://${PAPERLESS_IP}"
       PAPERLESS_PROXY_SSL_HEADER: '["HTTP_X_FORWARDED_PROTO", "https"]'
       PAPERLESS_TRUSTED_PROXIES: "127.0.0.1"
-      PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER: "HTTP_X_REAL_IP"
+      PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER: "X-Real-IP"
 
       USERMAP_UID: 1000
       USERMAP_GID: 1000
@@ -15262,10 +15263,10 @@ EOF
 }
 
 # =============================================================================
-# V135 · PAPERLESS HTTPS / CSRF REVERSE-PROXY MIGRATION
+# V136 · PAPERLESS HTTPS / CSRF / ALLAUTH REVERSE-PROXY MIGRATION
 # =============================================================================
 
-repair_existing_paperless_https_v135() {
+repair_existing_paperless_proxy_v136() {
     command -v pct >/dev/null 2>&1 || return 0
 
     local ctid=""
@@ -15285,7 +15286,7 @@ repair_existing_paperless_https_v135() {
     done < <(pct list 2>/dev/null | awk 'NR>1 {print $1}')
 
     [[ -n "$ctid" ]] || {
-        info "Paperless V135: kein vorhandener Paperless-LXC gefunden."
+        info "Paperless V136: kein vorhandener Paperless-LXC gefunden."
         return 0
     }
 
@@ -15302,18 +15303,18 @@ repair_existing_paperless_https_v135() {
     )"
 
     [[ -n "$ip" ]] || {
-        warn "Paperless V135: IP von CT ${ctid} konnte nicht ermittelt werden."
+        warn "Paperless V136: IP von CT ${ctid} konnte nicht ermittelt werden."
         return 1
     }
 
     pct exec "$ctid" -- test -s /opt/paperless/docker-compose.yml || {
-        warn "Paperless V135: /opt/paperless/docker-compose.yml fehlt in CT ${ctid}."
+        warn "Paperless V136: /opt/paperless/docker-compose.yml fehlt in CT ${ctid}."
         return 1
     }
 
-    fix_script="/tmp/paperless-v135-${ctid}.py"
+    fix_script="/tmp/paperless-v136-${ctid}.py"
 
-    cat > "$fix_script" <<'PYV135'
+    cat > "$fix_script" <<'PYV136'
 from pathlib import Path
 import os
 import re
@@ -15326,7 +15327,7 @@ wanted = {
     "PAPERLESS_URL": f'"https://{ip}"',
     "PAPERLESS_PROXY_SSL_HEADER": """'["HTTP_X_FORWARDED_PROTO", "https"]'""",
     "PAPERLESS_TRUSTED_PROXIES": '"127.0.0.1"',
-    "PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER": '"HTTP_X_REAL_IP"',
+    "PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER": '"X-Real-IP"',
 }
 
 for key in wanted:
@@ -15335,6 +15336,15 @@ for key in wanted:
         "",
         text,
     )
+
+# PAPERLESS_URL ergänzt CSRF_TRUSTED_ORIGINS bereits selbst.
+# Einen ggf. manuell ergänzten identischen Origin entfernen, damit er nicht
+# doppelt in Django erscheint.
+text = re.sub(
+    r"(?m)^\s{6}PAPERLESS_CSRF_TRUSTED_ORIGINS:\s*.*\n?",
+    "",
+    text,
+)
 
 anchor = re.search(
     r'(?m)^(\s{6}PAPERLESS_SECRET_KEY:\s*.*)
@@ -45139,37 +45149,47 @@ text = (
 )
 
 path.write_text(text, encoding="utf-8")
-PYV135
+PYV136
 
-    pct push "$ctid" "$fix_script" /root/paperless-v135.py -perms 0700 >/dev/null
+    pct push "$ctid" "$fix_script" /root/paperless-v136.py -perms 0700 >/dev/null
     rm -f "$fix_script"
 
     if ! pct exec "$ctid" -- env PAPERLESS_PUBLIC_IP="$ip" \
-        python3 /root/paperless-v135.py; then
-        warn "Paperless V135: Compose-Migration fehlgeschlagen."
+        python3 /root/paperless-v136.py; then
+        warn "Paperless V136: Compose-Migration fehlgeschlagen."
         return 1
     fi
 
-    pct exec "$ctid" -- rm -f /root/paperless-v135.py >/dev/null 2>&1 || true
+    pct exec "$ctid" -- rm -f /root/paperless-v136.py >/dev/null 2>&1 || true
 
     if ! pct exec "$ctid" -- bash -lc '
         set -Eeuo pipefail
         cd /opt/paperless
         docker compose config -q
-        docker compose up -d webserver
+        docker compose up -d --force-recreate webserver
+
+        for _ in $(seq 1 45); do
+            if docker compose ps --format json webserver 2>/dev/null |
+                grep -q '"Health":"healthy"'; then
+                break
+            fi
+            sleep 2
+        done
+
         docker compose exec -T webserver python -c "
 import os
 assert os.environ.get(\"PAPERLESS_URL\") == \"https://'"$ip"'\"
 assert os.environ.get(\"PAPERLESS_PROXY_SSL_HEADER\") == \"[\\\"HTTP_X_FORWARDED_PROTO\\\", \\\"https\\\"]\"
 assert os.environ.get(\"PAPERLESS_TRUSTED_PROXIES\") == \"127.0.0.1\"
-print(\"Paperless HTTPS/CSRF environment OK\")
+assert os.environ.get(\"PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER\") == \"X-Real-IP\"
+print(\"Paperless HTTPS/CSRF/allauth environment OK\")
 "
     '; then
-        warn "Paperless V135: Webserver/Environment-Prüfung fehlgeschlagen."
+        warn "Paperless V136: Webserver/Environment-Prüfung fehlgeschlagen."
         return 1
     fi
 
-    ok "Paperless V135: HTTPS/CSRF für https://${ip} aktiv."
+    ok "Paperless V136: HTTPS/CSRF für https://${ip} aktiv."
 }
 
 # =============================================================================
@@ -74440,10 +74460,10 @@ fi
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
 
-# V135: Auch ein bereits vorhandenes Paperless bei einem Dashboard-Update
-# auf die korrekte HTTPS-/CSRF-Reverse-Proxy-Konfiguration migrieren.
+# V136: Auch ein bereits vorhandenes Paperless bei einem Dashboard-Update
+# auf HTTPS-/CSRF-/allauth-Reverse-Proxy-Konfiguration migrieren.
 if (( INSTALL_DASHBOARD || INSTALL_PAPERLESS )); then
-    run_install_step "Paperless HTTPS / CSRF prüfen" repair_existing_paperless_https_v135
+    run_install_step "Paperless HTTPS / CSRF / Login-IP prüfen" repair_existing_paperless_proxy_v136
 fi
 
 (( INSTALL_PIHOLE )) && run_install_step "Pi-hole + Unbound" install_pihole
