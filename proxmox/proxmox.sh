@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V137
+# PROXMOX MODULARER KOMPLETT-INSTALLER V138
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -52,6 +52,7 @@ set -Eeuo pipefail
 #   V135: Paperless HTTPS-Reverse-Proxy/CSRF-Konfiguration repariert; bestehende Paperless-CTs automatisch migrieren
 #   V136: Paperless allauth Client-IP hinter nginx korrigiert; X-Real-IP statt HTTP_X_REAL_IP
 #   V137: Paperless Neuinstallation enthält vollständige HTTPS/CSRF/allauth-Proxy-Konfiguration + Abschlussprüfung
+#   V138: Paperless NAS-Inbox auf NFS per Consumer-Polling überwachen; Inbox-Zugriff bei Installation prüfen
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -754,8 +755,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V137"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V137"
+TUI_TITLE="PROXMOX INSTALLER V138"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V138"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1127,7 +1128,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 137" \
+                    --title "HAUPTMENÜ · Version 138" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8642,7 +8643,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V137",
+    "installer_version": "V138",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9116,7 +9117,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V137 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V138 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15088,12 +15089,17 @@ install_paperless() {
     local paperless_media_path="/opt/paperless/media"
     local paperless_export_path="/opt/paperless/export"
     local paperless_consume_path="/opt/paperless/consume"
+    local paperless_consumer_polling_interval="0"
 
     if (( PAPERLESS_EXTERNAL_STORAGE )); then
         paperless_data_path="/mnt/paperless-storage/${PAPERLESS_DATA_SUBDIR}"
         paperless_media_path="/mnt/paperless-storage/${PAPERLESS_MEDIA_SUBDIR}"
         paperless_export_path="/mnt/paperless-storage/${PAPERLESS_EXPORT_SUBDIR}"
         paperless_consume_path="/mnt/paperless-storage/${PAPERLESS_CONSUME_SUBDIR}"
+
+        # NFS/SMB liefern Dateisystem-Ereignisse nicht zuverlässig an inotify.
+        # Paperless soll die NAS-Inbox deshalb aktiv abfragen.
+        paperless_consumer_polling_interval="10"
     else
         pct exec "$PL_ID" -- \
             mkdir -p \
@@ -15162,6 +15168,9 @@ services:
       PAPERLESS_TIME_ZONE: Europe/Berlin
       PAPERLESS_OCR_LANGUAGE: deu
       PAPERLESS_OCR_LANGUAGES: "deu eng"
+
+      # V138: Bei NAS/NFS/SMB positive Polling-Zeit, lokal weiterhin 0/inotify.
+      PAPERLESS_CONSUMER_POLLING_INTERVAL: "${paperless_consumer_polling_interval}"
 
       PAPERLESS_ADMIN_USER: "${PAPERLESS_USER}"
       PAPERLESS_ADMIN_PASSWORD: "${PAPERLESS_PASS}"
@@ -15252,9 +15261,10 @@ EOF
     configure_lxc_web_standard_ports_v65 "$PL_ID" "Paperless-ngx" "http" "8000"
     verify_web_v107 "Paperless-ngx" "https://${PAPERLESS_IP}/" 120
 
-    # V137: Neuinstallation gilt erst als erfolgreich, wenn der laufende
+    # V138: Neuinstallation gilt erst als erfolgreich, wenn der laufende
     # Container, Django und nginx die erwartete Proxy-Konfiguration verwenden.
-    verify_paperless_proxy_v137 "$PL_ID" "$PAPERLESS_IP" ||         die "Paperless Reverse-Proxy-/Login-Konfiguration ist unvollständig."
+    verify_paperless_proxy_v138 "$PL_ID" "$PAPERLESS_IP" "$paperless_consumer_polling_interval" || \
+        die "Paperless Reverse-Proxy-/Login-/Inbox-Konfiguration ist unvollständig."
 
     ok "Paperless + Ollama installiert."
     echo "Paperless: https://${PAPERLESS_IP}/"
@@ -15268,22 +15278,23 @@ EOF
 }
 
 # =============================================================================
-# V137 · PAPERLESS HTTPS / CSRF / ALLAUTH
+# V138 · PAPERLESS HTTPS / CSRF / ALLAUTH / NAS-INBOX
 # =============================================================================
 
-verify_paperless_proxy_v137() {
+verify_paperless_proxy_v138() {
     local ctid="$1"
     local ip="$2"
+    local expected_polling="${3:-}"
     local env_out=""
     local django_out=""
 
     [[ "$ctid" =~ ^[0-9]+$ ]] || {
-        warn "Paperless V137: ungültige CT-ID: $ctid"
+        warn "Paperless V138: ungültige CT-ID: $ctid"
         return 1
     }
 
     [[ -n "$ip" ]] || {
-        warn "Paperless V137: erwartete IP fehlt."
+        warn "Paperless V138: erwartete IP fehlt."
         return 1
     }
 
@@ -15292,7 +15303,7 @@ verify_paperless_proxy_v137() {
         cd /opt/paperless
         docker compose config -q
     ' || {
-        warn "Paperless V137: docker compose config ist ungültig."
+        warn "Paperless V138: docker compose config ist ungültig."
         return 1
     }
 
@@ -15321,7 +15332,7 @@ verify_paperless_proxy_v137() {
         docker compose ps
         exit 1
     '; then
-        warn "Paperless V137: Webserver wurde nicht healthy."
+        warn "Paperless V138: Webserver wurde nicht healthy."
         return 1
     fi
 
@@ -15332,29 +15343,51 @@ verify_paperless_proxy_v137() {
             docker compose exec -T webserver env
         '
     )" || {
-        warn "Paperless V137: Webserver-Environment konnte nicht gelesen werden."
+        warn "Paperless V138: Webserver-Environment konnte nicht gelesen werden."
         return 1
     }
 
     grep -Fxq "PAPERLESS_URL=https://${ip}" <<<"$env_out" || {
-        warn "Paperless V137: PAPERLESS_URL fehlt/falsch."
+        warn "Paperless V138: PAPERLESS_URL fehlt/falsch."
         return 1
     }
 
     grep -Fxq 'PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]' <<<"$env_out" || {
-        warn "Paperless V137: PAPERLESS_PROXY_SSL_HEADER fehlt/falsch."
+        warn "Paperless V138: PAPERLESS_PROXY_SSL_HEADER fehlt/falsch."
         return 1
     }
 
     grep -Fxq 'PAPERLESS_TRUSTED_PROXIES=127.0.0.1' <<<"$env_out" || {
-        warn "Paperless V137: PAPERLESS_TRUSTED_PROXIES fehlt/falsch."
+        warn "Paperless V138: PAPERLESS_TRUSTED_PROXIES fehlt/falsch."
         return 1
     }
 
     grep -Fxq 'PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER=X-Real-IP' <<<"$env_out" || {
-        warn "Paperless V137: allauth Client-IP-Header fehlt/falsch."
+        warn "Paperless V138: allauth Client-IP-Header fehlt/falsch."
         return 1
     }
+
+    if [[ -n "$expected_polling" ]]; then
+        grep -Fxq "PAPERLESS_CONSUMER_POLLING_INTERVAL=${expected_polling}" <<<"$env_out" || {
+            warn "Paperless V138: Consumer-Polling-Intervall fehlt/falsch."
+            return 1
+        }
+    fi
+
+    if [[ "$expected_polling" == "10" ]]; then
+        pct exec "$ctid" -- bash -lc '
+            set -Eeuo pipefail
+            cd /opt/paperless
+            docker compose exec -T webserver sh -lc "
+                test -d /usr/src/paperless/consume
+                test -r /usr/src/paperless/consume
+                test -w /usr/src/paperless/consume
+            "
+        ' || {
+            warn "Paperless V138: NAS-Inbox ist im laufenden Container nicht les-/schreibbar."
+            return 1
+        }
+    fi
 
     django_out="$(
         pct exec "$ctid" -- bash -lc '
@@ -15368,18 +15401,18 @@ print("PROXY=" + repr(settings.SECURE_PROXY_SSL_HEADER))
 '\''
         '
     )" || {
-        warn "Paperless V137: Django-Einstellungen konnten nicht geprüft werden."
+        warn "Paperless V138: Django-Einstellungen konnten nicht geprüft werden."
         return 1
     }
 
     grep -Fq "https://${ip}" <<<"$django_out" || {
-        warn "Paperless V137: externe HTTPS-Adresse fehlt in CSRF_TRUSTED_ORIGINS."
+        warn "Paperless V138: externe HTTPS-Adresse fehlt in CSRF_TRUSTED_ORIGINS."
         printf '%s\n' "$django_out" >&2
         return 1
     }
 
     grep -Fq "HTTP_X_FORWARDED_PROTO" <<<"$django_out" || {
-        warn "Paperless V137: SECURE_PROXY_SSL_HEADER nicht aktiv."
+        warn "Paperless V138: SECURE_PROXY_SSL_HEADER nicht aktiv."
         printf '%s\n' "$django_out" >&2
         return 1
     }
@@ -15387,27 +15420,28 @@ print("PROXY=" + repr(settings.SECURE_PROXY_SSL_HEADER))
     pct exec "$ctid" -- \
         grep -Fq 'proxy_set_header X-Real-IP $remote_addr;' \
         /etc/nginx/conf.d/pve-master-standard-web.conf || {
-        warn "Paperless V137: nginx setzt X-Real-IP nicht."
+        warn "Paperless V138: nginx setzt X-Real-IP nicht."
         return 1
     }
 
     pct exec "$ctid" -- \
         grep -Fq 'proxy_set_header X-Forwarded-Proto https;' \
         /etc/nginx/conf.d/pve-master-standard-web.conf || {
-        warn "Paperless V137: nginx setzt X-Forwarded-Proto=https nicht."
+        warn "Paperless V138: nginx setzt X-Forwarded-Proto=https nicht."
         return 1
     }
 
-    ok "Paperless V137: HTTPS, CSRF und allauth Client-IP geprüft."
+    ok "Paperless V138: HTTPS, CSRF, allauth Client-IP und Inbox-Polling geprüft."
 }
 
 
-repair_existing_paperless_proxy_v137() {
+repair_existing_paperless_proxy_v138() {
     command -v pct >/dev/null 2>&1 || return 0
 
     local ctid=""
     local ip=""
     local fix_script=""
+    local expected_polling="0"
 
     while read -r candidate; do
         [[ "$candidate" =~ ^[0-9]+$ ]] || continue
@@ -15422,7 +15456,7 @@ repair_existing_paperless_proxy_v137() {
     done < <(pct list 2>/dev/null | awk 'NR>1 {print $1}')
 
     [[ -n "$ctid" ]] || {
-        info "Paperless V137: kein vorhandener Paperless-LXC gefunden."
+        info "Paperless V138: kein vorhandener Paperless-LXC gefunden."
         return 0
     }
 
@@ -15439,18 +15473,22 @@ repair_existing_paperless_proxy_v137() {
     )"
 
     [[ -n "$ip" ]] || {
-        warn "Paperless V137: IP von CT ${ctid} konnte nicht ermittelt werden."
+        warn "Paperless V138: IP von CT ${ctid} konnte nicht ermittelt werden."
         return 1
     }
 
     pct exec "$ctid" -- test -s /opt/paperless/docker-compose.yml || {
-        warn "Paperless V137: /opt/paperless/docker-compose.yml fehlt in CT ${ctid}."
+        warn "Paperless V138: /opt/paperless/docker-compose.yml fehlt in CT ${ctid}."
         return 1
     }
 
-    fix_script="/tmp/paperless-v137-${ctid}.py"
+    if pct exec "$ctid" --         grep -Fq '/mnt/paperless-storage/' /opt/paperless/docker-compose.yml; then
+        expected_polling="10"
+    fi
 
-    cat > "$fix_script" <<'PYV137'
+    fix_script="/tmp/paperless-v138-${ctid}.py"
+
+    cat > "$fix_script" <<'PYV138'
 from pathlib import Path
 import os
 import re
@@ -15459,11 +15497,17 @@ path = Path("/opt/paperless/docker-compose.yml")
 text = path.read_text(encoding="utf-8")
 ip = os.environ["PAPERLESS_PUBLIC_IP"].strip()
 
+external_consume = (
+    "/mnt/paperless-storage/" in text
+    and ":/usr/src/paperless/consume" in text
+)
+
 wanted = {
     "PAPERLESS_URL": f'"https://{ip}"',
     "PAPERLESS_PROXY_SSL_HEADER": """'["HTTP_X_FORWARDED_PROTO", "https"]'""",
     "PAPERLESS_TRUSTED_PROXIES": '"127.0.0.1"',
     "PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER": '"X-Real-IP"',
+    "PAPERLESS_CONSUMER_POLLING_INTERVAL": '"10"' if external_consume else '"0"',
 }
 
 for key in wanted:
@@ -15502,12 +15546,12 @@ text = (
 )
 
 path.write_text(text, encoding="utf-8")
-PYV137
+PYV138
 
     pct push \
         "$ctid" \
         "$fix_script" \
-        /root/paperless-v137.py \
+        /root/paperless-v138.py \
         -perms 0700 \
         >/dev/null
 
@@ -15515,12 +15559,12 @@ PYV137
 
     if ! pct exec "$ctid" -- \
         env PAPERLESS_PUBLIC_IP="$ip" \
-        python3 /root/paperless-v137.py; then
-        warn "Paperless V137: Compose-Migration fehlgeschlagen."
+        python3 /root/paperless-v138.py; then
+        warn "Paperless V138: Compose-Migration fehlgeschlagen."
         return 1
     fi
 
-    pct exec "$ctid" -- rm -f /root/paperless-v137.py >/dev/null 2>&1 || true
+    pct exec "$ctid" -- rm -f /root/paperless-v138.py >/dev/null 2>&1 || true
 
     if ! pct exec "$ctid" -- bash -lc '
         set -Eeuo pipefail
@@ -15528,11 +15572,11 @@ PYV137
         docker compose config -q
         docker compose up -d --force-recreate webserver
     '; then
-        warn "Paperless V137: Webserver-Recreate fehlgeschlagen."
+        warn "Paperless V138: Webserver-Recreate fehlgeschlagen."
         return 1
     fi
 
-    verify_paperless_proxy_v137 "$ctid" "$ip"
+    verify_paperless_proxy_v138 "$ctid" "$ip" "$expected_polling"
 }
 
 
@@ -44804,10 +44848,10 @@ fi
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
 
-# V137: Bei einem reinen Dashboard-Update einen bereits vorhandenen
+# V138: Bei einem reinen Dashboard-Update einen bereits vorhandenen
 # Paperless-CT nachziehen. Bei Neuinstallation prüft install_paperless() selbst.
 if (( INSTALL_DASHBOARD && ! INSTALL_PAPERLESS )); then
-    run_install_step         "Paperless HTTPS / CSRF / Login-IP prüfen"         repair_existing_paperless_proxy_v137
+    run_install_step         "Paperless HTTPS / CSRF / Login-IP prüfen"         repair_existing_paperless_proxy_v138
 fi
 
 (( INSTALL_PIHOLE )) && run_install_step "Pi-hole + Unbound" install_pihole
