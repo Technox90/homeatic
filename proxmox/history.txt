@@ -1,6 +1,36 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V133
+-----------------
+- Updatepfad für bereits vorhandene Dashboard-Installationen repariert.
+- Ursache: V132 enthielt die Theme-Funktionen zwar für Neuinstallationen, übersprang sie bei bestehenden V131/V132-Dashboards durch zu grobe Idempotenz-Prüfungen:
+  * vorhandenes settingsModal verhinderte das Einfügen der neuen Farbwähler,
+  * vorhandenes applyUiSettings() verhinderte das Einfügen der Theme-JavaScript-Funktionen,
+  * vorhandene /api/ui-settings-Route verhinderte das Erweitern der bestehenden API um Theme-Felder.
+- V133 migriert deshalb bestehende Installationen explizit:
+  * ui.json wird um fehlende/ungültige Theme-Werte ergänzt,
+  * read_ui_settings()-Defaults werden erweitert,
+  * helper_payload der Settings-API erhält alle Theme-Felder,
+  * Farbwähler werden in einen bestehenden Settings-Dialog nachgerüstet,
+  * Theme-JavaScript wird in bestehende Frontends nachgerüstet,
+  * Laden, Live-Vorschau und Speichern der Farben werden ergänzt.
+- Menü-Sichtbarkeit korrigiert:
+  * der sichtbare Trenner vor „⚙ Einstellungen“ war bereits vorhanden,
+  * .navManage verwendete jedoch margin-top:auto und drückte den Einstellungsbutton ans Ende des Sidebars,
+  * #dashboardSettingsHubButton wird jetzt direkt unter dem Trenner angezeigt,
+  * GitHub-Link bleibt direkt darunter,
+  * Sidebar ist vertikal scrollbar.
+- Beim Schließen des gemeinsamen Einstellungsfensters wird eine nicht gespeicherte Farb-Vorschau wieder auf die gespeicherten Werte zurückgesetzt.
+- Fehler im temporären Settings-Patchpfad korrigiert:
+  /tmp/pve-dashboard-settings-v4.$ statt /tmp/pve-dashboard-settings-v4.$
+- Finale Dashboard-Prüfung erweitert um:
+  * dashboardGithubLink
+  * PVE_SETTINGS_MENU_VISIBILITY_V133
+  * themeBg
+  * Theme-API theme_bg
+- Pi-hole-v6 dns.hosts, CNAME-Sync und die V129-SQLite-Korrektur bleiben unverändert erhalten.
+
 20.09.2026 – V132
 -----------------
 - Dashboard-Farbschema direkt in „⚙ Einstellungen“ integriert.
