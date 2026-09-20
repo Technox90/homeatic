@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V127
+-----------------
+- CNAME-Verifikation nach dem Pi-hole-Import auf die kanonische dig-Syntax korrigiert:
+  * "dig @127.0.0.1 <Alias> CNAME"
+- Keine Änderung an den eigentlichen DNS-/CNAME-Daten; nur der abschließende Funktionstest wurde präzisiert.
+
 20.09.2026 – V126
 -----------------
 - Pi-hole Standardlisten-Import repariert.

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V126
+# PROXMOX MODULARER KOMPLETT-INSTALLER V127
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -41,6 +41,7 @@ set -Eeuo pipefail
 #   V124: Dashboard systemd-NAMESPACE-Fix; /var/lib/pve-sensor-dashboard-web wird vor jedem Webdienst-Start angelegt
 #   V125: PVE-UPS Standardprofil aus PDF + Proxmox Benutzer pve-ups@pve, Token pve-ups, Rolle UPSPower
 #   V126: Pi-hole Listenimport mit docker exec -i + Verifikation; lokale DNS-/CNAME-Einträge aus GitHub
+#   V127: CNAME-DNS-Verifikation auf kanonische dig-Argumentreihenfolge korrigiert
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -743,7 +744,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V126"
+TUI_TITLE="PROXMOX INSTALLER V127"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1116,7 +1117,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 126" \
+                    --title "HAUPTMENÜ · Version 127" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8622,7 +8623,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V126",
+    "installer_version": "V127",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9096,7 +9097,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V126 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V127 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15299,7 +15300,7 @@ done
 }
 
 CNAME_RESULT="$(
-    dig +short CNAME "$CNAME_ALIAS" @127.0.0.1 +time=2 2>/dev/null |
+    dig +short @127.0.0.1 "$CNAME_ALIAS" CNAME +time=2 2>/dev/null |
     head -n1 |
     sed 's/[.]$//'
 )"
