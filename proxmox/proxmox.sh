@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V132
+# PROXMOX MODULARER KOMPLETT-INSTALLER V133
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -47,6 +47,7 @@ set -Eeuo pipefail
 #   V130: Pi-hole Local-DNS-Sync aus Proxmox-Gästen + Dashboard; Watcher + 10-Minuten-Fallback
 #   V131: Pi-hole-v6 Local DNS auf offizielles dns.hosts umgestellt; WebUI zeigt synchronisierte IP/Host-Einträge
 #   V132: Dashboard-Farbschema über Einstellungen anpassbar; persistente Theme-Farben mit Live-Vorschau
+#   V133: bestehende Dashboard-Installationen auf Theme-UI/API migrieren; Einstellungen/GitHub direkt sichtbar
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -749,8 +750,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V132"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V132"
+TUI_TITLE="PROXMOX INSTALLER V133"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V133"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1122,7 +1123,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 132" \
+                    --title "HAUPTMENÜ · Version 133" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8637,7 +8638,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V132",
+    "installer_version": "V133",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9111,7 +9112,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V132 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V133 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -22004,7 +22005,7 @@ __PVE_MENU_EDITOR_V4__
 install_dashboard_settings_v4() {
     header "DASHBOARD EINSTELLUNGEN / FARBEN / HTTPS / FAVICON"
 
-    local patch="/tmp/pve-dashboard-settings-v4.$"
+    local patch="/tmp/pve-dashboard-settings-v4.$$"
 
     cat > "$patch" <<'__PVE_DASHBOARD_SETTINGS_V4__'
 #!/usr/bin/env bash
@@ -24283,6 +24284,411 @@ print("[OK] Dashboard-Einstellungsdialog eingebaut.")
 print("[OK] Menü-Link-Protokoll HTTP/HTTPS eingebaut.")
 PY
 
+# V133: Bestehende V131/V132-Dashboards explizit migrieren.
+python3 - "$APP" "$INDEX" "$SETTINGS_FILE" <<'PYV133'
+from pathlib import Path
+import json
+import re
+import sys
+
+app_path = Path(sys.argv[1])
+index_path = Path(sys.argv[2])
+settings_path = Path(sys.argv[3])
+
+app = app_path.read_text(encoding="utf-8")
+index = index_path.read_text(encoding="utf-8")
+
+THEME_DEFAULTS = {
+    "theme_bg": "#08101b",
+    "theme_panel": "#101a29",
+    "theme_panel2": "#131f31",
+    "theme_line": "#28364b",
+    "theme_text": "#eef5ff",
+    "theme_muted": "#92a4bc",
+    "theme_accent": "#64a7ff",
+    "theme_accent2": "#9b7cff",
+    "theme_good": "#37d996",
+    "theme_warn": "#ffbd4a",
+    "theme_bad": "#ff5f6d",
+}
+
+COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def theme_lines(indent):
+    return "".join(
+        f'{indent}"{key}": "{value}",\n'
+        for key, value in THEME_DEFAULTS.items()
+    )
+
+
+try:
+    settings = json.loads(
+        settings_path.read_text(encoding="utf-8")
+    )
+    if not isinstance(settings, dict):
+        settings = {}
+except Exception:
+    settings = {}
+
+settings_changed = False
+
+for key, default in THEME_DEFAULTS.items():
+    value = str(settings.get(key, "")).strip()
+    if not COLOR_RE.fullmatch(value):
+        settings[key] = default
+        settings_changed = True
+
+if settings_changed or not settings_path.exists():
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(
+        json.dumps(
+            settings,
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+
+
+m = re.search(
+    r'(def read_ui_settings\(\):\s*\n'
+    r'\s*defaults\s*=\s*\{\s*\n)'
+    r'(.*?)'
+    r'(\n\s*\}\s*\n)',
+    app,
+    re.S,
+)
+
+if not m:
+    raise SystemExit(
+        "FEHLER: read_ui_settings()-Defaults nicht gefunden."
+    )
+
+if '"theme_bg"' not in m.group(2):
+    body = m.group(2)
+    if body and not body.endswith("\n"):
+        body += "\n"
+    body += theme_lines("        ")
+    app = (
+        app[:m.start()]
+        + m.group(1)
+        + body
+        + m.group(3)
+        + app[m.end():]
+    )
+
+m = re.search(
+    r'(helper_payload\s*=\s*\{\s*\n)'
+    r'(.*?)'
+    r'(\n\s*\}\s*\n\s*\n'
+    r'\s*favicon\s*=\s*request\.files\.get\("favicon"\))',
+    app,
+    re.S,
+)
+
+if not m:
+    raise SystemExit(
+        "FEHLER: helper_payload der Settings-API nicht gefunden."
+    )
+
+if '"theme_bg"' not in m.group(2):
+    theme_payload = "".join(
+        f'        "{key}": str(payload.get("{key}", "")).strip(),\n'
+        for key in THEME_DEFAULTS
+    )
+    body = m.group(2)
+    if body and not body.endswith("\n"):
+        body += "\n"
+    body += theme_payload
+    app = (
+        app[:m.start()]
+        + m.group(1)
+        + body
+        + m.group(3)
+        + app[m.end():]
+    )
+
+
+theme_html = r'''
+      <div class="full">
+        <div class="themeSectionHead">
+          <div>
+            <strong>Farbschema</strong>
+            <span>Farben werden sofort als Vorschau angezeigt.</span>
+          </div>
+          <button
+            type="button"
+            class="themeReset"
+            onclick="resetThemeColors()"
+          >Standardfarben</button>
+        </div>
+
+        <div class="themeGrid">
+          <div class="themeColor"><label for="themeBg">Hintergrund</label><input id="themeBg" type="color" value="#08101b" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themePanel">Panel dunkel</label><input id="themePanel" type="color" value="#101a29" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themePanel2">Panel hell</label><input id="themePanel2" type="color" value="#131f31" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeLine">Linien / Rahmen</label><input id="themeLine" type="color" value="#28364b" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeText">Text</label><input id="themeText" type="color" value="#eef5ff" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeMuted">Sekundärtext</label><input id="themeMuted" type="color" value="#92a4bc" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeAccent">Akzent</label><input id="themeAccent" type="color" value="#64a7ff" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeAccent2">Akzent 2</label><input id="themeAccent2" type="color" value="#9b7cff" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeGood">OK</label><input id="themeGood" type="color" value="#37d996" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeWarn">Warnung</label><input id="themeWarn" type="color" value="#ffbd4a" oninput="previewThemeColors()"></div>
+          <div class="themeColor"><label for="themeBad">Fehler</label><input id="themeBad" type="color" value="#ff5f6d" oninput="previewThemeColors()"></div>
+        </div>
+
+        <div class="themeHint">
+          Erst „Einstellungen speichern“ übernimmt das Farbschema dauerhaft.
+        </div>
+      </div>
+
+'''
+
+if 'id="themeBg"' not in index:
+    anchor = (
+        '      <div class="full">\n'
+        '        <label for="faviconFile">Favicon hochladen</label>'
+    )
+
+    if anchor not in index:
+        raise SystemExit(
+            "FEHLER: Favicon-Feld als Theme-Einfügepunkt nicht gefunden."
+        )
+
+    index = index.replace(
+        anchor,
+        theme_html + anchor,
+        1,
+    )
+
+
+theme_js = r'''
+const THEME_DEFAULTS={
+  theme_bg:'#08101b',
+  theme_panel:'#101a29',
+  theme_panel2:'#131f31',
+  theme_line:'#28364b',
+  theme_text:'#eef5ff',
+  theme_muted:'#92a4bc',
+  theme_accent:'#64a7ff',
+  theme_accent2:'#9b7cff',
+  theme_good:'#37d996',
+  theme_warn:'#ffbd4a',
+  theme_bad:'#ff5f6d'
+};
+
+const THEME_VARS={
+  theme_bg:'--bg',
+  theme_panel:'--panel',
+  theme_panel2:'--panel2',
+  theme_line:'--line',
+  theme_text:'--text',
+  theme_muted:'--muted',
+  theme_accent:'--accent',
+  theme_accent2:'--accent2',
+  theme_good:'--good',
+  theme_warn:'--warn',
+  theme_bad:'--bad'
+};
+
+const THEME_FIELDS={
+  theme_bg:'themeBg',
+  theme_panel:'themePanel',
+  theme_panel2:'themePanel2',
+  theme_line:'themeLine',
+  theme_text:'themeText',
+  theme_muted:'themeMuted',
+  theme_accent:'themeAccent',
+  theme_accent2:'themeAccent2',
+  theme_good:'themeGood',
+  theme_warn:'themeWarn',
+  theme_bad:'themeBad'
+};
+
+function validThemeColor(value,fallback){
+  const color=String(value||'').trim();
+  return /^#[0-9a-f]{6}$/i.test(color)
+    ? color.toLowerCase()
+    : fallback;
+}
+
+function applyThemeColors(settings){
+  const root=document.documentElement;
+  Object.entries(THEME_VARS).forEach(([key,cssVar])=>{
+    root.style.setProperty(
+      cssVar,
+      validThemeColor(
+        settings?.[key],
+        THEME_DEFAULTS[key]
+      )
+    );
+  });
+}
+
+function fillThemeInputs(settings){
+  Object.entries(THEME_FIELDS).forEach(([key,id])=>{
+    const el=$(id);
+    if(el){
+      el.value=validThemeColor(
+        settings?.[key],
+        THEME_DEFAULTS[key]
+      );
+    }
+  });
+}
+
+function themeFromInputs(){
+  const theme={};
+  Object.entries(THEME_FIELDS).forEach(([key,id])=>{
+    theme[key]=validThemeColor(
+      $(id)?.value,
+      THEME_DEFAULTS[key]
+    );
+  });
+  return theme;
+}
+
+function previewThemeColors(){
+  applyThemeColors(themeFromInputs());
+}
+
+function resetThemeColors(){
+  fillThemeInputs(THEME_DEFAULTS);
+  previewThemeColors();
+}
+
+'''
+
+if "const THEME_DEFAULTS={" not in index:
+    anchor = "function ensureFaviconLink(){"
+    if anchor not in index:
+        raise SystemExit(
+            "FEHLER: ensureFaviconLink() für Theme-JS nicht gefunden."
+        )
+    index = index.replace(
+        anchor,
+        theme_js + anchor,
+        1,
+    )
+
+apply_match = re.search(
+    r'function applyUiSettings\(settings\)\{.*?\n\}',
+    index,
+    re.S,
+)
+if not apply_match:
+    raise SystemExit("FEHLER: applyUiSettings() nicht gefunden.")
+
+apply_block = apply_match.group(0)
+if "applyThemeColors(uiSettings);" not in apply_block:
+    needle = "  const favicon=ensureFaviconLink();"
+    if needle not in apply_block:
+        raise SystemExit(
+            "FEHLER: Favicon-Anker in applyUiSettings() fehlt."
+        )
+    apply_block = apply_block.replace(
+        needle,
+        "  applyThemeColors(uiSettings);\n\n" + needle,
+        1,
+    )
+    index = (
+        index[:apply_match.start()]
+        + apply_block
+        + index[apply_match.end():]
+    )
+
+open_match = re.search(
+    r'async function openDashboardSettings\(\)\{.*?\n\}',
+    index,
+    re.S,
+)
+if not open_match:
+    raise SystemExit(
+        "FEHLER: openDashboardSettings() nicht gefunden."
+    )
+
+open_block = open_match.group(0)
+if "fillThemeInputs(settings);" not in open_block:
+    needle = "  $('faviconFile').value='';"
+    if needle not in open_block:
+        raise SystemExit(
+            "FEHLER: Favicon-Anker in openDashboardSettings() fehlt."
+        )
+    open_block = open_block.replace(
+        needle,
+        "  fillThemeInputs(settings);\n\n" + needle,
+        1,
+    )
+    index = (
+        index[:open_match.start()]
+        + open_block
+        + index[open_match.end():]
+    )
+
+save_match = re.search(
+    r'async function saveDashboardSettings\(\)\{.*?\n\}',
+    index,
+    re.S,
+)
+if not save_match:
+    raise SystemExit(
+        "FEHLER: saveDashboardSettings() nicht gefunden."
+    )
+
+save_block = save_match.group(0)
+if "const theme=themeFromInputs();" not in save_block:
+    needle = "  form.append('code',code);"
+    if needle not in save_block:
+        raise SystemExit(
+            "FEHLER: Code-Anker in saveDashboardSettings() fehlt."
+        )
+    addition = """  form.append('code',code);
+
+  const theme=themeFromInputs();
+
+  Object.entries(theme).forEach(([key,value])=>{
+    form.append(key,value);
+  });"""
+    save_block = save_block.replace(
+        needle,
+        addition,
+        1,
+    )
+    index = (
+        index[:save_match.start()]
+        + save_block
+        + index[save_match.end():]
+    )
+
+for required in (
+    'id="themeBg"',
+    "const THEME_DEFAULTS={",
+    "applyThemeColors(uiSettings);",
+    "fillThemeInputs(settings);",
+    "const theme=themeFromInputs();",
+):
+    if required not in index:
+        raise SystemExit(
+            "FEHLER: Theme-Migration unvollständig: " + required
+        )
+
+for required in (
+    '"theme_bg"',
+    '"theme_bad"',
+):
+    if required not in app:
+        raise SystemExit(
+            "FEHLER: Settings-API Theme-Migration unvollständig: "
+            + required
+        )
+
+app_path.write_text(app, encoding="utf-8")
+index_path.write_text(index, encoding="utf-8")
+
+print("[OK] Bestehende Dashboard-Settings auf Theme V133 migriert.")
+PYV133
+
 chmod 644 "$APP" "$INDEX"
 chown root:root "$APP" "$INDEX"
 
@@ -24630,6 +25036,35 @@ if "/* PVE_DASHBOARD_GITHUB_LINK_V1 */" not in text:
         raise SystemExit("FEHLER: </style> für GitHub-CSS nicht gefunden.")
     text = text.replace("</style>", github_css + "\n</style>", 1)
 
+visibility_css = r'''
+/* PVE_SETTINGS_MENU_VISIBILITY_V133 */
+.sideNav{
+  overflow-y:auto;
+}
+#navSettingsDivider{
+  flex:0 0 auto;
+}
+#dashboardSettingsHubButton{
+  margin-top:0 !important;
+  flex:0 0 auto;
+}
+#dashboardGithubLink{
+  flex:0 0 auto;
+  margin-bottom:6px;
+}
+'''
+
+if "/* PVE_SETTINGS_MENU_VISIBILITY_V133 */" not in text:
+    if "</style>" not in text:
+        raise SystemExit(
+            "FEHLER: </style> für Settings-Sichtbarkeit nicht gefunden."
+        )
+    text = text.replace(
+        "</style>",
+        visibility_css + "\n</style>",
+        1,
+    )
+
 # 2) Alte Dialogtitel umbenennen
 text = re.sub(
     r'(<div class="modal" id="linksModal">.*?<h2>).*?(</h2>)',
@@ -24766,6 +25201,9 @@ async function switchUnifiedSettingsTab(tab){
 }
 
 function closeUnifiedSettings(){
+  if(typeof applyThemeColors==='function' && typeof uiSettings!=='undefined'){
+    applyThemeColors(uiSettings);
+  }
   $('settingsHubModal').classList.remove('show');
   if($('linksModal'))$('linksModal').classList.remove('show');
   if($('settingsModal'))$('settingsModal').classList.remove('show');
@@ -43219,6 +43657,9 @@ validate_dashboard_final_state_v69() {
 
     local index_markers=(
         'id="dashboardSettingsHubButton"'
+        'id="dashboardGithubLink"'
+        'PVE_SETTINGS_MENU_VISIBILITY_V133'
+        'id="themeBg"'
         'PVE_CATEGORY_UI_TEST_V1'
         'PVE_CATEGORY_ASSIGNMENT_FIX_V2'
         'id="settingsHubTabCategories"'
@@ -43239,6 +43680,11 @@ validate_dashboard_final_state_v69() {
             failed=1
         fi
     done
+
+    grep -Fq '"theme_bg"' "$app" || {
+        warn "Dashboard Finalprüfung: Theme-API theme_bg fehlt."
+        failed=1
+    }
 
     grep -Fq 'PVE_UPS_SETTINGS_V2' "$app" || {
         warn "Dashboard Finalprüfung: PVE_UPS_SETTINGS_V2 fehlt."
