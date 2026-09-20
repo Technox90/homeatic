@@ -1,6 +1,41 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V134
+-----------------
+- Dashboard-Menüfooter korrigiert.
+- Ursache für die nach oben gewanderten Einstellungen:
+  * V133 setzte #dashboardSettingsHubButton absichtlich auf margin-top:0, damit der zuvor außerhalb des sichtbaren Bereichs liegende Button sofort sichtbar wurde.
+  * Dadurch stand „⚙ Einstellungen“ direkt nach dem dynamischen Dienstebereich statt am unteren Rand des Seitenmenüs.
+- V134 verwendet jetzt den Trenner #navSettingsDivider als Flex-Auto-Margin-Anker.
+- Ergebnis:
+  * Trenner + „⚙ Einstellungen“ + GitHub bilden wieder den unteren Menüabschluss.
+  * Bei wenigen Diensten bleibt der Block unten.
+  * Bei vielen Diensten bleibt das Seitenmenü vertikal scrollbar.
+- Fehlende Links bereits vorhandener CTs beim reinen Dashboard-Update behoben.
+- Ursache:
+  * Zusatzdienste wurden bisher nur über INSTALL_* Bedingungen mit dashboard_link_upsert eingetragen.
+  * Bei „Server-Dashboard installieren / aktualisieren“ waren die INSTALL_* Flags bereits vorhandener Dienste nicht gesetzt.
+  * Deshalb erschienen nur bereits gespeicherte bzw. die Basislinks, nicht aber vorhandene Zusatz-CTs.
+- Neuer Abgleich:
+  dashboard_reconcile_existing_guests_v134
+- Der Abgleich scannt vorhandene LXC über pct, ermittelt Hostname und private IPv4 und erkennt bekannte Installer-Webdienste.
+- Automatisch erkannt werden u. a.:
+  * Paperless, Pi-hole, NetAlertX
+  * Uptime Kuma, Vaultwarden, Caddy, Stirling PDF, ntfy
+  * Forgejo, Syncthing, Speedtest Tracker, Scrutiny, Mealie
+  * Proxmox Backup Server, Pulse, PVE-UPS
+  * Semaphore, Pocket ID, Prometheus, PVE Exporter, Grafana
+  * Pangolin, Gatus, Homepage, Nginx Proxy Manager, EMQX
+- Newt und CrowdSec werden bewusst nicht als Weblink ergänzt.
+- Sicherheitsregel:
+  * bestehende Links werden nicht gelöscht,
+  * bestehende URLs werden nicht überschrieben,
+  * manuelle Links bleiben unverändert,
+  * nur tatsächlich fehlende bekannte Dienste werden ergänzt.
+- Der Abgleich läuft vor der Standardkategorie-Zuordnung, sodass neu erkannte Dienste automatisch in Basics/Extras einsortiert werden können.
+- Pi-hole-v6 dns.hosts, CNAME-Sync, V129-SQLite-Fix und Dashboard-Theme-Migration bleiben unverändert erhalten.
+
 20.09.2026 – V133
 -----------------
 - Updatepfad für bereits vorhandene Dashboard-Installationen repariert.
