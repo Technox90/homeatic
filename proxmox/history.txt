@@ -1,6 +1,26 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V138
+-----------------
+- Paperless-NAS-Inbox wird bei externer Ablage jetzt zuverlässig per Polling überwacht.
+- Ursache für liegenbleibende Dokumente:
+  * die Consume-/Inbox-Struktur liegt bei PAPERLESS_EXTERNAL_STORAGE auf /mnt/paperless-storage,
+  * dieser Pfad basiert auf NFS/Netzwerkspeicher,
+  * native Dateisystembenachrichtigungen (inotify) funktionieren auf NFS/SMB nicht zuverlässig,
+  * dadurch konnten Dateien in der Inbox liegen bleiben, obwohl Paperless selbst healthy war.
+- Neu bei Paperless:
+  * PAPERLESS_CONSUMER_POLLING_INTERVAL=10 bei externer NAS-Ablage,
+  * PAPERLESS_CONSUMER_POLLING_INTERVAL=0 bei lokaler Ablage.
+- Die Neuinstallation prüft jetzt zusätzlich:
+  * ob der Polling-Wert tatsächlich im laufenden Webserver-Container vorhanden ist,
+  * ob /usr/src/paperless/consume im laufenden Container existiert,
+  * ob die Inbox lesbar und beschreibbar ist.
+- Bestehende Paperless-Installationen werden durch repair_existing_paperless_proxy_v138 entsprechend nachgezogen.
+- Bei vorhandener /mnt/paperless-storage-Consume-Bind-Mount wird Polling=10 gesetzt, sonst 0.
+- V137 HTTPS-/CSRF-/allauth-Korrekturen bleiben unverändert aktiv.
+- Pi-hole-v6 dns.hosts, SQLite-Schutz, Dashboard-Link-Abgleich und Theme bleiben unverändert erhalten.
+
 20.09.2026 – V137
 -----------------
 - Alle bestätigten Paperless-Reverse-Proxy-/Login-Korrekturen direkt in die Neuinstallation übernommen.
