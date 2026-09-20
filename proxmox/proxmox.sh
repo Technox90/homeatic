@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V130
+# PROXMOX MODULARER KOMPLETT-INSTALLER V131
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -45,6 +45,7 @@ set -Eeuo pipefail
 #   V128: Dashboard-Seitenmenü um dezenten GitHub-Verweis unterhalb von Einstellungen ergänzt
 #   V129: Pi-hole SQLite-Kommandos korrigiert; ungültige Option -ni vollständig entfernt
 #   V130: Pi-hole Local-DNS-Sync aus Proxmox-Gästen + Dashboard; Watcher + 10-Minuten-Fallback
+#   V131: Pi-hole-v6 Local DNS auf offizielles dns.hosts umgestellt; WebUI zeigt synchronisierte IP/Host-Einträge
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -747,7 +748,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V130"
+TUI_TITLE="PROXMOX INSTALLER V131"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1120,7 +1121,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 130" \
+                    --title "HAUPTMENÜ · Version 131" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8635,7 +8636,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V130",
+    "installer_version": "V131",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9109,7 +9110,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V130 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V131 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15192,24 +15193,23 @@ __PIHOLE_STANDARDLISTEN_V82__
     fi
 }
 
-install_pihole_local_dns_v126() {
+install_pihole_local_dns_v131() {
     local ct_id="${1:-$PH_ID}"
-    local host_script="/tmp/pihole-local-dns-v126-${ct_id}.sh"
-    local ct_script="/root/pihole-local-dns-v126.sh"
+    local host_script="/tmp/pihole-local-dns-v131-${ct_id}.sh"
+    local ct_script="/root/pihole-local-dns-v131.sh"
 
-    cat > "$host_script" <<'__PIHOLE_LOCAL_DNS_V126__'
+    cat > "$host_script" <<'__PIHOLE_LOCAL_DNS_V131__'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
 DNS_URL="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/dns/custom.list"
 CNAME_URL="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/cname/cname.txt"
 
-DNS_TARGET="/opt/pihole/etc-pihole/custom.list"
-DNS_TMP="/tmp/pihole-custom.list"
+DNS_TMP="/tmp/pihole-dns-hosts.txt"
 CNAME_TMP="/tmp/pihole-cname.txt"
 
 echo "============================================================"
-echo " PI-HOLE LOKALE DNS-/CNAME-EINTRÄGE V126"
+echo " PI-HOLE V6 LOKALE DNS-/CNAME-EINTRÄGE V131"
 echo "============================================================"
 echo
 
@@ -15221,22 +15221,53 @@ docker ps --format '{{.Names}}' | grep -qx pihole || {
 curl -fsSL --retry 3 --connect-timeout 10 "$DNS_URL" -o "$DNS_TMP"
 curl -fsSL --retry 3 --connect-timeout 10 "$CNAME_URL" -o "$CNAME_TMP"
 
-DNS_COUNT="$(
-    awk '
-        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-        NF >= 2 { count++ }
-        END { print count+0 }
-    ' "$DNS_TMP"
-)"
+declare -a DNS_ITEMS=()
+DNS_FIRST_IP=""
+DNS_FIRST_HOST=""
 
-(( DNS_COUNT > 0 )) || {
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    [[ -n "${line//[[:space:]]/}" ]] || continue
+
+    read -r ip host extra <<< "$line"
+
+    [[ -n "${ip:-}" && -n "${host:-}" && -z "${extra:-}" ]] || {
+        echo "FEHLER: Ungültige DNS-Zeile: $line"
+        exit 1
+    }
+
+    [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || {
+        echo "FEHLER: Ungültige IPv4-Adresse: $ip"
+        exit 1
+    }
+
+    [[ "$host" =~ ^[A-Za-z0-9._-]+$ ]] || {
+        echo "FEHLER: Ungültiger DNS-Hostname: $host"
+        exit 1
+    }
+
+    DNS_ITEMS+=("\"${ip} ${host}\"")
+
+    if [[ -z "$DNS_FIRST_IP" ]]; then
+        DNS_FIRST_IP="$ip"
+        DNS_FIRST_HOST="$host"
+    fi
+done < "$DNS_TMP"
+
+(( ${#DNS_ITEMS[@]} > 0 )) || {
     echo "FEHLER: Keine lokalen DNS-Einträge aus $DNS_URL geladen."
     exit 1
 }
 
-install -m 0644 "$DNS_TMP" "$DNS_TARGET"
+DNS_JSON="[$(IFS=,; echo "${DNS_ITEMS[*]}")]"
+
+echo "Setze Pi-hole-v6 dns.hosts ..."
+docker exec pihole pihole-FTL --config dns.hosts "$DNS_JSON"
 
 declare -a CNAME_ITEMS=()
+CNAME_ALIAS=""
+CNAME_TARGET=""
+
 while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
     [[ -n "${line//[[:space:]]/}" ]] || continue
@@ -15254,6 +15285,11 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     }
 
     CNAME_ITEMS+=("\"${alias},${target}\"")
+
+    if [[ -z "$CNAME_ALIAS" ]]; then
+        CNAME_ALIAS="$alias"
+        CNAME_TARGET="$target"
+    fi
 done < "$CNAME_TMP"
 
 (( ${#CNAME_ITEMS[@]} > 0 )) || {
@@ -15262,43 +15298,15 @@ done < "$CNAME_TMP"
 }
 
 CNAME_JSON="[$(IFS=,; echo "${CNAME_ITEMS[*]}")]"
-
-docker exec pihole \
-    pihole-FTL --config dns.cnameRecords "$CNAME_JSON"
-
-CNAME_ALIAS="$(
-    awk '
-        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-        NF >= 2 { print $1; exit }
-    ' "$CNAME_TMP"
-)"
-CNAME_TARGET="$(
-    awk '
-        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-        NF >= 2 { print $2; exit }
-    ' "$CNAME_TMP"
-)"
+docker exec pihole pihole-FTL --config dns.cnameRecords "$CNAME_JSON"
 
 rm -f "$DNS_TMP" "$CNAME_TMP"
 
 docker restart pihole >/dev/null
 
-DNS_HOST="$(
-    awk '
-        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-        NF >= 2 { print $2; exit }
-    ' "$DNS_TARGET"
-)"
-DNS_IP="$(
-    awk '
-        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
-        NF >= 2 { print $1; exit }
-    ' "$DNS_TARGET"
-)"
-
 READY=0
 for _ in $(seq 1 30); do
-    if dig +short "$DNS_HOST" @127.0.0.1 +time=2 2>/dev/null | grep -Fxq "$DNS_IP"; then
+    if dig +short @127.0.0.1 "$DNS_FIRST_HOST" A +time=2 2>/dev/null | grep -Fxq "$DNS_FIRST_IP"; then
         READY=1
         break
     fi
@@ -15306,7 +15314,7 @@ for _ in $(seq 1 30); do
 done
 
 (( READY == 1 )) || {
-    echo "FEHLER: Lokaler DNS-Eintrag $DNS_HOST -> $DNS_IP ist nach dem Neustart nicht auflösbar."
+    echo "FEHLER: Lokaler DNS-Eintrag $DNS_FIRST_HOST -> $DNS_FIRST_IP ist nicht auflösbar."
     docker logs --tail 80 pihole 2>/dev/null || true
     exit 1
 }
@@ -15323,11 +15331,11 @@ CNAME_RESULT="$(
     exit 1
 }
 
-echo "Lokale DNS-Einträge: $DNS_COUNT"
+echo "Lokale DNS-Einträge (dns.hosts): ${#DNS_ITEMS[@]}"
 echo "CNAME-Einträge: ${#CNAME_ITEMS[@]}"
-echo "DNS-Test: $DNS_HOST -> $DNS_IP [OK]"
+echo "DNS-Test: $DNS_FIRST_HOST -> $DNS_FIRST_IP [OK]"
 echo "CNAME-Test: $CNAME_ALIAS -> $CNAME_TARGET [OK]"
-__PIHOLE_LOCAL_DNS_V126__
+__PIHOLE_LOCAL_DNS_V131__
 
     chmod +x "$host_script"
 
@@ -15340,7 +15348,7 @@ __PIHOLE_LOCAL_DNS_V126__
 
     if pct exec "$ct_id" -- bash "$ct_script"; then
         pct exec "$ct_id" -- rm -f "$ct_script" 2>/dev/null || true
-        ok "Pi-hole lokale DNS- und CNAME-Einträge aus GitHub übernommen."
+        ok "Pi-hole-v6 lokale DNS- und CNAME-Einträge eingerichtet."
     else
         warn "Pi-hole lokale DNS-/CNAME-Einträge konnten nicht vollständig eingerichtet werden."
         warn "CT-Skript bleibt zur Diagnose erhalten: $ct_script"
@@ -15348,24 +15356,23 @@ __PIHOLE_LOCAL_DNS_V126__
     fi
 }
 
-install_pihole_dns_sync_v130() {
+install_pihole_dns_sync_v131() {
     local ct_id="${1:-$PH_ID}"
     local sync_dir="/etc/pve-pihole-dns-sync"
     local helper="/usr/local/sbin/pve-pihole-dns-sync"
     local base_file="${sync_dir}/custom.list.base"
     local base_url="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/dns/custom.list"
 
-    header "PI-HOLE DNS-SYNC · PROXMOX + DASHBOARD"
+    header "PI-HOLE V6 DNS-SYNC · PROXMOX + DASHBOARD"
 
-    mkdir -p "$sync_dir" /var/lib/pve-sensor-dashboard-web
-    chmod 755 "$sync_dir"
+    mkdir -p "$sync_dir" /var/lib/pve-sensor-dashboard-web /var/lib/pve-pihole-dns-sync
+    chmod 755 "$sync_dir" /var/lib/pve-pihole-dns-sync
 
     if ! curl -fsSL --retry 3 --connect-timeout 10 "$base_url" -o "${base_file}.tmp"; then
-        warn "GitHub-DNS-Basis konnte nicht geladen werden; verwende vorhandene Pi-hole custom.list als Fallback."
-        pct exec "$ct_id" -- cat /opt/pihole/etc-pihole/custom.list > "${base_file}.tmp" 2>/dev/null || true
+        warn "GitHub-DNS-Basis konnte nicht geladen werden."
+        : > "${base_file}.tmp"
     fi
 
-    [[ -s "${base_file}.tmp" ]] || die "Keine DNS-Basis für den Pi-hole-DNS-Sync verfügbar."
     mv -f "${base_file}.tmp" "$base_file"
     chmod 644 "$base_file"
 
@@ -15378,7 +15385,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import time
 import unicodedata
 from pathlib import Path
@@ -15386,9 +15392,8 @@ from urllib.parse import urlparse
 
 BASE_FILE = Path("/etc/pve-pihole-dns-sync/custom.list.base")
 LINKS_FILE = Path("/var/lib/pve-sensor-dashboard-web/links.json")
+STATE_FILE = Path("/var/lib/pve-pihole-dns-sync/managed-hosts.json")
 LOCK_FILE = Path("/run/lock/pve-pihole-dns-sync.lock")
-BEGIN = "# BEGIN NODEZERO MANAGED DNS"
-END = "# END NODEZERO MANAGED DNS"
 
 RFC1918 = (
     ipaddress.ip_network("10.0.0.0/8"),
@@ -15421,20 +15426,20 @@ KNOWN = {
     "ups": "ups.lan",
 }
 
-def run(args, timeout=6):
+def run(args, timeout=8):
     try:
         return subprocess.run(
             args,
             text=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             timeout=timeout,
             check=False,
         )
-    except Exception:
-        return subprocess.CompletedProcess(args, 1, "", "")
+    except Exception as exc:
+        return subprocess.CompletedProcess(args, 1, "", str(exc))
 
-def out(args, timeout=6):
+def out(args, timeout=8):
     return run(args, timeout).stdout.strip()
 
 def private_ipv4(value):
@@ -15478,6 +15483,18 @@ def find_pihole_ct():
             return conf.stem
     return None
 
+def parse_dns_hosts(raw):
+    raw = re.sub(r"\x1b\[[0-9;]*m", "", raw or "").strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [str(x).strip() for x in data if str(x).strip()]
+
 LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
 lock = LOCK_FILE.open("w")
 try:
@@ -15493,10 +15510,6 @@ if not ph_id:
 if "status: running" not in out(["pct", "status", ph_id], 3).lower():
     print(f"[HINWEIS] Pi-hole-LXC {ph_id} läuft nicht; kein DNS-Sync.")
     sys.exit(0)
-
-if not BASE_FILE.is_file() or BASE_FILE.stat().st_size == 0:
-    print(f"FEHLER: DNS-Basis fehlt: {BASE_FILE}", file=sys.stderr)
-    sys.exit(1)
 
 records = {}
 seq = 0
@@ -15523,16 +15536,17 @@ def put(host, ip, priority, source):
             "seq": seq,
         }
 
-# 1. GitHub-Basis/Fallback.
-for raw in BASE_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
-    line = raw.split("#", 1)[0].strip()
-    if not line:
-        continue
-    parts = line.split()
-    if len(parts) >= 2:
-        put(parts[1], parts[0], 10, "github")
+# 1) GitHub-Fallback.
+if BASE_FILE.is_file():
+    for raw in BASE_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) >= 2:
+            put(parts[1], parts[0], 10, "github")
 
-# 2. Dashboard-Links mit privater IPv4.
+# 2) Dashboard: ausschließlich private IPv4-Ziele.
 try:
     dashboard = json.loads(LINKS_FILE.read_text(encoding="utf-8"))
 except Exception:
@@ -15555,175 +15569,159 @@ if isinstance(dashboard, list):
         if host and ip:
             put(host, ip, 20, "dashboard")
 
-# 3. Proxmox-Host.
+# 3) Proxmox-Host.
 route = out(["ip", "-4", "route", "get", "1.1.1.1"], 3)
 match = re.search(r"\bsrc\s+(\d+\.\d+\.\d+\.\d+)", route)
 if match:
     put("pve.lan", match.group(1), 40, "proxmox-host")
 
-# 4. LXC: Runtime-IP, sonst statische netX-IP.
-lxc_dir = Path("/etc/pve/lxc")
-if lxc_dir.exists():
-    for conf in sorted(lxc_dir.glob("*.conf")):
-        ctid = conf.stem
+# 4) LXC.
+for conf in sorted(Path("/etc/pve/lxc").glob("*.conf")):
+    ctid = conf.stem
+    try:
+        text = conf.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        continue
+    hm = re.search(r"(?m)^hostname:\s*(\S+)\s*$", text)
+    guest_name = hm.group(1) if hm else f"ct-{ctid}"
+    host = dns_name(guest_name)
+    if not host:
+        continue
+
+    ip = None
+    if "status: running" in out(["pct", "status", ctid], 2).lower():
+        ip = first_private(out(["pct", "exec", ctid, "--", "hostname", "-I"], 4))
+
+    if not ip:
+        nm = re.search(r"(?m)^net\d+:.*?\bip=([^,\s]+)", text)
+        if nm:
+            ip = private_ipv4(nm.group(1))
+
+    if ip:
+        put(host, ip, 30, f"lxc:{ctid}")
+
+# 5) QEMU/VM über Guest Agent.
+for conf in sorted(Path("/etc/pve/qemu-server").glob("*.conf")):
+    vmid = conf.stem
+    try:
+        text = conf.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        continue
+    nm = re.search(r"(?m)^name:\s*(\S+)\s*$", text)
+    guest_name = nm.group(1) if nm else f"vm-{vmid}"
+    host = dns_name(guest_name)
+    if not host:
+        continue
+
+    raw = out(["qm", "guest", "cmd", vmid, "network-get-interfaces"], 5)
+    ip = None
+    if raw:
         try:
-            text = conf.read_text(encoding="utf-8", errors="ignore")
+            stack = [json.loads(raw)]
+            while stack and not ip:
+                current = stack.pop()
+                if isinstance(current, dict):
+                    candidate = private_ipv4(current.get("ip-address"))
+                    if candidate:
+                        ip = candidate
+                        break
+                    stack.extend(current.values())
+                elif isinstance(current, list):
+                    stack.extend(current)
         except Exception:
-            continue
-        hm = re.search(r"(?m)^hostname:\s*(\S+)\s*$", text)
-        guest_name = hm.group(1) if hm else f"ct-{ctid}"
-        host = dns_name(guest_name)
-        if not host:
-            continue
+            pass
 
-        ip = None
-        if "status: running" in out(["pct", "status", ctid], 2).lower():
-            ip = first_private(out(["pct", "exec", ctid, "--", "hostname", "-I"], 4))
-
-        if not ip:
-            nm = re.search(r"(?m)^net\d+:.*?\bip=([^,\s]+)", text)
-            if nm:
-                ip = private_ipv4(nm.group(1))
-
-        if ip:
-            put(host, ip, 30, f"lxc:{ctid}")
-
-# 5. QEMU: echte IP über Guest Agent, sofern verfügbar.
-qemu_dir = Path("/etc/pve/qemu-server")
-if qemu_dir.exists():
-    for conf in sorted(qemu_dir.glob("*.conf")):
-        vmid = conf.stem
-        try:
-            text = conf.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            continue
-        nm = re.search(r"(?m)^name:\s*(\S+)\s*$", text)
-        guest_name = nm.group(1) if nm else f"vm-{vmid}"
-        host = dns_name(guest_name)
-        if not host:
-            continue
-
-        raw = out(["qm", "guest", "cmd", vmid, "network-get-interfaces"], 5)
-        ip = None
-        if raw:
-            try:
-                stack = [json.loads(raw)]
-                while stack and not ip:
-                    current = stack.pop()
-                    if isinstance(current, dict):
-                        candidate = private_ipv4(current.get("ip-address"))
-                        if candidate:
-                            ip = candidate
-                            break
-                        stack.extend(current.values())
-                    elif isinstance(current, list):
-                        stack.extend(current)
-            except Exception:
-                pass
-        if ip:
-            put(host, ip, 30, f"qemu:{vmid}")
+    if ip:
+        put(host, ip, 30, f"qemu:{vmid}")
 
 if not records:
     print("FEHLER: Keine verwalteten DNS-Einträge ermittelt.", file=sys.stderr)
     sys.exit(1)
 
-current = out(
-    ["pct", "exec", ph_id, "--", "cat", "/opt/pihole/etc-pihole/custom.list"],
-    5,
-)
-old_lines = current.splitlines()
+# Aktuelle Pi-hole-v6 Local-DNS-Einträge direkt aus dns.hosts lesen.
+current_cmd = [
+    "pct", "exec", ph_id, "--",
+    "docker", "exec", "pihole",
+    "pihole-FTL", "--config", "dns.hosts",
+]
+current_result = run(current_cmd, 10)
+if current_result.returncode != 0:
+    print("FEHLER: Pi-hole dns.hosts konnte nicht gelesen werden.", file=sys.stderr)
+    print(current_result.stderr.strip(), file=sys.stderr)
+    sys.exit(1)
 
-managed_hosts = set(records)
-preserved = []
-inside = False
+current_hosts = parse_dns_hosts(current_result.stdout)
 
-for raw in old_lines:
-    stripped = raw.strip()
-    if stripped == BEGIN:
-        inside = True
-        continue
-    if stripped == END:
-        inside = False
-        continue
-    if inside:
-        continue
-
-    active = raw.split("#", 1)[0].strip().split()
-    if len(active) >= 2 and active[1].lower().rstrip(".") in managed_hosts:
-        continue
-    preserved.append(raw.rstrip())
-
-while preserved and not preserved[-1].strip():
-    preserved.pop()
-
-new_lines = preserved[:]
-if new_lines:
-    new_lines.append("")
-new_lines.append(BEGIN)
-new_lines.append("# Automatisch: Proxmox-Gäste > Dashboard > GitHub-Fallback")
-for host in sorted(records):
-    new_lines.append(f"{records[host]['ip']} {host}")
-new_lines.append(END)
-new_lines.append("")
-new_content = "\n".join(new_lines)
-
-old_content = current
-if old_content and not old_content.endswith("\n"):
-    old_content += "\n"
-
-if new_content == old_content:
-    print(f"[OK] Pi-hole DNS-Sync: keine Änderungen ({len(records)} Einträge).")
-    sys.exit(0)
-
-fd, temp_path = tempfile.mkstemp(prefix="pve-pihole-dns-", suffix=".list")
 try:
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(new_content)
+    old_managed = set(json.loads(STATE_FILE.read_text(encoding="utf-8")))
+except Exception:
+    old_managed = set()
 
-    pushed = run(
-        ["pct", "push", ph_id, temp_path, "/opt/pihole/etc-pihole/custom.list"],
-        15,
+new_managed = set(records)
+replace_hosts = old_managed | new_managed
+
+# Manuelle Pi-hole-Einträge erhalten, sofern sie nicht denselben Hostnamen
+# wie ein von NodeZero verwalteter Datensatz verwenden.
+preserved = []
+for entry in current_hosts:
+    parts = entry.split()
+    if len(parts) < 2:
+        continue
+    names = {x.lower().rstrip(".") for x in parts[1:]}
+    if names & replace_hosts:
+        continue
+    preserved.append(entry)
+
+managed_entries = [
+    f"{records[host]['ip']} {host}"
+    for host in sorted(records)
+]
+final_hosts = preserved + managed_entries
+
+if final_hosts != current_hosts:
+    payload = json.dumps(final_hosts, ensure_ascii=False, separators=(",", ":"))
+    set_result = run(
+        [
+            "pct", "exec", ph_id, "--",
+            "docker", "exec", "pihole",
+            "pihole-FTL", "--config", "dns.hosts", payload,
+        ],
+        20,
     )
-    if pushed.returncode != 0:
-        print("FEHLER: custom.list konnte nicht in den Pi-hole-LXC übertragen werden.", file=sys.stderr)
+    if set_result.returncode != 0:
+        print("FEHLER: Pi-hole dns.hosts konnte nicht aktualisiert werden.", file=sys.stderr)
+        print(set_result.stderr.strip(), file=sys.stderr)
         sys.exit(1)
-finally:
-    try:
-        os.unlink(temp_path)
-    except FileNotFoundError:
-        pass
 
-run(["pct", "exec", ph_id, "--", "chmod", "0644", "/opt/pihole/etc-pihole/custom.list"], 5)
-restart = run(["pct", "exec", ph_id, "--", "docker", "restart", "pihole"], 30)
-if restart.returncode != 0:
-    print("FEHLER: Pi-hole Docker-Container konnte nicht neu gestartet werden.", file=sys.stderr)
-    sys.exit(1)
+STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+STATE_FILE.write_text(
+    json.dumps(sorted(new_managed), ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+STATE_FILE.chmod(0o600)
 
-ready = False
-for _ in range(30):
-    status = run(
-        ["pct", "exec", ph_id, "--", "docker", "exec", "pihole", "pihole", "status"],
-        5,
-    )
-    if status.returncode == 0:
-        ready = True
-        break
-    time.sleep(2)
+print(
+    f"[OK] Pi-hole-v6 DNS-Sync: {len(managed_entries)} automatisch verwaltete "
+    f"+ {len(preserved)} manuelle Einträge."
+)
 
-if not ready:
-    print("FEHLER: Pi-hole wurde nach DNS-Sync nicht rechtzeitig bereit.", file=sys.stderr)
-    sys.exit(1)
-
-print(f"[OK] Pi-hole DNS-Sync: {len(records)} verwaltete Einträge aktualisiert.")
+# Echtes DNS prüfen.
 for probe in ("pve.lan", "pihole.lan"):
     expected = records.get(probe, {}).get("ip")
     if not expected:
         continue
-    answer = out(
-        ["pct", "exec", ph_id, "--", "dig", "+short", "@127.0.0.1", probe, "A", "+time=2"],
-        5,
-    ).splitlines()
-    actual = answer[0].strip() if answer else ""
+
+    actual = ""
+    for _ in range(10):
+        answer = out(
+            ["pct", "exec", ph_id, "--", "dig", "+short", "@127.0.0.1", probe, "A", "+time=2"],
+            5,
+        ).splitlines()
+        actual = answer[0].strip() if answer else ""
+        if actual == expected:
+            break
+        time.sleep(1)
+
     if actual == expected:
         print(f"[OK] {probe} -> {actual}")
     else:
@@ -15737,7 +15735,7 @@ PY_SYNC
 
     cat > /etc/systemd/system/pve-pihole-dns-sync.service <<EOF
 [Unit]
-Description=Synchronize Proxmox and Dashboard IPs to Pi-hole local DNS
+Description=Synchronize Proxmox and Dashboard IPs to Pi-hole v6 local DNS
 After=network-online.target
 Wants=network-online.target
 
@@ -15778,7 +15776,7 @@ EOF
     systemctl enable --now pve-pihole-dns-sync.timer
 
     if systemctl start pve-pihole-dns-sync.service; then
-        ok "Pi-hole DNS-Sync eingerichtet und initial ausgeführt."
+        ok "Pi-hole-v6 DNS-Sync eingerichtet und initial ausgeführt."
     else
         systemctl status pve-pihole-dns-sync.service --no-pager -l || true
         journalctl -u pve-pihole-dns-sync.service -n 80 --no-pager || true
@@ -15789,7 +15787,8 @@ EOF
         return 1
     fi
 
-    echo "  Helper: $helper"
+    echo "  Quelle: Proxmox-Gäste > Dashboard > GitHub-Fallback"
+    echo "  Pi-hole-v6 Ziel: dns.hosts"
     echo "  Dashboard-Watcher: aktiv"
     echo "  Fallback-Timer: alle 10 Minuten"
 }
@@ -16171,14 +16170,14 @@ EOF
     echo "  Quelle DNS:   Technox90/homeatic · pihole/dns/custom.list"
     echo "  Quelle CNAME: Technox90/homeatic · pihole/cname/cname.txt"
 
-    if ! install_pihole_local_dns_v126 "$PH_ID"; then
+    if ! install_pihole_local_dns_v131 "$PH_ID"; then
         if (( OPTIMAL_INSTALL )); then
             die "Pi-hole lokale DNS-/CNAME-Einträge konnten im Optimalmodus nicht eingerichtet werden."
         fi
         warn "Pi-hole läuft weiter; lokale DNS-/CNAME-Einträge können später erneut importiert werden."
     fi
 
-    if ! install_pihole_dns_sync_v130 "$PH_ID"; then
+    if ! install_pihole_dns_sync_v131 "$PH_ID"; then
         warn "Automatischer Pi-hole DNS-Sync ist derzeit nicht aktiv."
     fi
 

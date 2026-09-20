@@ -1,6 +1,28 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V131
+-----------------
+- Pi-hole-v6 Local-DNS-Verwaltung auf den offiziellen Konfigurationsschlüssel "dns.hosts" umgestellt.
+- Ursache für die leere WebUI-Tabelle behoben:
+  * V130 schrieb die automatisch ermittelten IP-/Host-Zuordnungen direkt nach /etc/pihole/custom.list.
+  * Pi-hole v6 verwaltet die WebUI-Liste "Lokale DNS-Einträge" über dns.hosts.
+- Die initialen GitHub-DNS-Einträge werden jetzt mit:
+  pihole-FTL --config dns.hosts [...]
+  gesetzt.
+- Der automatische Proxmox-/Dashboard-Sync schreibt ebenfalls direkt nach dns.hosts.
+- Pi-hole FTL erzeugt daraus selbst seine interne custom.list; Datei, DNS-Auflösung und WebUI bleiben damit konsistent.
+- Bereits manuell in Pi-hole gepflegte dns.hosts-Einträge bleiben erhalten.
+- Der Sync speichert nur die von NodeZero verwalteten Hostnamen in:
+  /var/lib/pve-pihole-dns-sync/managed-hosts.json
+  und ersetzt bei Folgeläufen ausschließlich diese Hostnamen.
+- Priorität bleibt:
+  1. Proxmox Host/VM/LXC
+  2. private Dashboard-IP
+  3. GitHub-Fallback
+- Dashboard-Watcher und 10-Minuten-Fallback-Timer bleiben bestehen.
+- Nach dem Sync werden pve.lan und pihole.lan weiterhin mit echten DNS-Abfragen geprüft.
+
 20.09.2026 – V130
 -----------------
 - Automatischen Pi-hole Local-DNS-Sync ergänzt.
