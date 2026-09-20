@@ -1,6 +1,19 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V128
+-----------------
+- Dashboard-Seitenmenü um einen GitHub-Verweis ergänzt.
+- Position: direkt unterhalb von "⚙ Einstellungen", damit der Projektlink sichtbar bleibt, aber nicht mit den eigentlichen Dashboard-Funktionen konkurriert.
+- Anzeige:
+  * GitHub
+  * Technox90 / homeatic
+- Ziel: https://github.com/Technox90/homeatic
+- Der Link öffnet in einem neuen Tab und verwendet "noopener noreferrer".
+- Eigene dezente Seitenmenü-Darstellung mit kleinem GH-Symbol, Haupttext und Repository-Unterzeile.
+- Installation ist idempotent: ein bereits vorhandener GitHub-Link wird nicht doppelt eingefügt.
+- Der Dashboard-Installationscheck prüft den Link und die Zieladresse nach dem Patch.
+
 20.09.2026 – V127
 -----------------
 - CNAME-Verifikation nach dem Pi-hole-Import auf die kanonische dig-Syntax korrigiert:

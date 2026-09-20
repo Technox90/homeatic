@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V127
+# PROXMOX MODULARER KOMPLETT-INSTALLER V128
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -42,6 +42,7 @@ set -Eeuo pipefail
 #   V125: PVE-UPS Standardprofil aus PDF + Proxmox Benutzer pve-ups@pve, Token pve-ups, Rolle UPSPower
 #   V126: Pi-hole Listenimport mit docker exec -i + Verifikation; lokale DNS-/CNAME-Einträge aus GitHub
 #   V127: CNAME-DNS-Verifikation auf kanonische dig-Argumentreihenfolge korrigiert
+#   V128: Dashboard-Seitenmenü um dezenten GitHub-Verweis unterhalb von Einstellungen ergänzt
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -744,7 +745,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V127"
+TUI_TITLE="PROXMOX INSTALLER V128"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1117,7 +1118,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 127" \
+                    --title "HAUPTMENÜ · Version 128" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8623,7 +8624,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V127",
+    "installer_version": "V128",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9097,7 +9098,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V127 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V128 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -23726,6 +23727,63 @@ else:
         "", text, count=1, flags=re.S | re.I
     )
 
+# V128: Projekt-/Quellenverweis direkt unterhalb von "Einstellungen".
+github_link = (
+    '<a id="dashboardGithubLink" class="navGithub" '
+    'href="https://github.com/Technox90/homeatic" '
+    'target="_blank" rel="noopener noreferrer" '
+    'aria-label="GitHub Repository Technox90 homeatic">'
+    '<span class="navGithubIcon" aria-hidden="true">GH</span>'
+    '<span class="navGithubText">'
+    '<span class="navGithubName">GitHub</span>'
+    '<span class="navGithubRepo">Technox90 / homeatic</span>'
+    '</span>'
+    '</a>'
+)
+
+settings_anchor = re.compile(
+    r'(<button\b(?=[^>]*id=["\']dashboardSettingsHubButton["\'])[^>]*>.*?</button>)',
+    re.S | re.I
+)
+
+if 'id="dashboardGithubLink"' not in text:
+    if not settings_anchor.search(text):
+        raise SystemExit("FEHLER: Einstellungen-Button für GitHub-Verweis nicht gefunden.")
+    text = settings_anchor.sub(lambda m: m.group(1) + "\n  " + github_link, text, count=1)
+
+github_css = r'''
+/* PVE_DASHBOARD_GITHUB_LINK_V1 */
+.navGithub{
+  display:flex;align-items:center;gap:10px;
+  margin-top:9px;padding:10px 11px;
+  border-top:1px solid #26384f;
+  border-radius:10px;
+  color:var(--text);text-decoration:none;
+  transition:background .15s ease,border-color .15s ease
+}
+.navGithub:hover{
+  background:#121f31;
+  border-color:#355174
+}
+.navGithubIcon{
+  width:32px;height:32px;display:grid;place-items:center;
+  flex:0 0 32px;border-radius:9px;
+  background:#172437;border:1px solid #304966;
+  color:#d8e7f8;font-size:10px;font-weight:850;letter-spacing:.05em
+}
+.navGithubText{display:flex;flex-direction:column;min-width:0}
+.navGithubName{font-size:12px;font-weight:750}
+.navGithubRepo{
+  margin-top:2px;color:var(--muted);font-size:10px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+'''
+
+if "/* PVE_DASHBOARD_GITHUB_LINK_V1 */" not in text:
+    if "</style>" not in text:
+        raise SystemExit("FEHLER: </style> für GitHub-CSS nicht gefunden.")
+    text = text.replace("</style>", github_css + "\n</style>", 1)
+
 # 2) Alte Dialogtitel umbenennen
 text = re.sub(
     r'(<div class="modal" id="linksModal">.*?<h2>).*?(</h2>)',
@@ -23915,6 +23973,8 @@ sleep 2
 echo
 echo "Prüfung:"
 grep -Fq 'id="dashboardSettingsHubButton"' "$INDEX" && echo "  [OK] Einstellungen-Button"
+grep -Fq 'id="dashboardGithubLink"' "$INDEX" && echo "  [OK] GitHub-Verweis"
+grep -Fq 'https://github.com/Technox90/homeatic' "$INDEX" && echo "  [OK] GitHub-Ziel"
 grep -Fq 'id="settingsHubModal"' "$INDEX" && echo "  [OK] Gemeinsames Fenster"
 grep -Fq '>Linkverwaltung</button>' "$INDEX" && echo "  [OK] Reiter Linkverwaltung"
 grep -Fq '>Dashboard</button>' "$INDEX" && echo "  [OK] Reiter Dashboard"
