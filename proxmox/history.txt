@@ -1,6 +1,30 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V136
+-----------------
+- Paperless-login 403 nach erfolgreichem CSRF-Fix behoben.
+- Neues Fehlerbild:
+  django.core.exceptions.PermissionDenied: Unable to determine client IP address
+- Ursache:
+  PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER war fälschlich als Django-META-Name HTTP_X_REAL_IP gesetzt.
+- Laut Paperless/allauth erwartet diese Option den echten HTTP-Headernamen.
+- Für nginx ist deshalb jetzt korrekt:
+  PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER=X-Real-IP
+- PAPERLESS_TRUSTED_PROXIES=127.0.0.1 bleibt bestehen.
+- nginx setzt bereits:
+  proxy_set_header X-Real-IP $remote_addr;
+- Bestehende Paperless-Installationen werden mit repair_existing_paperless_proxy_v136 migriert.
+- Die Migration:
+  * ersetzt den falschen Headernamen,
+  * entfernt einen ggf. zusätzlich gesetzten identischen PAPERLESS_CSRF_TRUSTED_ORIGINS-Eintrag, weil PAPERLESS_URL den Origin bereits selbst ergänzt,
+  * validiert docker compose,
+  * recreatet den Paperless-Webserver mit --force-recreate,
+  * prüft die geladenen Environment-Werte.
+- HTTPS bleibt der vorgesehene Standard; ein Wechsel auf HTTP ist für diesen Fehler nicht erforderlich.
+- V135 CSRF-/PAPERLESS_URL-Fix bleibt erhalten.
+- V134 Dashboard-Link-Abgleich, Theme, Pi-hole-v6 dns.hosts und SQLite-Schutz bleiben unverändert.
+
 20.09.2026 – V135
 -----------------
 - Paperless-ngx HTTPS-/CSRF-Fehler hinter dem lokalen nginx-Reverse-Proxy behoben.
