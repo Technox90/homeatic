@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V128
+# PROXMOX MODULARER KOMPLETT-INSTALLER V129
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -43,6 +43,7 @@ set -Eeuo pipefail
 #   V126: Pi-hole Listenimport mit docker exec -i + Verifikation; lokale DNS-/CNAME-Einträge aus GitHub
 #   V127: CNAME-DNS-Verifikation auf kanonische dig-Argumentreihenfolge korrigiert
 #   V128: Dashboard-Seitenmenü um dezenten GitHub-Verweis unterhalb von Einstellungen ergänzt
+#   V129: Pi-hole SQLite-Kommandos korrigiert; ungültige Option -ni vollständig entfernt
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -745,7 +746,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V128"
+TUI_TITLE="PROXMOX INSTALLER V129"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1118,7 +1119,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 128" \
+                    --title "HAUPTMENÜ · Version 129" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8624,7 +8625,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V128",
+    "installer_version": "V129",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9098,7 +9099,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V128 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V129 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -14994,7 +14995,7 @@ done
     exit 1
 }
 
-if ! docker exec pihole pihole-FTL sqlite3 -ni /etc/pihole/gravity.db \
+if ! docker exec pihole pihole-FTL sqlite3 /etc/pihole/gravity.db \
     "PRAGMA table_info(adlist);" \
     | grep -q '|type|'; then
     echo "FEHLER: Pi-hole gravity.db unterstützt noch keine"
@@ -15095,12 +15096,12 @@ SQL
 # V126: docker exec muss STDIN mit -i offen halten. Ohne -i konnte SQLite
 # erfolgreich starten, ohne die SQL-INSERTs tatsächlich zu erhalten.
 docker exec -i pihole \
-    pihole-FTL sqlite3 -ni /etc/pihole/gravity.db \
+    pihole-FTL sqlite3 /etc/pihole/gravity.db \
     < "$SQL_FILE"
 
 LIST_COUNT="$(
     docker exec pihole \
-        pihole-FTL sqlite3 -ni /etc/pihole/gravity.db \
+        pihole-FTL sqlite3 /etc/pihole/gravity.db \
         "SELECT COUNT(*) FROM adlist
          WHERE (address='${BLOCK_PRO}' AND type=0)
             OR (address='${BLOCK_TIF}' AND type=0)
@@ -15136,7 +15137,7 @@ echo "============================================================"
 echo " EINGETRAGENE LISTEN"
 echo "============================================================"
 
-docker exec pihole pihole-FTL sqlite3 -header -column -ni \
+docker exec pihole pihole-FTL sqlite3 -header -column \
     /etc/pihole/gravity.db \
     "SELECT
        CASE type

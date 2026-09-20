@@ -1,6 +1,19 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V129
+-----------------
+- Pi-hole SQLite-Aufrufe korrigiert.
+- Fehlerbild bei der Reparatur/Kontrolle: "sqlite3: Error: unknown option: -ni".
+- Ursache: "-ni" ist keine gültige Option der im aktuellen Pi-hole-Image verwendeten SQLite-CLI.
+- Alle vier betroffenen Aufrufe im Pi-hole-Standardlisten-Code wurden korrigiert:
+  * Schema-Prüfung
+  * SQL-Import über STDIN
+  * 4/4-Listenverifikation
+  * tabellarische Kontrollausgabe
+- SQL-Import bleibt weiterhin über "docker exec -i" interaktiv an STDIN angebunden; nur die ungültige SQLite-Option wurde entfernt.
+- Tabellenanzeige verwendet jetzt ausschließlich "-header -column".
+
 20.09.2026 – V128
 -----------------
 - Dashboard-Seitenmenü um einen GitHub-Verweis ergänzt.
