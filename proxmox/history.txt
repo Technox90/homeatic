@@ -1,6 +1,31 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V132
+-----------------
+- Dashboard-Farbschema direkt in „⚙ Einstellungen“ integriert.
+- Persistente Theme-Farben werden zusammen mit den übrigen UI-Einstellungen in /etc/pve-sensor-dashboard/ui.json gespeichert.
+- Einstellbar sind:
+  * Hintergrund
+  * Panel dunkel
+  * Panel hell
+  * Linien / Rahmen
+  * Text
+  * Sekundärtext
+  * Akzent
+  * Akzent 2
+  * OK
+  * Warnung
+  * Fehler
+- HTML-Farbwähler zeigen Änderungen sofort als Live-Vorschau im Dashboard.
+- „Standardfarben“ setzt alle Farbwähler auf die bisherigen NodeZero-Standardwerte zurück.
+- Schließen ohne Speichern stellt das zuletzt gespeicherte Farbschema wieder her.
+- Bestehende V131-ui.json-Dateien bleiben kompatibel; fehlende Theme-Werte werden automatisch mit den Standardfarben ergänzt.
+- Das Frontend wendet die gespeicherten Farben beim Laden über die vorhandenen CSS-Variablen an.
+- Karten, Dialoge, Navigation, Buttons, aktive Zeitbereiche und Statusfarben reagieren auf das gewählte Farbschema.
+- Dashboard-Settings-Patch von V3 auf V4 angehoben.
+- Installer-Version auf V132 aktualisiert; Pi-hole-v6-dns.hosts-Sync aus V131 bleibt unverändert erhalten.
+
 20.09.2026 – V131
 -----------------
 - Pi-hole-v6 Local-DNS-Verwaltung auf den offiziellen Konfigurationsschlüssel "dns.hosts" umgestellt.
