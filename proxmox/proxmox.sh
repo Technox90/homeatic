@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V133
+# PROXMOX MODULARER KOMPLETT-INSTALLER V134
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -48,6 +48,7 @@ set -Eeuo pipefail
 #   V131: Pi-hole-v6 Local DNS auf offizielles dns.hosts umgestellt; WebUI zeigt synchronisierte IP/Host-Einträge
 #   V132: Dashboard-Farbschema über Einstellungen anpassbar; persistente Theme-Farben mit Live-Vorschau
 #   V133: bestehende Dashboard-Installationen auf Theme-UI/API migrieren; Einstellungen/GitHub direkt sichtbar
+#   V134: Dashboard-Footer wieder unten; bestehende bekannte Web-CTs beim Update automatisch als fehlende Links ergänzen
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -750,8 +751,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V133"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V133"
+TUI_TITLE="PROXMOX INSTALLER V134"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V134"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1123,7 +1124,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 133" \
+                    --title "HAUPTMENÜ · Version 134" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8638,7 +8639,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V133",
+    "installer_version": "V134",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9112,7 +9113,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V133 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V134 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11985,6 +11986,303 @@ dashboard_link_upsert() {
     printf '%s|%s|new\n' "$name" "$url" > "$tmp"
     pve-dashboard-link import "$tmp" >/dev/null 2>&1 || true
     rm -f "$tmp"
+}
+
+# -----------------------------------------------------------------------------
+# V134 · VORHANDENE INSTALLER-WEB-CTs MIT DASHBOARD-LINKS ABGLEICHEN
+# -----------------------------------------------------------------------------
+# Ein reines Dashboard-Update setzt die INSTALL_* Flags bestehender Dienste
+# nicht. V134 erkennt bekannte vorhandene LXC am Hostnamen und ergänzt nur
+# fehlende Dashboard-Links. Vorhandene/manuelle Links bleiben unverändert.
+
+dashboard_existing_ct_ipv4_v134() {
+    local ctid="$1"
+    local ip=""
+
+    if pct status "$ctid" 2>/dev/null | grep -q 'status: running'; then
+        ip="$(
+            pct exec "$ctid" -- hostname -I 2>/dev/null |
+            tr ' ' '\n' |
+            grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' |
+            head -n1 || true
+        )"
+    fi
+
+    if [[ -z "$ip" ]]; then
+        ip="$(
+            pct config "$ctid" 2>/dev/null |
+            sed -n 's/^net[0-9][0-9]*:.*[, ]ip=\([^,]*\).*/\1/p' |
+            cut -d/ -f1 |
+            grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' |
+            head -n1 || true
+        )"
+    fi
+
+    [[ -n "$ip" ]] || return 1
+    printf '%s\n' "$ip"
+}
+
+dashboard_reconcile_existing_guests_v134() {
+    [[ -f /var/lib/pve-sensor-dashboard-web/links.json ]] || return 0
+    command -v pct >/dev/null 2>&1 || return 0
+
+    local ctid=""
+    local hostname=""
+    local hostkey=""
+    local ip=""
+    local name=""
+    local url=""
+    local tmp=""
+
+    tmp="$(mktemp /tmp/pve-dashboard-existing-guests-v134.XXXXXX)"
+    : > "$tmp"
+
+    while read -r ctid; do
+        [[ "$ctid" =~ ^[0-9]+$ ]] || continue
+
+        hostname="$(
+            pct config "$ctid" 2>/dev/null |
+            awk -F': ' '/^hostname:/ {print $2; exit}'
+        )"
+
+        [[ -n "$hostname" ]] || continue
+
+        hostkey="$(
+            printf '%s' "$hostname" |
+            tr '[:upper:]_' '[:lower:]-'
+        )"
+
+        ip="$(dashboard_existing_ct_ipv4_v134 "$ctid" || true)"
+        [[ -n "$ip" ]] || continue
+
+        name=""
+        url=""
+
+        case "$hostkey" in
+            paperless|paperless-ngx)
+                name="Paperless"
+                url="https://${ip}/"
+                ;;
+            pihole|pi-hole)
+                name="Pi-hole"
+                url="http://${ip}/admin/"
+                ;;
+            netalertx|netalert)
+                name="NetAlertX"
+                url="http://${ip}/"
+                ;;
+            uptime-kuma|uptime)
+                name="Uptime Kuma"
+                url="https://${ip}/"
+                ;;
+            vaultwarden)
+                name="Vaultwarden"
+                url="https://${ip}/"
+                ;;
+            caddy)
+                name="Caddy Reverse Proxy"
+                url="http://${ip}/"
+                ;;
+            stirling-pdf|stirlingpdf|stirling)
+                name="Stirling PDF"
+                url="https://${ip}/"
+                ;;
+            ntfy)
+                name="ntfy"
+                url="https://${ip}/"
+                ;;
+            forgejo)
+                name="Forgejo"
+                url="https://${ip}/"
+                ;;
+            syncthing)
+                name="Syncthing"
+                url="https://${ip}/"
+                ;;
+            speedtest-tracker|speedtest)
+                name="Speedtest Tracker"
+                url="https://${ip}/"
+                ;;
+            scrutiny)
+                name="Scrutiny"
+                url="https://${ip}/"
+                ;;
+            mealie)
+                name="Mealie"
+                url="https://${ip}/"
+                ;;
+            proxmox-backup-server|pbs)
+                name="Proxmox Backup Server"
+                url="https://${ip}:8007/"
+                ;;
+            pulse)
+                name="Pulse"
+                url="https://${ip}/"
+                ;;
+            pve-ups|pveups)
+                name="PVE-UPS"
+                url="https://${ip}/"
+                ;;
+            semaphore)
+                name="Semaphore"
+                url="https://${ip}/"
+                ;;
+            pocketid|pocket-id)
+                name="Pocket ID"
+                url="https://${ip}/"
+                ;;
+            prometheus)
+                name="Prometheus"
+                url="https://${ip}/"
+                ;;
+            pve-exporter|prometheus-pve-exporter)
+                name="Prometheus PVE Exporter"
+                url="https://${ip}/"
+                ;;
+            grafana)
+                name="Grafana"
+                url="https://${ip}/"
+                ;;
+            pangolin)
+                name="Pangolin"
+                url="http://${ip}:3002/"
+                ;;
+            gatus)
+                name="Gatus"
+                url="https://${ip}/"
+                ;;
+            homepage)
+                name="Homepage"
+                url="https://${ip}/"
+                ;;
+            nginx-proxy-manager|nginxproxymanager|npm)
+                name="Nginx Proxy Manager"
+                url="http://${ip}:81/"
+                ;;
+            emqx)
+                name="EMQX MQTT"
+                url="https://${ip}/"
+                ;;
+            *)
+                continue
+                ;;
+        esac
+
+        printf '%s\t%s\t%s\t%s\n' \
+            "$ctid" "$hostname" "$name" "$url" >> "$tmp"
+
+    done < <(pct list 2>/dev/null | awk 'NR>1 {print $1}')
+
+    python3 - \
+        /var/lib/pve-sensor-dashboard-web/links.json \
+        "$tmp" <<'PYV134LINKS'
+from pathlib import Path
+import json
+import re
+import sys
+
+links_path = Path(sys.argv[1])
+discovered_path = Path(sys.argv[2])
+
+try:
+    links = json.loads(
+        links_path.read_text(encoding="utf-8")
+    )
+except Exception:
+    links = []
+
+if not isinstance(links, list):
+    links = []
+
+existing_names = {
+    str(item.get("name", "")).strip().casefold()
+    for item in links
+    if isinstance(item, dict)
+    and str(item.get("name", "")).strip()
+}
+
+existing_ids = {
+    str(item.get("id", "")).strip()
+    for item in links
+    if isinstance(item, dict)
+    and str(item.get("id", "")).strip()
+}
+
+added = []
+
+for raw in discovered_path.read_text(
+    encoding="utf-8"
+).splitlines():
+    parts = raw.split("\t", 3)
+
+    if len(parts) != 4:
+        continue
+
+    ctid, hostname, name, url = [
+        value.strip()
+        for value in parts
+    ]
+
+    if not name or not url:
+        continue
+
+    if name.casefold() in existing_names:
+        continue
+
+    base = re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        hostname.casefold(),
+    ).strip("-") or f"ct-{ctid}"
+
+    link_id = f"auto-{base}"
+
+    if link_id in existing_ids:
+        link_id = f"{link_id}-{ctid or 'ct'}"
+
+    links.append({
+        "id": link_id,
+        "type": "link",
+        "name": name,
+        "url": url,
+        "target": "new",
+        "group": "",
+    })
+
+    existing_names.add(name.casefold())
+    existing_ids.add(link_id)
+    added.append((ctid, name, url))
+
+if added:
+    temp = links_path.with_suffix(".json.v134.tmp")
+    temp.write_text(
+        json.dumps(
+            links,
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    temp.chmod(0o600)
+    temp.replace(links_path)
+
+print(
+    f"[OK] Dashboard CT-Abgleich V134: "
+    f"{len(added)} fehlende Link(s) ergänzt."
+)
+
+for ctid, name, url in added:
+    print(f"  CT {ctid}: {name} -> {url}")
+PYV134LINKS
+
+    rm -f "$tmp"
+
+    chown pve-monitor:pve-monitor \
+        /var/lib/pve-sensor-dashboard-web/links.json \
+        2>/dev/null || true
+    chmod 600 \
+        /var/lib/pve-sensor-dashboard-web/links.json \
+        2>/dev/null || true
 }
 
 # =============================================================================
@@ -25038,11 +25336,13 @@ if "/* PVE_DASHBOARD_GITHUB_LINK_V1 */" not in text:
 
 visibility_css = r'''
 /* PVE_SETTINGS_MENU_VISIBILITY_V133 */
+/* V134: Footerblock aus Trenner + Einstellungen + GitHub unten halten. */
 .sideNav{
   overflow-y:auto;
 }
 #navSettingsDivider{
   flex:0 0 auto;
+  margin-top:auto !important;
 }
 #dashboardSettingsHubButton{
   margin-top:0 !important;
@@ -44302,6 +44602,12 @@ fi
 (( INSTALL_HOMEPAGE )) && dashboard_link_upsert "Homepage" "https://${HOMEPAGE_IP}/"
 (( INSTALL_NPM )) && dashboard_link_upsert "Nginx Proxy Manager" "http://${NPM_IP}:81/"
 (( INSTALL_EMQX )) && dashboard_link_upsert "EMQX MQTT" "https://${EMQX_IP}/"
+
+# V134: Bei Dashboard-Updates vorhandene bekannte Web-CTs erneut erkennen.
+# Nur fehlende Links werden ergänzt; manuelle/bestehende Links bleiben erhalten.
+if (( INSTALL_DASHBOARD )) || [[ -f /opt/pve-sensor-dashboard/static/index.html ]]; then
+    dashboard_reconcile_existing_guests_v134
+fi
 
 if (( INSTALL_DASHBOARD )); then
     python3 - <<'PYROUTERFINAL'
