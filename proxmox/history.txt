@@ -1,6 +1,28 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V130
+-----------------
+- Automatischen Pi-hole Local-DNS-Sync ergänzt.
+- Neue Host-Hilfe: /usr/local/sbin/pve-pihole-dns-sync
+- Priorität der Quellen:
+  1. tatsächlich erkannte Proxmox VM/LXC-IP
+  2. private IPv4 aus Dashboard-Links
+  3. pihole/dns/custom.list aus GitHub als Fallback
+- Proxmox-Host wird automatisch als pve.lan mit seiner aktuellen primären IPv4 eingetragen.
+- LXC: laufende IP über "hostname -I", sonst statische ip=... aus der Proxmox-Konfiguration.
+- QEMU/VM: Laufzeit-IP über den QEMU Guest Agent, wenn verfügbar; sonst Dashboard/GitHub-Fallback.
+- Dashboard-Links werden nur übernommen, wenn die URL eine private RFC1918-IPv4 enthält. Öffentliche Ziele wie GitHub werden nicht übernommen.
+- Bekannte Dienste behalten kurze Namen wie homeassistant.lan, paperless.lan, pihole.lan, netalert.lan, uptime.lan, pdf.lan und ups.lan.
+- Weitere private Dashboard-Dienste erhalten automatisch einen normalisierten <name>.lan-Eintrag.
+- Die custom.list erhält einen klar markierten NODEZERO-MANAGED-Bereich; manuelle Einträge außerhalb bleiben erhalten.
+- Bei identischem Hostnamen gewinnt die automatisch ermittelte aktuelle IP, damit keine widersprüchlichen DNS-Dubletten entstehen.
+- Pi-hole wird nur neu gestartet, wenn sich die erzeugte custom.list tatsächlich ändert.
+- Automatik:
+  * systemd Path-Watcher auf /var/lib/pve-sensor-dashboard-web/links.json
+  * zusätzlicher 10-Minuten-Timer als Fallback
+- Reset/Cleanup entfernt Helper, State-Verzeichnis und systemd-Units wieder vollständig.
+
 20.09.2026 – V129
 -----------------
 - Pi-hole SQLite-Aufrufe korrigiert.

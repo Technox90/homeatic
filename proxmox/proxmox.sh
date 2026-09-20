@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V129
+# PROXMOX MODULARER KOMPLETT-INSTALLER V130
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -44,6 +44,7 @@ set -Eeuo pipefail
 #   V127: CNAME-DNS-Verifikation auf kanonische dig-Argumentreihenfolge korrigiert
 #   V128: Dashboard-Seitenmenü um dezenten GitHub-Verweis unterhalb von Einstellungen ergänzt
 #   V129: Pi-hole SQLite-Kommandos korrigiert; ungültige Option -ni vollständig entfernt
+#   V130: Pi-hole Local-DNS-Sync aus Proxmox-Gästen + Dashboard; Watcher + 10-Minuten-Fallback
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -746,7 +747,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V129"
+TUI_TITLE="PROXMOX INSTALLER V130"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1119,7 +1120,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 129" \
+                    --title "HAUPTMENÜ · Version 130" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -1965,6 +1966,9 @@ remove_master_host_components_v72() {
 
     # Dashboard-Dienste sicher stoppen.
     systemctl disable --now pve-sensor-collector.timer 2>/dev/null || true
+    systemctl disable --now pve-pihole-dns-sync.path 2>/dev/null || true
+    systemctl disable --now pve-pihole-dns-sync.timer 2>/dev/null || true
+    systemctl stop pve-pihole-dns-sync.service 2>/dev/null || true
     systemctl disable --now pve-sensor-web.service 2>/dev/null || true
 
     # Auto-Updater entfernen.
@@ -2000,6 +2004,7 @@ remove_master_host_components_v72() {
         /usr/local/sbin/pve-dashboard-set-code \
         /usr/local/sbin/pve-dashboard-link \
         /usr/local/sbin/pve-dashboard-settings-helper \
+        /usr/local/sbin/pve-pihole-dns-sync \
         /usr/local/sbin/proxmox-auto-updater \
         /usr/local/sbin/proxmox-auto-updater-config \
         /usr/local/sbin/proxmox-master-tls-renew \
@@ -2025,7 +2030,9 @@ remove_master_host_components_v72() {
         /opt/pve-sensor-dashboard \
         /etc/pve-sensor-dashboard \
         /var/lib/pve-sensor-dashboard \
-        /var/lib/pve-sensor-dashboard-web
+        /var/lib/pve-sensor-dashboard-web \
+        /var/lib/pve-pihole-dns-sync \
+        /etc/pve-pihole-dns-sync
 
     # Auto-Updater Laufzeitdaten/Secrets entfernen.
     rm -rf \
@@ -2166,6 +2173,9 @@ proxmox_zero_v72() {
         /etc/pve-sensor-dashboard \
         /var/lib/pve-sensor-dashboard-web \
         /etc/systemd/system/pve-sensor-web.service \
+        /etc/systemd/system/pve-pihole-dns-sync.service \
+        /etc/systemd/system/pve-pihole-dns-sync.path \
+        /etc/systemd/system/pve-pihole-dns-sync.timer \
         /etc/systemd/system/pve-sensor-collector.service \
         /etc/systemd/system/pve-sensor-collector.timer \
         /etc/systemd/system/proxmox-auto-updater.service \
@@ -8625,7 +8635,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V129",
+    "installer_version": "V130",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9099,7 +9109,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V129 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V130 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -15338,6 +15348,452 @@ __PIHOLE_LOCAL_DNS_V126__
     fi
 }
 
+install_pihole_dns_sync_v130() {
+    local ct_id="${1:-$PH_ID}"
+    local sync_dir="/etc/pve-pihole-dns-sync"
+    local helper="/usr/local/sbin/pve-pihole-dns-sync"
+    local base_file="${sync_dir}/custom.list.base"
+    local base_url="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/pihole/dns/custom.list"
+
+    header "PI-HOLE DNS-SYNC · PROXMOX + DASHBOARD"
+
+    mkdir -p "$sync_dir" /var/lib/pve-sensor-dashboard-web
+    chmod 755 "$sync_dir"
+
+    if ! curl -fsSL --retry 3 --connect-timeout 10 "$base_url" -o "${base_file}.tmp"; then
+        warn "GitHub-DNS-Basis konnte nicht geladen werden; verwende vorhandene Pi-hole custom.list als Fallback."
+        pct exec "$ct_id" -- cat /opt/pihole/etc-pihole/custom.list > "${base_file}.tmp" 2>/dev/null || true
+    fi
+
+    [[ -s "${base_file}.tmp" ]] || die "Keine DNS-Basis für den Pi-hole-DNS-Sync verfügbar."
+    mv -f "${base_file}.tmp" "$base_file"
+    chmod 644 "$base_file"
+
+    cat > "$helper" <<'PY_SYNC'
+#!/usr/bin/env python3
+import fcntl
+import ipaddress
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
+from pathlib import Path
+from urllib.parse import urlparse
+
+BASE_FILE = Path("/etc/pve-pihole-dns-sync/custom.list.base")
+LINKS_FILE = Path("/var/lib/pve-sensor-dashboard-web/links.json")
+LOCK_FILE = Path("/run/lock/pve-pihole-dns-sync.lock")
+BEGIN = "# BEGIN NODEZERO MANAGED DNS"
+END = "# END NODEZERO MANAGED DNS"
+
+RFC1918 = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+)
+
+KNOWN = {
+    "pve": "pve.lan",
+    "proxmox": "pve.lan",
+    "homeassistant": "homeassistant.lan",
+    "home assistant": "homeassistant.lan",
+    "ha": "homeassistant.lan",
+    "paperless": "paperless.lan",
+    "paperless ngx": "paperless.lan",
+    "paperless-ngx": "paperless.lan",
+    "pihole": "pihole.lan",
+    "pi-hole": "pihole.lan",
+    "netalertx": "netalert.lan",
+    "netalert": "netalert.lan",
+    "uptime": "uptime.lan",
+    "uptime kuma": "uptime.lan",
+    "stirling": "pdf.lan",
+    "stirling pdf": "pdf.lan",
+    "speedtest": "speedtest.lan",
+    "speedtest tracker": "speedtest.lan",
+    "scrutiny": "scrutiny.lan",
+    "pve-ups": "ups.lan",
+    "pve ups": "ups.lan",
+    "ups": "ups.lan",
+}
+
+def run(args, timeout=6):
+    try:
+        return subprocess.run(
+            args,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            check=False,
+        )
+    except Exception:
+        return subprocess.CompletedProcess(args, 1, "", "")
+
+def out(args, timeout=6):
+    return run(args, timeout).stdout.strip()
+
+def private_ipv4(value):
+    try:
+        ip = ipaddress.ip_address(str(value or "").split("/", 1)[0].strip())
+    except Exception:
+        return None
+    if ip.version == 4 and any(ip in net for net in RFC1918):
+        return str(ip)
+    return None
+
+def first_private(text):
+    for token in re.split(r"[\s,;]+", text or ""):
+        ip = private_ipv4(token)
+        if ip:
+            return ip
+    return None
+
+def normalized_key(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.lower().replace("_", " ").strip()
+    return re.sub(r"\s+", " ", text)
+
+def dns_name(value):
+    key = normalized_key(value)
+    if key in KNOWN:
+        return KNOWN[key]
+    slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-")
+    if slug.endswith("-lan"):
+        slug = slug[:-4]
+    return (slug[:55] + ".lan") if slug else None
+
+def find_pihole_ct():
+    for conf in sorted(Path("/etc/pve/lxc").glob("*.conf")):
+        try:
+            text = conf.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        if re.search(r"(?m)^hostname:\s*pihole\s*$", text):
+            return conf.stem
+    return None
+
+LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+lock = LOCK_FILE.open("w")
+try:
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    sys.exit(0)
+
+ph_id = find_pihole_ct()
+if not ph_id:
+    print("[HINWEIS] Pi-hole-LXC nicht gefunden; kein DNS-Sync.")
+    sys.exit(0)
+
+if "status: running" not in out(["pct", "status", ph_id], 3).lower():
+    print(f"[HINWEIS] Pi-hole-LXC {ph_id} läuft nicht; kein DNS-Sync.")
+    sys.exit(0)
+
+if not BASE_FILE.is_file() or BASE_FILE.stat().st_size == 0:
+    print(f"FEHLER: DNS-Basis fehlt: {BASE_FILE}", file=sys.stderr)
+    sys.exit(1)
+
+records = {}
+seq = 0
+
+def put(host, ip, priority, source):
+    global seq
+    host = str(host or "").strip().lower().rstrip(".")
+    ip = private_ipv4(ip)
+    if not host or not ip:
+        return
+    if "." not in host:
+        host += ".lan"
+    seq += 1
+    current = records.get(host)
+    if (
+        current is None
+        or priority > current["priority"]
+        or (priority == current["priority"] and seq >= current["seq"])
+    ):
+        records[host] = {
+            "ip": ip,
+            "priority": priority,
+            "source": source,
+            "seq": seq,
+        }
+
+# 1. GitHub-Basis/Fallback.
+for raw in BASE_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+    line = raw.split("#", 1)[0].strip()
+    if not line:
+        continue
+    parts = line.split()
+    if len(parts) >= 2:
+        put(parts[1], parts[0], 10, "github")
+
+# 2. Dashboard-Links mit privater IPv4.
+try:
+    dashboard = json.loads(LINKS_FILE.read_text(encoding="utf-8"))
+except Exception:
+    dashboard = []
+
+if isinstance(dashboard, list):
+    for item in dashboard:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type", "link") != "link" or item.get("id") == "router":
+            continue
+        name = str(item.get("name", "")).strip()
+        url = str(item.get("url", "")).strip()
+        try:
+            parsed = urlparse(url if "://" in url else "http://" + url)
+            ip = private_ipv4(parsed.hostname)
+        except Exception:
+            ip = None
+        host = dns_name(name)
+        if host and ip:
+            put(host, ip, 20, "dashboard")
+
+# 3. Proxmox-Host.
+route = out(["ip", "-4", "route", "get", "1.1.1.1"], 3)
+match = re.search(r"\bsrc\s+(\d+\.\d+\.\d+\.\d+)", route)
+if match:
+    put("pve.lan", match.group(1), 40, "proxmox-host")
+
+# 4. LXC: Runtime-IP, sonst statische netX-IP.
+lxc_dir = Path("/etc/pve/lxc")
+if lxc_dir.exists():
+    for conf in sorted(lxc_dir.glob("*.conf")):
+        ctid = conf.stem
+        try:
+            text = conf.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        hm = re.search(r"(?m)^hostname:\s*(\S+)\s*$", text)
+        guest_name = hm.group(1) if hm else f"ct-{ctid}"
+        host = dns_name(guest_name)
+        if not host:
+            continue
+
+        ip = None
+        if "status: running" in out(["pct", "status", ctid], 2).lower():
+            ip = first_private(out(["pct", "exec", ctid, "--", "hostname", "-I"], 4))
+
+        if not ip:
+            nm = re.search(r"(?m)^net\d+:.*?\bip=([^,\s]+)", text)
+            if nm:
+                ip = private_ipv4(nm.group(1))
+
+        if ip:
+            put(host, ip, 30, f"lxc:{ctid}")
+
+# 5. QEMU: echte IP über Guest Agent, sofern verfügbar.
+qemu_dir = Path("/etc/pve/qemu-server")
+if qemu_dir.exists():
+    for conf in sorted(qemu_dir.glob("*.conf")):
+        vmid = conf.stem
+        try:
+            text = conf.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        nm = re.search(r"(?m)^name:\s*(\S+)\s*$", text)
+        guest_name = nm.group(1) if nm else f"vm-{vmid}"
+        host = dns_name(guest_name)
+        if not host:
+            continue
+
+        raw = out(["qm", "guest", "cmd", vmid, "network-get-interfaces"], 5)
+        ip = None
+        if raw:
+            try:
+                stack = [json.loads(raw)]
+                while stack and not ip:
+                    current = stack.pop()
+                    if isinstance(current, dict):
+                        candidate = private_ipv4(current.get("ip-address"))
+                        if candidate:
+                            ip = candidate
+                            break
+                        stack.extend(current.values())
+                    elif isinstance(current, list):
+                        stack.extend(current)
+            except Exception:
+                pass
+        if ip:
+            put(host, ip, 30, f"qemu:{vmid}")
+
+if not records:
+    print("FEHLER: Keine verwalteten DNS-Einträge ermittelt.", file=sys.stderr)
+    sys.exit(1)
+
+current = out(
+    ["pct", "exec", ph_id, "--", "cat", "/opt/pihole/etc-pihole/custom.list"],
+    5,
+)
+old_lines = current.splitlines()
+
+managed_hosts = set(records)
+preserved = []
+inside = False
+
+for raw in old_lines:
+    stripped = raw.strip()
+    if stripped == BEGIN:
+        inside = True
+        continue
+    if stripped == END:
+        inside = False
+        continue
+    if inside:
+        continue
+
+    active = raw.split("#", 1)[0].strip().split()
+    if len(active) >= 2 and active[1].lower().rstrip(".") in managed_hosts:
+        continue
+    preserved.append(raw.rstrip())
+
+while preserved and not preserved[-1].strip():
+    preserved.pop()
+
+new_lines = preserved[:]
+if new_lines:
+    new_lines.append("")
+new_lines.append(BEGIN)
+new_lines.append("# Automatisch: Proxmox-Gäste > Dashboard > GitHub-Fallback")
+for host in sorted(records):
+    new_lines.append(f"{records[host]['ip']} {host}")
+new_lines.append(END)
+new_lines.append("")
+new_content = "\n".join(new_lines)
+
+old_content = current
+if old_content and not old_content.endswith("\n"):
+    old_content += "\n"
+
+if new_content == old_content:
+    print(f"[OK] Pi-hole DNS-Sync: keine Änderungen ({len(records)} Einträge).")
+    sys.exit(0)
+
+fd, temp_path = tempfile.mkstemp(prefix="pve-pihole-dns-", suffix=".list")
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(new_content)
+
+    pushed = run(
+        ["pct", "push", ph_id, temp_path, "/opt/pihole/etc-pihole/custom.list"],
+        15,
+    )
+    if pushed.returncode != 0:
+        print("FEHLER: custom.list konnte nicht in den Pi-hole-LXC übertragen werden.", file=sys.stderr)
+        sys.exit(1)
+finally:
+    try:
+        os.unlink(temp_path)
+    except FileNotFoundError:
+        pass
+
+run(["pct", "exec", ph_id, "--", "chmod", "0644", "/opt/pihole/etc-pihole/custom.list"], 5)
+restart = run(["pct", "exec", ph_id, "--", "docker", "restart", "pihole"], 30)
+if restart.returncode != 0:
+    print("FEHLER: Pi-hole Docker-Container konnte nicht neu gestartet werden.", file=sys.stderr)
+    sys.exit(1)
+
+ready = False
+for _ in range(30):
+    status = run(
+        ["pct", "exec", ph_id, "--", "docker", "exec", "pihole", "pihole", "status"],
+        5,
+    )
+    if status.returncode == 0:
+        ready = True
+        break
+    time.sleep(2)
+
+if not ready:
+    print("FEHLER: Pi-hole wurde nach DNS-Sync nicht rechtzeitig bereit.", file=sys.stderr)
+    sys.exit(1)
+
+print(f"[OK] Pi-hole DNS-Sync: {len(records)} verwaltete Einträge aktualisiert.")
+for probe in ("pve.lan", "pihole.lan"):
+    expected = records.get(probe, {}).get("ip")
+    if not expected:
+        continue
+    answer = out(
+        ["pct", "exec", ph_id, "--", "dig", "+short", "@127.0.0.1", probe, "A", "+time=2"],
+        5,
+    ).splitlines()
+    actual = answer[0].strip() if answer else ""
+    if actual == expected:
+        print(f"[OK] {probe} -> {actual}")
+    else:
+        print(
+            f"[WARNUNG] {probe}: erwartet {expected}, DNS antwortet {actual or '<leer>'}.",
+            file=sys.stderr,
+        )
+PY_SYNC
+
+    chmod 755 "$helper"
+
+    cat > /etc/systemd/system/pve-pihole-dns-sync.service <<EOF
+[Unit]
+Description=Synchronize Proxmox and Dashboard IPs to Pi-hole local DNS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=${helper}
+EOF
+
+    cat > /etc/systemd/system/pve-pihole-dns-sync.path <<'EOF'
+[Unit]
+Description=Watch Dashboard links for Pi-hole DNS synchronization
+
+[Path]
+PathChanged=/var/lib/pve-sensor-dashboard-web/links.json
+Unit=pve-pihole-dns-sync.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > /etc/systemd/system/pve-pihole-dns-sync.timer <<'EOF'
+[Unit]
+Description=Periodic Pi-hole DNS synchronization
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=20s
+Persistent=true
+Unit=pve-pihole-dns-sync.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable --now pve-pihole-dns-sync.path
+    systemctl enable --now pve-pihole-dns-sync.timer
+
+    if systemctl start pve-pihole-dns-sync.service; then
+        ok "Pi-hole DNS-Sync eingerichtet und initial ausgeführt."
+    else
+        systemctl status pve-pihole-dns-sync.service --no-pager -l || true
+        journalctl -u pve-pihole-dns-sync.service -n 80 --no-pager || true
+        if (( OPTIMAL_INSTALL )); then
+            die "Pi-hole DNS-Sync konnte im Optimalmodus nicht initialisiert werden."
+        fi
+        warn "Pi-hole DNS-Sync konnte nicht initialisiert werden."
+        return 1
+    fi
+
+    echo "  Helper: $helper"
+    echo "  Dashboard-Watcher: aktiv"
+    echo "  Fallback-Timer: alle 10 Minuten"
+}
+
 generate_pihole_app_password_v83() {
     local ip="$1"
     local admin_password="$2"
@@ -15720,6 +16176,10 @@ EOF
             die "Pi-hole lokale DNS-/CNAME-Einträge konnten im Optimalmodus nicht eingerichtet werden."
         fi
         warn "Pi-hole läuft weiter; lokale DNS-/CNAME-Einträge können später erneut importiert werden."
+    fi
+
+    if ! install_pihole_dns_sync_v130 "$PH_ID"; then
+        warn "Automatischer Pi-hole DNS-Sync ist derzeit nicht aktiv."
     fi
 
     if pct exec "$PH_ID" -- \
