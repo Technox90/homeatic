@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V124
+# PROXMOX MODULARER KOMPLETT-INSTALLER V125
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -39,6 +39,7 @@ set -Eeuo pipefail
 #   V122: Pi-hole Exporter ohne hart codierten /app-Pfad; Start über Image-CMD + BIND_ADDR/PORT
 #   V123: Dashboard-Webdienst mit 30-s-Readiness-Test, DB-unabhängigem /api/info und automatischer Fehlerdiagnose
 #   V124: Dashboard systemd-NAMESPACE-Fix; /var/lib/pve-sensor-dashboard-web wird vor jedem Webdienst-Start angelegt
+#   V125: PVE-UPS Standardprofil aus PDF + Proxmox Benutzer pve-ups@pve, Token pve-ups, Rolle UPSPower
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -741,7 +742,7 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V124"
+TUI_TITLE="PROXMOX INSTALLER V125"
 TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
 
 ensure_tui() {
@@ -1114,7 +1115,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 124" \
+                    --title "HAUPTMENÜ · Version 125" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8620,7 +8621,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V124",
+    "installer_version": "V125",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9094,7 +9095,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V124 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V125 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -29502,6 +29503,21 @@ cfg.dry_run = True
 if hasattr(cfg, "timezone"):
     cfg.timezone = "Europe/Berlin"
 
+if hasattr(cfg, "ntp_server"):
+    cfg.ntp_server = ""
+
+if hasattr(cfg, "selftest_enabled"):
+    cfg.selftest_enabled = True
+
+if hasattr(cfg, "selftest_hour"):
+    cfg.selftest_hour = 9
+
+if hasattr(cfg, "selftest_interval_min"):
+    cfg.selftest_interval_min = 1440
+
+if hasattr(cfg, "selftest_log_ok"):
+    cfg.selftest_log_ok = True
+
 # -----------------------------------------------------------------------
 # UPS NAS / NUT
 # Preserve id, credentials and per-UPS overrides when the entry exists.
@@ -29513,7 +29529,7 @@ for item in cfg.ups:
     if (
         getattr(item, "type", "") == "nut"
         and (
-            getattr(item, "name", "") == "NAS"
+            getattr(item, "name", "") == "USV"
             or (
                 getattr(item, "host", "") == "192.168.178.20"
                 and int(getattr(item, "port", 3493)) == 3493
@@ -29525,15 +29541,17 @@ for item in cfg.ups:
 
 if ups is None:
     ups = NutConfig(
-        name="NAS",
+        name="USV",
         host="192.168.178.20",
         port=3493,
         ups_name="ups",
+        username="",
+        password="",
         timeout_s=3.0,
     )
     cfg.ups.append(ups)
 else:
-    ups.name = "NAS"
+    ups.name = "USV"
     ups.host = "192.168.178.20"
     ups.port = 3493
     ups.ups_name = "ups"
@@ -29613,7 +29631,7 @@ if pve_host is None and TOKEN_ID and TOKEN_SECRET:
         token_secret=TOKEN_SECRET,
         verify_tls=False,
         this_host=True,
-        order=999,
+        order=0,
         ups_ids=[ups.id],
         ups_policy="all",
     )
@@ -29624,9 +29642,14 @@ elif pve_host is not None:
     pve_host.api_url = f"https://{HOST_IP}:8006"
     pve_host.verify_tls = False
     pve_host.this_host = True
+    pve_host.order = 0
+    pve_host.enabled = True
 
     if hasattr(pve_host, "ups_ids"):
         pve_host.ups_ids = [ups.id]
+
+    if hasattr(pve_host, "ups_policy"):
+        pve_host.ups_policy = "all"
 
     if TOKEN_ID and TOKEN_SECRET:
         pve_host.token_id = TOKEN_ID
@@ -29637,11 +29660,12 @@ def secret_text(value):
         return value.get_secret_value()
     return str(value or "")
 
+EXPECTED_TOKEN_ID = "pve-ups@pve!pve-ups"
 needs_token = True
 
 if pve_host is not None:
     needs_token = not (
-        str(getattr(pve_host, "token_id", "")).strip()
+        str(getattr(pve_host, "token_id", "")).strip() == EXPECTED_TOKEN_ID
         and secret_text(getattr(pve_host, "token_secret", "")).strip()
     )
 
@@ -29727,7 +29751,7 @@ async def main():
     for ups in cfg.ups:
         if (
             getattr(ups, "type", "") != "nut"
-            or getattr(ups, "name", "") != "NAS"
+            or getattr(ups, "name", "") != "USV"
         ):
             continue
 
@@ -29739,7 +29763,7 @@ async def main():
             )
 
             ups_results.append({
-                "name": getattr(ups, "name", "NAS"),
+                "name": getattr(ups, "name", "USV"),
                 "reachable": reachable,
                 "power_source": getattr(state, "power_source", None),
                 "battery_status": getattr(state, "battery_status", None),
@@ -29750,7 +29774,7 @@ async def main():
 
         except Exception as exc:
             ups_results.append({
-                "name": getattr(ups, "name", "NAS"),
+                "name": getattr(ups, "name", "USV"),
                 "reachable": False,
                 "error": str(exc),
             })
@@ -30872,32 +30896,54 @@ except Exception:
 # Create a PVE token ONLY when PVE-UPS has no usable token stored.
 # ---------------------------------------------------------------------------
 
+PVEUPS_USER_ID="pve-ups@pve"
+PVEUPS_TOKEN_NAME="pve-ups"
+PVEUPS_ROLE_NAME="UPSPower"
+PVEUPS_NODE_PATH="/nodes/${NODE_NAME}"
+PVEUPS_TOKEN_ID="${PVEUPS_USER_ID}!${PVEUPS_TOKEN_NAME}"
+
+echo
+echo "===== PVE-UPS PROXMOX API-BERECHTIGUNGEN ====="
+
+if pveum role list 2>/dev/null | awk '{print $1}' | grep -Fxq "$PVEUPS_ROLE_NAME"; then
+    pveum role modify "$PVEUPS_ROLE_NAME" \
+        -privs "Sys.Audit Sys.PowerMgmt"
+else
+    pveum role add "$PVEUPS_ROLE_NAME" \
+        -privs "Sys.Audit Sys.PowerMgmt"
+fi
+
+if pveum user list 2>/dev/null | awk '{print $1}' | grep -Fxq "$PVEUPS_USER_ID"; then
+    pveum user modify "$PVEUPS_USER_ID" \
+        -comment "UPS Shutdown API | Token-ID: ${PVEUPS_TOKEN_ID}" >/dev/null
+else
+    pveum user add "$PVEUPS_USER_ID" \
+        -comment "UPS Shutdown API | Token-ID: ${PVEUPS_TOKEN_ID}" >/dev/null
+fi
+
+pveum acl modify "$PVEUPS_NODE_PATH" \
+    -user "$PVEUPS_USER_ID" \
+    -role "$PVEUPS_ROLE_NAME"
+
+# Bei Privilege Separation braucht auch der Token eine eigene ACL.
+pveum acl modify "$PVEUPS_NODE_PATH" \
+    -token "$PVEUPS_TOKEN_ID" \
+    -role "$PVEUPS_ROLE_NAME" \
+    2>/dev/null || true
+
 if [[ "$NEEDS_TOKEN" == "1" ]]; then
     echo
-    echo "PVE-UPS hat noch keinen verwendbaren Proxmox-Shutdown-Token."
-    echo "Ein eigener minimal berechtigter Token wird angelegt."
+    echo "PVE-UPS benötigt den Standard-Token ${PVEUPS_TOKEN_ID}."
+    echo "Der Token wird neu erzeugt, damit das Secret sicher übernommen werden kann."
 
-    pveum user add ups@pve >/dev/null 2>&1 || true
-
-    if pveum role list 2>/dev/null | awk '{print $1}' | grep -Fxq UpsShutdown; then
-        pveum role modify UpsShutdown -privs "Sys.PowerMgmt"
-    else
-        pveum role add UpsShutdown -privs "Sys.PowerMgmt"
-    fi
-
-    pveum acl modify "/nodes/${NODE_NAME}" \
-        -user ups@pve \
-        -role UpsShutdown
-
-    # The secret of an existing token cannot be read back.
-    # Recreate only because config explicitly reported that no usable secret exists.
-    pveum user token remove ups@pve shutdown >/dev/null 2>&1 || true
+    # Ein vorhandenes Secret kann Proxmox nicht erneut anzeigen.
+    pveum user token remove "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" >/dev/null 2>&1 || true
 
     TOKEN_JSON="$(
         pveum user token add \
-            ups@pve \
-            shutdown \
-            --privsep 0 \
+            "$PVEUPS_USER_ID" \
+            "$PVEUPS_TOKEN_NAME" \
+            -privsep 1 \
             --output-format json
     )"
 
@@ -30915,9 +30961,13 @@ print(data.get("value") or data.get("token") or "")
         exit 1
     }
 
-    TOKEN_ID="ups@pve!shutdown"
+    TOKEN_ID="$PVEUPS_TOKEN_ID"
 
-    # Do not print the secret. Pass it only for this single process invocation.
+    # Token-ACL nach der Erzeugung nochmals verbindlich setzen.
+    pveum acl modify "$PVEUPS_NODE_PATH" \
+        -token "$TOKEN_ID" \
+        -role "$PVEUPS_ROLE_NAME"
+
     CONFIG_RESULT="$(
         pct exec "$CTID" -- \
             env \
@@ -30929,14 +30979,18 @@ print(data.get("value") or data.get("token") or "")
             /root/pve-ups-configure-v58.py
     )"
 
-    # V107: Token-Secret sofort extern und root-only sichern. Ein bestehendes
-    # Proxmox API-Token-Secret kann später nicht erneut ausgelesen werden.
+    # Secret root-only ablegen; der Proxmox-Kommentar enthält bewusst nur
+    # Token-ID + Dateipfad und NICHT das Secret im Klartext.
     install -d -m 0700 -o root -g root /home/passwd
     TOKEN_STAMP="${INSTALL_SECRET_STAMP_V107:-$(date +%Y%m%d-%H%M%S)}"
     TOKEN_FILE="/home/passwd/pve-ups-proxmox-api-token-pw-${TOKEN_STAMP}.txt"
     umask 077
     {
         echo "Komponente: PVE-UPS Proxmox API Token"
+        echo "Benutzer:   ${PVEUPS_USER_ID}"
+        echo "Rolle:      ${PVEUPS_ROLE_NAME}"
+        echo "Rechte:     Sys.Audit Sys.PowerMgmt"
+        echo "Pfad:       ${PVEUPS_NODE_PATH}"
         echo "Token-ID:   ${TOKEN_ID}"
         echo "Erstellt:   $(date '+%d.%m.%Y %H:%M:%S')"
         echo
@@ -30946,11 +31000,20 @@ print(data.get("value") or data.get("token") or "")
     chmod 600 "$TOKEN_FILE"
     chown root:root "$TOKEN_FILE"
 
+    pveum user modify "$PVEUPS_USER_ID" \
+        -comment "UPS Shutdown API | Token-ID: ${TOKEN_ID} | Secret: ${TOKEN_FILE}" \
+        >/dev/null
+
     unset TOKEN_SECRET TOKEN_JSON
 
     echo "[OK] Proxmox-Shutdown-Token eingerichtet."
+    echo "[OK] Token-ID: ${TOKEN_ID}"
     echo "[OK] Token-Secret gespeichert: $TOKEN_FILE"
 fi
+
+echo
+echo "Token-Berechtigungen:"
+pveum user token permissions "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" || true
 
 # ---------------------------------------------------------------------------
 # Apply timezone at OS level as well. This does not alter shutdown thresholds.

@@ -1,6 +1,41 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V125
+-----------------
+- PVE-UPS-Proxmox-API-Berechtigungen auf den gewünschten Standard umgestellt:
+  * Benutzer: pve-ups@pve
+  * Token: pve-ups
+  * Token-ID: pve-ups@pve!pve-ups
+  * Rolle: UPSPower
+  * Rechte: Sys.Audit Sys.PowerMgmt
+  * ACL-Pfad: /nodes/<lokaler-node>
+  * Token mit Privilege Separation (-privsep 1)
+- Benutzerkommentar enthält Token-ID; nach Erzeugung zusätzlich den root-only Speicherpfad des Secrets.
+- Das Token-Secret wird NICHT als Klartext in den Proxmox-Kommentar geschrieben, sondern weiterhin unter /home/passwd/pve-ups-proxmox-api-token-pw-<datum>.txt mit 0600 gespeichert.
+- Bestehende PVE-UPS-Konfiguration mit alter Token-ID wird auf pve-ups@pve!pve-ups migriert; falls das Secret dafür nicht verfügbar ist, wird der Standard-Token neu erzeugt und direkt in PVE-UPS übernommen.
+- PVE-UPS-Standardwerte an die bereitgestellte PDF-Konfiguration angepasst:
+  * USV-Anzeigename: USV
+  * NUT-Server: 192.168.178.20:3493
+  * NUT-USV-Name: ups
+  * Timeout: 3 s
+  * Akkubetrieb: 600 s
+  * Restlaufzeit: 10 min
+  * Ladestand: 30 %
+  * battery low/depleted: aktiv
+  * Polling Netz/Akku: 30 s / 8 s
+  * nicht erreichbar nach 3 Polls
+  * Shutdown-Timeout: 60 s
+  * Wieder scharf nach Netzrückkehr: 5 min
+  * Kommunikationsverlust-Shutdown: aus
+  * Shutdown bei Verbindungsverlust im Akkubetrieb fortsetzen: aktiv
+  * Host-Reihenfolge: 0
+  * TLS-Prüfung: aus
+  * lokaler Host: aktiv und als "Dieser Host" markiert
+  * Selbsttest: täglich um 09:00, erfolgreiche Tests ins Eventlog
+  * Zeitzone: Europe/Berlin
+- Vorhandene Webhook-Zugangsdaten werden erhalten; ein in Screenshots/PDF sichtbarer Webhook wird nicht als Secret in das öffentliche Repository eingebettet.
+
 20.09.2026 – V124
 -----------------
 - Dashboard systemd-NAMESPACE-Fehler behoben.
