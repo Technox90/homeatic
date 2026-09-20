@@ -1,6 +1,30 @@
 Verfolgung der Änderungen
 ==========================
 
+20.09.2026 – V137
+-----------------
+- Alle bestätigten Paperless-Reverse-Proxy-/Login-Korrekturen direkt in die Neuinstallation übernommen.
+- Neue Paperless-Installationen enthalten jetzt fest:
+  * PAPERLESS_URL=https://<Paperless-IP>
+  * PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
+  * PAPERLESS_TRUSTED_PROXIES=127.0.0.1
+  * PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER=X-Real-IP
+- PAPERLESS_CSRF_TRUSTED_ORIGINS wird bei der Neuinstallation bewusst nicht zusätzlich gesetzt:
+  PAPERLESS_URL ergänzt denselben Origin bereits in Django und verhindert so den zuvor beobachteten Doppeleintrag.
+- Neue Abschlussprüfung verify_paperless_proxy_v137:
+  * docker compose config muss gültig sein,
+  * Paperless-Webserver muss healthy/running sein,
+  * tatsächlich geladene Container-Environment-Werte werden geprüft,
+  * Django CSRF_TRUSTED_ORIGINS muss https://<Paperless-IP> enthalten,
+  * SECURE_PROXY_SSL_HEADER muss aktiv sein,
+  * nginx muss X-Real-IP und X-Forwarded-Proto=https setzen.
+- Eine Paperless-Neuinstallation gilt erst nach erfolgreicher Proxy-/Login-Prüfung als abgeschlossen.
+- Bestehende Installationen können weiterhin über repair_existing_paperless_proxy_v137 nachgezogen werden.
+- Bei einem reinen Dashboard-Update wird diese Reparatur weiterhin ausgeführt; bei gleichzeitiger Paperless-Neuinstallation nicht doppelt.
+- V136-Migrationsblock vollständig neu aufgebaut.
+- Dabei einen durch die vorherige Patch-Generierung beschädigten/duplizierten Quelltextbereich entfernt; die echte Pi-hole-Funktion bleibt genau einmal erhalten.
+- Pi-hole-v6 dns.hosts, V129-SQLite-Fix, V134 Dashboard-Link-Abgleich und Dashboard-Theme bleiben unverändert erhalten.
+
 20.09.2026 – V136
 -----------------
 - Paperless-login 403 nach erfolgreichem CSRF-Fix behoben.
