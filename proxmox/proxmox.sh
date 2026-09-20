@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V131
+# PROXMOX MODULARER KOMPLETT-INSTALLER V132
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -46,6 +46,7 @@ set -Eeuo pipefail
 #   V129: Pi-hole SQLite-Kommandos korrigiert; ungültige Option -ni vollständig entfernt
 #   V130: Pi-hole Local-DNS-Sync aus Proxmox-Gästen + Dashboard; Watcher + 10-Minuten-Fallback
 #   V131: Pi-hole-v6 Local DNS auf offizielles dns.hosts umgestellt; WebUI zeigt synchronisierte IP/Host-Einträge
+#   V132: Dashboard-Farbschema über Einstellungen anpassbar; persistente Theme-Farben mit Live-Vorschau
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -748,8 +749,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V131"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V119"
+TUI_TITLE="PROXMOX INSTALLER V132"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V132"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1121,7 +1122,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 131" \
+                    --title "HAUPTMENÜ · Version 132" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8636,7 +8637,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V131",
+    "installer_version": "V132",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9110,7 +9111,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V131 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V132 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -21997,15 +21998,15 @@ __PVE_MENU_EDITOR_V4__
 
 
 # =============================================================================
-# DASHBOARD EINSTELLUNGEN / HTTPS / FAVICON - FIX V3
+# DASHBOARD EINSTELLUNGEN / FARBEN / HTTPS / FAVICON - V4
 # =============================================================================
 
-install_dashboard_settings_v3() {
-    header "DASHBOARD EINSTELLUNGEN / HTTPS / FAVICON"
+install_dashboard_settings_v4() {
+    header "DASHBOARD EINSTELLUNGEN / FARBEN / HTTPS / FAVICON"
 
-    local patch="/tmp/pve-dashboard-settings-v3.$$"
+    local patch="/tmp/pve-dashboard-settings-v4.$"
 
-    cat > "$patch" <<'__PVE_DASHBOARD_SETTINGS_V3__'
+    cat > "$patch" <<'__PVE_DASHBOARD_SETTINGS_V4__'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -22052,12 +22053,14 @@ BACKUP="/root/backups/pve-dashboard-settings-backup-$(date +%Y%m%d-%H%M%S)"
 }
 
 echo "============================================================"
-echo " DASHBOARD EINSTELLUNGEN + HTTPS + FAVICON - FIX V3"
+echo " DASHBOARD EINSTELLUNGEN + FARBEN + HTTPS + FAVICON - V4"
 echo "============================================================"
 echo
 echo "Neu:"
 echo "  - Webseitenname ändern"
 echo "  - Server-Menü-Name ändern"
+echo "  - Dashboard-Farben / Farbschema anpassen"
+echo "  - Live-Vorschau + Standardfarben wiederherstellen"
 echo "  - Favicon hochladen / ersetzen / löschen"
 echo "  - Dashboard HTTPS aktivieren"
 echo "  - HTTP -> HTTPS Umleitung optional"
@@ -22114,6 +22117,17 @@ data = {
     "https_host": os.environ.get("DASHBOARD_IP", "127.0.0.1"),
     "favicon_url": "",
     "certificate_type": "HTTP",
+    "theme_bg": "#08101b",
+    "theme_panel": "#101a29",
+    "theme_panel2": "#131f31",
+    "theme_line": "#28364b",
+    "theme_text": "#eef5ff",
+    "theme_muted": "#92a4bc",
+    "theme_accent": "#64a7ff",
+    "theme_accent2": "#9b7cff",
+    "theme_good": "#37d996",
+    "theme_warn": "#ffbd4a",
+    "theme_bad": "#ff5f6d",
 }
 
 path.write_text(
@@ -22156,6 +22170,22 @@ HOST_RE = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$"
 )
 
+COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+THEME_DEFAULTS = {
+    "theme_bg": "#08101b",
+    "theme_panel": "#101a29",
+    "theme_panel2": "#131f31",
+    "theme_line": "#28364b",
+    "theme_text": "#eef5ff",
+    "theme_muted": "#92a4bc",
+    "theme_accent": "#64a7ff",
+    "theme_accent2": "#9b7cff",
+    "theme_good": "#37d996",
+    "theme_warn": "#ffbd4a",
+    "theme_bad": "#ff5f6d",
+}
+
 
 def fail(message, code=1):
     print(
@@ -22179,6 +22209,15 @@ def bool_value(value):
         "ja",
         "on",
     )
+
+
+def valid_color(value, fallback):
+    value = str(value or "").strip()
+
+    if not COLOR_RE.fullmatch(value):
+        return fallback
+
+    return value.lower()
 
 
 def current_ip():
@@ -22588,6 +22627,17 @@ def apply(payload):
     except Exception:
         current = {}
 
+    theme = {}
+
+    for key, default in THEME_DEFAULTS.items():
+        theme[key] = valid_color(
+            payload.get(
+                key,
+                current.get(key, default),
+            ),
+            default,
+        )
+
     settings = {
         "website_name": website_name,
         "menu_name": menu_name,
@@ -22598,6 +22648,7 @@ def apply(payload):
             current.get("favicon_url", "")
         ),
         "certificate_type": "HTTP",
+        **theme,
     }
 
     install_favicon(payload, settings)
@@ -22837,6 +22888,17 @@ def read_ui_settings():
         "https_host": "",
         "favicon_url": "",
         "certificate_type": "HTTP",
+        "theme_bg": "#08101b",
+        "theme_panel": "#101a29",
+        "theme_panel2": "#131f31",
+        "theme_line": "#28364b",
+        "theme_text": "#eef5ff",
+        "theme_muted": "#92a4bc",
+        "theme_accent": "#64a7ff",
+        "theme_accent2": "#9b7cff",
+        "theme_good": "#37d996",
+        "theme_warn": "#ffbd4a",
+        "theme_bad": "#ff5f6d",
     }
 
     try:
@@ -22922,6 +22984,17 @@ def ui_settings_save():
         "favicon_action": str(
             payload.get("favicon_action", "keep")
         ).strip(),
+        "theme_bg": str(payload.get("theme_bg", "")).strip(),
+        "theme_panel": str(payload.get("theme_panel", "")).strip(),
+        "theme_panel2": str(payload.get("theme_panel2", "")).strip(),
+        "theme_line": str(payload.get("theme_line", "")).strip(),
+        "theme_text": str(payload.get("theme_text", "")).strip(),
+        "theme_muted": str(payload.get("theme_muted", "")).strip(),
+        "theme_accent": str(payload.get("theme_accent", "")).strip(),
+        "theme_accent2": str(payload.get("theme_accent2", "")).strip(),
+        "theme_good": str(payload.get("theme_good", "")).strip(),
+        "theme_warn": str(payload.get("theme_warn", "")).strip(),
+        "theme_bad": str(payload.get("theme_bad", "")).strip(),
     }
 
     favicon = request.files.get("favicon")
@@ -23122,7 +23195,7 @@ if 'id="linkProtocol"' not in index:
         )
 
 settings_css = r'''
-/* PVE_DASHBOARD_SETTINGS_V1 */
+/* PVE_DASHBOARD_SETTINGS_V2 */
 .settingsPreview{
   display:flex;
   align-items:center;
@@ -23169,12 +23242,144 @@ settings_css = r'''
   line-height:1.5;
 }
 .settingsUrl{
-  color:#85b8ff;
+  color:var(--accent);
   word-break:break-all;
+}
+.settingsDialog{
+  width:min(820px,100%);
+  max-height:90vh;
+  overflow:auto;
+}
+.themeSectionHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:4px 0 8px;
+}
+.themeSectionHead strong{
+  font-size:13px;
+}
+.themeSectionHead span{
+  display:block;
+  margin-top:3px;
+  color:var(--muted);
+  font-size:11px;
+}
+.themeReset{
+  white-space:nowrap;
+  padding:7px 10px;
+  font-size:11px;
+}
+.themeGrid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+.themeColor{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 9px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--panel2);
+}
+.themeColor label{
+  margin:0;
+  font-size:11px;
+}
+.themeColor input[type="color"]{
+  width:48px;
+  min-width:48px;
+  height:34px;
+  margin:0;
+  padding:2px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel);
+  cursor:pointer;
+}
+.themeColor input[type="color"]::-webkit-color-swatch-wrapper{
+  padding:0;
+}
+.themeColor input[type="color"]::-webkit-color-swatch{
+  border:0;
+  border-radius:5px;
+}
+.themeHint{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.45;
+}
+body{
+  background:var(--bg);
+}
+.live,
+.chart,
+.note,
+.dialog,
+.linkList,
+.settingsPreview,
+.settingsNote{
+  background:var(--panel);
+}
+.card{
+  background:linear-gradient(155deg,var(--panel2),var(--panel));
+}
+button,
+.dialog input,
+.dialog select{
+  background:var(--panel2);
+  color:var(--text);
+  border-color:var(--line);
+}
+.sideNav{
+  background:linear-gradient(180deg,var(--panel2),var(--bg));
+  border-right-color:var(--line);
+}
+.menuBtn{
+  border-color:var(--accent);
+  color:var(--accent);
+}
+.navManage{
+  border-color:var(--accent2);
+}
+.navIcon{
+  background:var(--panel2);
+  border-color:var(--line);
+}
+.navLink:hover{
+  background:var(--panel2);
+  border-color:var(--line);
+}
+.linkRow{
+  border-bottom-color:var(--line);
+}
+.ranges button.active{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--bg);
+}
+.checkRow input[type="checkbox"]{
+  accent-color:var(--accent);
+}
+.msg.err{
+  color:var(--bad);
+}
+.msg.ok{
+  color:var(--good);
+}
+@media(max-width:760px){
+  .themeGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
 }
 '''
 
-if "/* PVE_DASHBOARD_SETTINGS_V1 */" not in index:
+if "/* PVE_DASHBOARD_SETTINGS_V2 */" not in index:
     if "</style>" not in index:
         raise SystemExit("FEHLER: </style> nicht gefunden.")
 
@@ -23186,11 +23391,11 @@ if "/* PVE_DASHBOARD_SETTINGS_V1 */" not in index:
 
 settings_modal = r'''
 <div class="modal" id="settingsModal">
-  <div class="dialog linkDialog">
+  <div class="dialog linkDialog settingsDialog">
     <h2>Dashboard anpassen</h2>
 
     <p>
-      Webseitenname, Menüname, Favicon und HTTPS
+      Webseitenname, Menüname, Farben, Favicon und HTTPS
       zentral einstellen.
     </p>
 
@@ -23213,6 +23418,77 @@ settings_modal = r'''
           maxlength="60"
           placeholder="Server-Menü"
         >
+      </div>
+
+      <div class="full">
+        <div class="themeSectionHead">
+          <div>
+            <strong>Farbschema</strong>
+            <span>
+              Farben werden sofort als Vorschau angezeigt.
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="themeReset"
+            onclick="resetThemeColors()"
+          >
+            Standardfarben
+          </button>
+        </div>
+
+        <div class="themeGrid">
+          <div class="themeColor">
+            <label for="themeBg">Hintergrund</label>
+            <input id="themeBg" type="color" value="#08101b" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themePanel">Panel dunkel</label>
+            <input id="themePanel" type="color" value="#101a29" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themePanel2">Panel hell</label>
+            <input id="themePanel2" type="color" value="#131f31" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeLine">Linien / Rahmen</label>
+            <input id="themeLine" type="color" value="#28364b" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeText">Text</label>
+            <input id="themeText" type="color" value="#eef5ff" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeMuted">Sekundärtext</label>
+            <input id="themeMuted" type="color" value="#92a4bc" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeAccent">Akzent</label>
+            <input id="themeAccent" type="color" value="#64a7ff" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeAccent2">Akzent 2</label>
+            <input id="themeAccent2" type="color" value="#9b7cff" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeGood">OK</label>
+            <input id="themeGood" type="color" value="#37d996" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeWarn">Warnung</label>
+            <input id="themeWarn" type="color" value="#ffbd4a" oninput="previewThemeColors()">
+          </div>
+          <div class="themeColor">
+            <label for="themeBad">Fehler</label>
+            <input id="themeBad" type="color" value="#ff5f6d" oninput="previewThemeColors()">
+          </div>
+        </div>
+
+        <div class="themeHint">
+          Die Vorschau ist erst nach „Einstellungen speichern“
+          dauerhaft. „Schließen“ verwirft nicht gespeicherte Farben.
+        </div>
       </div>
 
       <div class="full">
@@ -23347,6 +23623,105 @@ if 'id="settingsModal"' not in index:
 settings_js = r'''
 let uiSettings={};
 
+const THEME_DEFAULTS={
+  theme_bg:'#08101b',
+  theme_panel:'#101a29',
+  theme_panel2:'#131f31',
+  theme_line:'#28364b',
+  theme_text:'#eef5ff',
+  theme_muted:'#92a4bc',
+  theme_accent:'#64a7ff',
+  theme_accent2:'#9b7cff',
+  theme_good:'#37d996',
+  theme_warn:'#ffbd4a',
+  theme_bad:'#ff5f6d'
+};
+
+const THEME_VARS={
+  theme_bg:'--bg',
+  theme_panel:'--panel',
+  theme_panel2:'--panel2',
+  theme_line:'--line',
+  theme_text:'--text',
+  theme_muted:'--muted',
+  theme_accent:'--accent',
+  theme_accent2:'--accent2',
+  theme_good:'--good',
+  theme_warn:'--warn',
+  theme_bad:'--bad'
+};
+
+const THEME_FIELDS={
+  theme_bg:'themeBg',
+  theme_panel:'themePanel',
+  theme_panel2:'themePanel2',
+  theme_line:'themeLine',
+  theme_text:'themeText',
+  theme_muted:'themeMuted',
+  theme_accent:'themeAccent',
+  theme_accent2:'themeAccent2',
+  theme_good:'themeGood',
+  theme_warn:'themeWarn',
+  theme_bad:'themeBad'
+};
+
+function validThemeColor(value,fallback){
+  const color=String(value||'').trim();
+
+  return /^#[0-9a-f]{6}$/i.test(color)
+    ? color.toLowerCase()
+    : fallback;
+}
+
+function applyThemeColors(settings){
+  const root=document.documentElement;
+
+  Object.entries(THEME_VARS).forEach(([key,cssVar])=>{
+    root.style.setProperty(
+      cssVar,
+      validThemeColor(
+        settings?.[key],
+        THEME_DEFAULTS[key]
+      )
+    );
+  });
+}
+
+function fillThemeInputs(settings){
+  Object.entries(THEME_FIELDS).forEach(([key,id])=>{
+    const el=$(id);
+
+    if(el){
+      el.value=validThemeColor(
+        settings?.[key],
+        THEME_DEFAULTS[key]
+      );
+    }
+  });
+}
+
+function themeFromInputs(){
+  const theme={};
+
+  Object.entries(THEME_FIELDS).forEach(([key,id])=>{
+    theme[key]=validThemeColor(
+      $(id)?.value,
+      THEME_DEFAULTS[key]
+    );
+  });
+
+  return theme;
+}
+
+function previewThemeColors(){
+  applyThemeColors(themeFromInputs());
+}
+
+function resetThemeColors(){
+  fillThemeInputs(THEME_DEFAULTS);
+  previewThemeColors();
+}
+
 function ensureFaviconLink(){
   let link=document.querySelector(
     'link[data-dashboard-favicon="1"]'
@@ -23382,6 +23757,8 @@ function applyUiSettings(settings){
   if($('navMenuTitle')){
     $('navMenuTitle').textContent=menu;
   }
+
+  applyThemeColors(uiSettings);
 
   const favicon=ensureFaviconLink();
 
@@ -23480,6 +23857,8 @@ async function openDashboardSettings(){
     settings.https_host
     || location.hostname;
 
+  fillThemeInputs(settings);
+
   $('faviconFile').value='';
   $('faviconClear').checked=false;
   $('settingsCode').value='';
@@ -23498,6 +23877,7 @@ async function openDashboardSettings(){
 }
 
 function closeDashboardSettings(){
+  applyThemeColors(uiSettings);
   $('settingsModal').classList.remove('show');
 }
 
@@ -23542,6 +23922,12 @@ async function saveDashboardSettings(){
     $('httpsHost').value.trim()
   );
   form.append('code',code);
+
+  const theme=themeFromInputs();
+
+  Object.entries(theme).forEach(([key,value])=>{
+    form.append(key,value);
+  });
 
   form.append(
     'favicon_action',
@@ -23941,7 +24327,7 @@ echo
 echo "Log:"
 echo "  $LOGFILE"
 echo "============================================================"
-__PVE_DASHBOARD_SETTINGS_V3__
+__PVE_DASHBOARD_SETTINGS_V4__
 
     chmod 700 "$patch"
     bash "$patch"
@@ -43435,7 +43821,7 @@ fi
 (( INSTALL_DASHBOARD )) && install_dashboard_router_domain_fix
 (( INSTALL_DASHBOARD )) && install_dashboard_router_top_link
 (( INSTALL_DASHBOARD )) && install_dashboard_menu_editor_v4
-(( INSTALL_DASHBOARD )) && install_dashboard_settings_v3
+(( INSTALL_DASHBOARD )) && install_dashboard_settings_v4
 (( INSTALL_DASHBOARD )) && install_dashboard_settings_write_paths
 # V69: TLS erst nach allen modernen Dashboard-Patches.
 # Dadurch bleibt das Menü selbst bei einem TLS-Fehler auf dem aktuellen Stand.
