@@ -21,20 +21,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Bash syntax
+      - name: Master installer Bash syntax
         run: bash -n proxmox/proxmox.sh
+
+      - name: Dashboard module Bash syntax
+        run: bash -n proxmox/modules/dashboard.sh
 
       - name: Dashboard Python syntax
         run: python3 -m py_compile dashboard/collector.py dashboard/app.py
 
-      - name: V139 layout checks
+      - name: V140 modularization checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/root/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'local APP_DIR="/opt/nodezero/dashboard"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_DASHBOARD_ASSET_REF="f1005bd0a8d385b791d0a4d25cf1ab2dc67198d2"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="44722c61915c6bcce5b0257962a03a3774db440a"' proxmox/proxmox.sh
+          grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
+          grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
+          grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
+          grep -q 'install_dashboard_layout_editor_v71() {' proxmox/modules/dashboard.sh
+          grep -q 'validate_dashboard_final_state_v69() {' proxmox/modules/dashboard.sh
+          grep -q 'local APP_DIR="/opt/nodezero/dashboard"' proxmox/modules/dashboard.sh
+          if grep -q 'install_dashboard() {' proxmox/proxmox.sh; then
+            echo "Dashboard definition still embedded in master installer"
+            exit 1
+          fi
           test -s dashboard/collector.py
           test -s dashboard/app.py
           test -s dashboard/index.html
+          test "$(wc -c < proxmox/proxmox.sh)" -lt 700000
