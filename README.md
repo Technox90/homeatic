@@ -6,13 +6,14 @@ Dieses Repository bündelt meine Home-Assistant-, Proxmox- und Pi-hole-Konfigura
 
 - **proxmox/** – Proxmox VE Master-Installer und Dokumentation
 - **pihole/** – eigene DNS-Einträge, Allow-/Blocklisten und Pi-hole-Dokumentation
+- **dashboard/** – ausgelagerte Basisquellen des Proxmox-Dashboards
 - weitere Home-Assistant-/Homelab-Dateien können hier ergänzt werden
 
 ## Proxmox
 
 Der Proxmox-Bereich enthält meinen modularen Komplett-Installer für Proxmox VE. Er kann unter anderem Home Assistant, Paperless-ngx + Ollama, Pi-hole + Unbound, NetAlertX, Uptime Kuma, Caddy, Prometheus, Grafana, PVE-UPS, EMQX und weitere Dienste installieren und konfigurieren.
 
-Aktueller Installationskandidat: **V118**
+Aktueller Installationskandidat: **V139**
 
 ### Schnellinstallation
 
@@ -49,7 +50,10 @@ Der Installer kümmert sich unter anderem um:
 - Storage- und Kapazitätsprüfungen
 - LXC-/VM-Erstellung mit festen Ressourcenprofilen
 - lokale HTTPS-Zertifikate und CA
-- Passwort-, Token- und Secret-Ablage unter `/home/passwd/`
+- aktive Passwort-, Token- und Secret-Ablage unter `/root/passwort/`
+- lokale Secret-Sicherung unter `/home/passwort/`
+- permanente Installations-/Image-Caches unter `/home/img/`
+- Download-Cache unter `/root/downloads/`
 - Pi-hole + Unbound + Pi-hole Exporter
 - automatische Pi-hole Block-/Allowlisten
 - Prometheus-/Grafana-Monitoring
@@ -119,3 +123,17 @@ Der feste **Optimal-Stack** ist aktuell mit insgesamt ungefähr **61 vCPU**, **8
 ### Home Assistant HTTPS
 
 Home Assistant wird vom Installer direkt auf **HTTPS-Port 443** vorbereitet. Bei der Standard-IP ist die Weboberfläche anschließend unter `https://192.168.178.101` erreichbar. Das Zertifikat wird von der lokalen NodeZero-CA signiert.
+
+## V139 Dateilayout
+
+V139 trennt Secrets, Downloads, große Images und installierten Eigen-Code klar voneinander:
+
+```text
+/root/passwort/          aktive Secrets
+/home/passwort/          lokale Secret-Sicherung
+/root/downloads/         Downloads und wiederverwendbare Artefakte
+/home/img/               HAOS/LXC/ISO/Docker/Ollama/Image-Cache
+/opt/nodezero/dashboard/ installiertes Dashboard
+```
+
+Die Dashboard-Basisdateien werden aus `dashboard/` versionsgebunden geladen. Alte Pfade werden bei einem Update soweit möglich automatisch migriert und über Kompatibilitäts-Symlinks weiter unterstützt.
