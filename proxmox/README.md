@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V139**
+Installationskandidat: **V140**
 
 Geplante Hauptdatei:
 
@@ -160,3 +160,14 @@ V139 trennt Installerlogik und große Dashboard-Quelldateien. `collector.py`, `a
 ```
 
 Der bestehende Cache aus `/home/Images` und das alte Dashboard unter `/opt/pve-sensor-dashboard` werden beim Update soweit eindeutig möglich automatisch übernommen. Kompatibilitäts-Symlinks verhindern, dass ältere Helfer sofort brechen.
+
+
+## Dashboard vollständig modularisiert · V140
+
+Ab V140 befindet sich die komplette Dashboard-Logik in:
+
+```text
+proxmox/modules/dashboard.sh
+```
+
+Der Master-Installer enthält nur noch den Modul-Loader. Das Modul wird über einen unveränderlichen Git-Commit nach `/root/downloads/nodezero/modules/<git-ref>/dashboard.sh` geladen, mit `bash -n` geprüft und anschließend per `source` eingebunden. Die separaten Dashboard-Basisdateien unter `dashboard/` bleiben bestehen.

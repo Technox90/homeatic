@@ -13,7 +13,7 @@ Dieses Repository bündelt meine Home-Assistant-, Proxmox- und Pi-hole-Konfigura
 
 Der Proxmox-Bereich enthält meinen modularen Komplett-Installer für Proxmox VE. Er kann unter anderem Home Assistant, Paperless-ngx + Ollama, Pi-hole + Unbound, NetAlertX, Uptime Kuma, Caddy, Prometheus, Grafana, PVE-UPS, EMQX und weitere Dienste installieren und konfigurieren.
 
-Aktueller Installationskandidat: **V139**
+Aktueller Installationskandidat: **V140**
 
 ### Schnellinstallation
 
@@ -137,3 +137,7 @@ V139 trennt Secrets, Downloads, große Images und installierten Eigen-Code klar 
 ```
 
 Die Dashboard-Basisdateien werden aus `dashboard/` versionsgebunden geladen. Alte Pfade werden bei einem Update soweit möglich automatisch migriert und über Kompatibilitäts-Symlinks weiter unterstützt.
+
+## V140 Dashboard-Modul
+
+Die komplette Dashboard-Installations- und Migrationslogik liegt ab V140 in `proxmox/modules/dashboard.sh`. Der Master-Installer lädt das Modul versionsgebunden nach `/root/downloads/nodezero/modules/<git-ref>/dashboard.sh` und bindet es erst danach ein. Dadurch enthält `proxmox.sh` nicht mehr zehntausende Zeilen Dashboard-HTML-/Python-/Patchlogik.

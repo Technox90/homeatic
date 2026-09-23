@@ -1,6 +1,35 @@
 Verfolgung der Änderungen
 ==========================
 
+23.09.2026 – V140
+-----------------
+- Vollständige Dashboard-Logik aus proxmox/proxmox.sh ausgelagert.
+- Neues Modul: proxmox/modules/dashboard.sh.
+- Ausgelagert wurden rund 23.000 Zeilen, darunter:
+  * Dashboard-Installation,
+  * Service-/Link-Manager und Menüsortierung,
+  * Router-Link und flexibler Menü-Editor,
+  * Einstellungen, Farben und Theme-Migrationen,
+  * Kategorien und Kategorie-Zuordnung,
+  * Dashboard HTTP/HTTPS-Konfiguration,
+  * USV-/NAS-Karte und USV-Einstellungen,
+  * Layout-Editor,
+  * Pi-hole-Dashboard-Einstellungen,
+  * finale Dashboard-Prüfung und /usv-Shortcut.
+- Der Master-Installer lädt dashboard.sh über einen unveränderlichen Git-Commit.
+- Modul-Cache: /root/downloads/nodezero/modules/<git-ref>/dashboard.sh.
+- Vor dem source wird das heruntergeladene Modul immer mit bash -n geprüft.
+- Bereits vorhandene Moduldateien werden wiederverwendet und nicht erneut heruntergeladen.
+- Die Dashboard-Basisdateien collector.py, app.py und index.html bleiben weiterhin separat unter dashboard/.
+- V139-Dateilayout bleibt unverändert:
+  * /root/passwort für aktive Secrets,
+  * /home/passwort für die lokale Secret-Sicherung,
+  * /root/downloads für Downloads,
+  * /home/img für permanente Images/Caches,
+  * /opt/nodezero für installierten Eigen-Code.
+- OpenRGB, Paperless V138, Pi-hole, PVE-UPS und die übrigen Module bleiben im Master-Installer erhalten.
+- GitHub Actions prüft ab V140 Hauptinstaller, Dashboard-Modul und Python-Basisdateien separat.
+
 23.09.2026 – V139
 -----------------
 - Installer-Dateilayout auf feste NodeZero-Pfade umgestellt:
