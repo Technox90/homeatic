@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V138
+# PROXMOX MODULARER KOMPLETT-INSTALLER V139
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -53,6 +53,7 @@ set -Eeuo pipefail
 #   V136: Paperless allauth Client-IP hinter nginx korrigiert; X-Real-IP statt HTTP_X_REAL_IP
 #   V137: Paperless Neuinstallation enthält vollständige HTTPS/CSRF/allauth-Proxy-Konfiguration + Abschlussprüfung
 #   V138: Paperless NAS-Inbox auf NFS per Consumer-Polling überwachen; Inbox-Zugriff bei Installation prüfen
+#   V139: NodeZero-Dateilayout + externes Dashboard-Quellpaket; Secrets/Downloads/Image-Cache sauber getrennt
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -109,13 +110,68 @@ export DEBIAN_FRONTEND=noninteractive
 BACKUP_ROOT="/root/backups"
 DIAGNOSE_ROOT="/root/diagnose"
 
-mkdir -p \
-    "$BACKUP_ROOT" \
-    "$DIAGNOSE_ROOT"
+# V139 · feste NodeZero-Dateistruktur
+NODEZERO_SECRET_DIR="/root/passwort"
+NODEZERO_SECRET_BACKUP_DIR="/home/passwort"
+NODEZERO_DOWNLOAD_DIR="/root/downloads"
+NODEZERO_IMAGE_DIR="/home/img"
+NODEZERO_APP_ROOT="/opt/nodezero"
 
-chmod 700 \
-    "$BACKUP_ROOT" \
-    "$DIAGNOSE_ROOT"
+nodezero_backup_secrets_v139() {
+    install -d -m 0700 -o root -g root "$NODEZERO_SECRET_DIR" "$NODEZERO_SECRET_BACKUP_DIR"
+
+    local file=""
+    while IFS= read -r -d '' file; do
+        install -m 0600 -o root -g root "$file" \
+            "$NODEZERO_SECRET_BACKUP_DIR/$(basename "$file")"
+    done < <(find "$NODEZERO_SECRET_DIR" -maxdepth 1 -type f -print0 2>/dev/null)
+}
+
+migrate_nodezero_layout_v139() {
+    install -d -m 0700 -o root -g root \
+        "$BACKUP_ROOT" \
+        "$DIAGNOSE_ROOT" \
+        "$NODEZERO_SECRET_DIR" \
+        "$NODEZERO_SECRET_BACKUP_DIR" \
+        "$NODEZERO_DOWNLOAD_DIR"
+
+    install -d -m 0755 -o root -g root \
+        "$NODEZERO_IMAGE_DIR" \
+        "$NODEZERO_APP_ROOT"
+
+    # Alter permanenter Image-Cache -> neuer Standardpfad.
+    if [[ -d /home/Images && ! -L /home/Images ]]; then
+        if [[ -z "$(find "$NODEZERO_IMAGE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+            rmdir "$NODEZERO_IMAGE_DIR" 2>/dev/null || true
+            mv /home/Images "$NODEZERO_IMAGE_DIR"
+            ln -s "$NODEZERO_IMAGE_DIR" /home/Images
+            echo "  [V139] Image-Cache nach $NODEZERO_IMAGE_DIR migriert."
+        else
+            echo "  [V139] Hinweis: /home/Images und $NODEZERO_IMAGE_DIR existieren beide; neuer Pfad bleibt maßgeblich."
+        fi
+    elif [[ ! -e /home/Images ]]; then
+        ln -s "$NODEZERO_IMAGE_DIR" /home/Images
+    fi
+
+    # Alte Secret-Ablage übernehmen, ohne vorhandene neue Dateien zu überschreiben.
+    if [[ -d /home/passwd && ! -L /home/passwd ]]; then
+        cp -an /home/passwd/. "$NODEZERO_SECRET_DIR/" 2>/dev/null || true
+        cp -an /home/passwd/. "$NODEZERO_SECRET_BACKUP_DIR/" 2>/dev/null || true
+    fi
+
+    # Bestehendes Dashboard in die neue /opt/nodezero-Struktur verschieben.
+    if [[ -d /opt/pve-sensor-dashboard && ! -L /opt/pve-sensor-dashboard &&
+          ! -e "$NODEZERO_APP_ROOT/dashboard" ]]; then
+        mv /opt/pve-sensor-dashboard "$NODEZERO_APP_ROOT/dashboard"
+    fi
+    if [[ ! -e /opt/pve-sensor-dashboard && -d "$NODEZERO_APP_ROOT/dashboard" ]]; then
+        ln -s "$NODEZERO_APP_ROOT/dashboard" /opt/pve-sensor-dashboard
+    fi
+
+    nodezero_backup_secrets_v139
+}
+
+migrate_nodezero_layout_v139
 
 
 # -----------------------------------------------------------------------------
@@ -755,8 +811,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V138"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V138"
+TUI_TITLE="PROXMOX INSTALLER V139"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V139"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1728,9 +1784,9 @@ delete_all_lxc_and_managed_ha_no_confirm() {
     echo "Andere VMs mit anderen Namen bleiben bestehen."
     echo
     echo "NICHT gelöscht werden:"
-    echo "  - /home/Images"
+    echo "  - /home/img"
     echo "  - /home/Data"
-    echo "  - /home/passwd (V107) + alte /root/pw-*.txt"
+    echo "  - /root/passwort (V107) + alte /root/pw-*.txt"
     echo
     echo "Abbruch ist jetzt nur noch mit STRG+C möglich."
     echo
@@ -1781,14 +1837,14 @@ delete_all_lxc_and_managed_ha_no_confirm() {
 # V101 · OPTIMALE INSTALLATION · KOMPLETTER GUEST-RESET OHNE RÜCKFRAGE
 # =============================================================================
 # Löscht bewusst ALLE LXC und ALLE VMs. Persistente Installer-/Cache-Daten unter
-# /home/Images und /home/Data bleiben erhalten. Dadurch kann der optimale Stack
+# /home/img und /home/Data bleiben erhalten. Dadurch kann der optimale Stack
 # anschließend mit festen IDs/IPs ab 101 vollständig neu aufgebaut werden.
 
 optimal_install_reset_v100() {
     header "OPTIMALE INSTALLATION · GUEST-RESET"
 
     echo "${RED}${BOLD}V101 Optimalmodus: alle vorhandenen VMs und LXC werden jetzt ohne Rückfrage gelöscht.${RESET}"
-    echo "Erhalten bleiben: /home/Images, /home/Data, /root/backups, /root/diagnose."
+    echo "Erhalten bleiben: /home/img, /home/Data, /root/backups, /root/diagnose."
     echo
 
     local id=""
@@ -1831,11 +1887,11 @@ optimal_install_reset_v100() {
 #   - No-Subscription/Nag-Removal bleibt bewusst bestehen und wird erneut
 #     angewendet.
 #   - Persistente Benutzer-/Installer-Daten werden NICHT gelöscht:
-#       /home/Images
+#       /home/img
 #       /home/Data
 #       /root/backups
 #       /root/diagnose
-#       /home/passwd
+#       /root/passwort
 #       /root/pw-*.txt (Legacy)
 #
 # Dieser Modus installiert anschließend NICHTS neu.
@@ -2035,7 +2091,7 @@ remove_master_host_components_v72() {
 
     # Dashboard-Daten/Code entfernen.
     rm -rf \
-        /opt/pve-sensor-dashboard \
+        /opt/nodezero/dashboard \
         /etc/pve-sensor-dashboard \
         /var/lib/pve-sensor-dashboard \
         /var/lib/pve-sensor-dashboard-web \
@@ -2139,11 +2195,11 @@ proxmox_zero_v72() {
     echo "  - No-Subscription / Subscription-Nag-Removal"
     echo "  - Proxmox Netzwerk-Konfiguration"
     echo "  - Proxmox Storage-Konfiguration"
-    echo "  - /home/Images"
+    echo "  - /home/img"
     echo "  - /home/Data inkl. Setup-Profile und Local-CA-Quelldateien"
     echo "  - /root/backups"
     echo "  - /root/diagnose"
-    echo "  - /home/passwd (V107) + alte /root/pw-*.txt"
+    echo "  - /root/passwort (V107) + alte /root/pw-*.txt"
     echo
     echo "Danach wird NICHT automatisch neu installiert."
     echo "Der Host bleibt als leerer Proxmox-Host stehen."
@@ -2262,7 +2318,7 @@ proxmox_zero_v72() {
 
     echo
     echo "Erhaltene Daten:"
-    echo "  /home/Images"
+    echo "  /home/img"
     echo "  /home/Data"
     echo "  /root/backups"
     echo "  /root/diagnose"
@@ -4395,16 +4451,16 @@ PY
 
 new_pw_file() {
     local stamp file nr
-    install -d -m 0700 -o root -g root /home/passwd
+    install -d -m 0700 -o root -g root /root/passwort
     stamp="$(date +%Y%m%d-%H%M%S)"
-    file="/home/passwd/pihole-web-api-pw-${stamp}.txt"
+    file="/root/passwort/pihole-web-api-pw-${stamp}.txt"
 
     if [[ -e "$file" ]]; then
         nr=2
-        while [[ -e "/home/passwd/pihole-web-api-pw-${stamp}-${nr}.txt" ]]; do
+        while [[ -e "/root/passwort/pihole-web-api-pw-${stamp}-${nr}.txt" ]]; do
             nr=$((nr + 1))
         done
-        file="/home/passwd/pihole-web-api-pw-${stamp}-${nr}.txt"
+        file="/root/passwort/pihole-web-api-pw-${stamp}-${nr}.txt"
     fi
 
     printf '%s\n' "$file"
@@ -4877,11 +4933,11 @@ PY
 )"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
-install -d -m 0700 -o root -g root /home/passwd
-FILE="/home/passwd/pihole-home-assistant-app-pw-${STAMP}.txt"
+install -d -m 0700 -o root -g root /root/passwort
+FILE="/root/passwort/pihole-home-assistant-app-pw-${STAMP}.txt"
 N=2
 while [[ -e "$FILE" ]]; do
-    FILE="/home/passwd/pihole-home-assistant-app-pw-${STAMP}-${N}.txt"
+    FILE="/root/passwort/pihole-home-assistant-app-pw-${STAMP}-${N}.txt"
     N=$((N + 1))
 done
 
@@ -5008,7 +5064,7 @@ install_pihole_language_tool() {
 set -Eeuo pipefail
 
 TRANSLATE_URL="https://raw.githubusercontent.com/pimanDE/translate2german/master/translate2german.sh"
-CACHE_DIR="/home/Images/pihole-language"
+CACHE_DIR="/root/downloads/pihole-language"
 SOURCE_FILE="${CACHE_DIR}/translate2german.sh"
 CONVERTED_FILE="${CACHE_DIR}/translate2german.docker.sh"
 
@@ -5529,13 +5585,13 @@ LOG_DIR="/var/log/proxmox-auto-updater"
 STATE_DIR="/var/lib/proxmox-auto-updater"
 PUSH_CONF="/root/.config/proxmox-auto-updater/pushover.env"
 
-IMAGE_DIR="/home/Images"
+IMAGE_DIR="/home/img"
 HAOS_CACHE="${IMAGE_DIR}/haos"
 LXC_CACHE="${IMAGE_DIR}/template/cache"
 DOCKER_CACHE="${IMAGE_DIR}/docker"
 OLLAMA_CACHE="${IMAGE_DIR}/ollama"
-DOWNLOAD_CACHE="${IMAGE_DIR}/downloads"
-PIHOLE_LANG_CACHE="${IMAGE_DIR}/pihole-language"
+DOWNLOAD_CACHE="/root/downloads"
+PIHOLE_LANG_CACHE="/root/downloads/pihole-language"
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 chmod 700 "$LOG_DIR" "$STATE_DIR"
@@ -6889,7 +6945,7 @@ set -Eeuo pipefail
     exit 1
 }
 
-PW_DIR="/home/passwd"
+PW_DIR="/root/passwort"
 LEGACY_PW_DIR="/root"
 
 load_files() {
@@ -6966,7 +7022,7 @@ show_latest() {
     load_files
 
     if (( ${#PW_FILES[@]} == 0 )); then
-        echo "Keine Passwortdateien unter /home/passwd oder alte /root/pw-*.txt gefunden."
+        echo "Keine Passwortdateien unter /root/passwort oder alte /root/pw-*.txt gefunden."
         return 1
     fi
 
@@ -8643,7 +8699,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V138",
+    "installer_version": "V139",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8983,22 +9039,22 @@ show_installer_info() {
     info_text+="  PBS Standard: 128 GB\n\n"
 
     info_text+="PERMANENTER DOWNLOAD-CACHE\n"
-    info_text+="  /home/Images\n"
+    info_text+="  /home/img\n"
     info_text+="  LXC-Templates, HAOS, Docker-Images, Ollama-Modelle\n"
     info_text+="  APT-Pakete/Paketlisten, Pi-hole Daten, Scrutiny Collector\n"
     info_text+="  Docker-Images werden nur gespeichert, wenn dort >= 10 GB frei sind\n"
-    info_text+="  KOMPLETT NEU löscht /home/Images NICHT\n\n"
+    info_text+="  KOMPLETT NEU löscht /home/img NICHT\n\n"
 
     info_text+="PERSISTENTE ANWENDUNGSDATEN\n"
     info_text+="  Uptime Kuma: /home/Data/uptime-kuma\n"
     info_text+="  Setup-Profile: /home/Data/proxmox-installer\n"
-    info_text+="  Zugangsdaten: jeweils eigene Datei unter /home/passwd (0600)\n"
+    info_text+="  Zugangsdaten: jeweils eigene Datei unter /root/passwort (0600)\n"
     info_text+="  last-setup.json: zuletzt ausgefüllte Konfiguration\n"
     info_text+="  last-success.json: letzte erfolgreiche Installation\n"
     info_text+="  Historie: maximal 10 erfolgreiche Profile\n"
     info_text+="  Laden: /home/Data · beliebiger Dateipfad · HTTP/HTTPS\n"
     info_text+="  Keine Passwörter/API-Tokens/Sicherheitscodes im Setup-Profil\n"
-    info_text+="  KOMPLETT NEU löscht /home/Data und /home/passwd NICHT\n\n"
+    info_text+="  KOMPLETT NEU löscht /home/Data und /root/passwort NICHT\n\n"
 
     info_text+="ID-/IP-AUTOMATIK\n"
     info_text+="  ID 100 bleibt reserviert\n"
@@ -9021,9 +9077,9 @@ show_installer_info() {
     info_text+="  Debian 13: Cloud-Image · Desktop oder Headless\n"
     info_text+="  Ubuntu 24.04 LTS: Cloud-Image · Desktop oder Headless\n"
     info_text+="  Linux Mint: ISO · Desktop empfohlen\n"
-    info_text+="  ISO-Cache: /home/Images/template/iso\n"
-    info_text+="  Cloud-Images: /home/Images/os\n"
-    info_text+="  Cloud-Init: /home/Images/snippets\n"
+    info_text+="  ISO-Cache: /home/img/template/iso\n"
+    info_text+="  Cloud-Images: /home/img/os\n"
+    info_text+="  Cloud-Init: /home/img/snippets\n"
     info_text+="  Betriebssystem-VM ist auch in ALLES INSTALLIEREN/AUSWAHL wählbar\n"
     info_text+="  KOMPLETT NEU und Basis-Paket fragen optional nach einer OS-VM\n"
     info_text+="  O = Optimale Installation: ALLE VMs/LXC löschen, Optimal-Stack unattended installieren; nur NAS bleibt interaktiv\n"
@@ -9062,7 +9118,7 @@ OPTIMAL_RESET_PENDING=0
 # V107 · Jede Zugangsinformation bekommt eine eigene, root-only Datei.
 # Der Zeitstempel gilt für den gesamten Installationslauf.
 INSTALL_SECRET_STAMP_V107="$(date +%Y%m%d-%H%M%S)"
-INSTALL_SECRET_DIR_V107="/home/passwd"
+INSTALL_SECRET_DIR_V107="/root/passwort"
 PASSWORD_FILE="${INSTALL_SECRET_DIR_V107}/install-index-${INSTALL_SECRET_STAMP_V107}.txt"
 
 secret_slug_v107() {
@@ -9117,7 +9173,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V138 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V139 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9184,6 +9240,7 @@ persist_install_secrets_v107() {
     secret_write_v107 "emqx-admin" "EMQX Dashboard Admin" "${EMQX_ADMIN_PASS:-}" "admin" "${EMQX_IP:+https://${EMQX_IP}/}"
 
     refresh_secret_index_v107
+    nodezero_backup_secrets_v139
 }
 
 # V110: Noch VOR dem ersten apt-get update / Menü die Proxmox-Paketquellen
@@ -9549,8 +9606,8 @@ if (( INSTALL_DASHBOARD )); then
     header "DASHBOARD INSTALLIEREN / AKTUALISIEREN"
 
     DASHBOARD_EXISTS=0
-    if [[ -f /opt/pve-sensor-dashboard/app.py &&
-          -f /opt/pve-sensor-dashboard/static/index.html ]]; then
+    if [[ -f /opt/nodezero/dashboard/app.py &&
+          -f /opt/nodezero/dashboard/static/index.html ]]; then
         DASHBOARD_EXISTS=1
     fi
 
@@ -9677,7 +9734,7 @@ fi
 # Permanenter Image-Cache
 # -----------------------------------------------------------------------------
 
-IMAGE_CACHE_DIR="/home/Images"
+IMAGE_CACHE_DIR="/home/img"
 IMAGE_CACHE_STORAGE="image-cache"
 
 HAOS_CACHE_DIR="${IMAGE_CACHE_DIR}/haos"
@@ -9689,7 +9746,7 @@ OLLAMA_CACHE_DIR="${IMAGE_CACHE_DIR}/ollama"
 
 DOCKER_IMAGE_CACHE_DIR="${IMAGE_CACHE_DIR}/docker"
 APT_CACHE_DIR="${IMAGE_CACHE_DIR}/apt"
-DOWNLOAD_CACHE_DIR="${IMAGE_CACHE_DIR}/downloads"
+DOWNLOAD_CACHE_DIR="/root/downloads"
 
 HOST_APT_ARCHIVES="${APT_CACHE_DIR}/host/archives"
 DOCKER_GPG_CACHE="${DOCKER_IMAGE_CACHE_DIR}/docker.asc"
@@ -9756,7 +9813,7 @@ Binary::apt::APT::Keep-Downloaded-Packages "true";
 EOF
 }
 
-# V107 · /home/Images liegt auf dem Host-Dateisystem. Docker-Image-Caches
+# V107 · /home/img liegt auf dem Host-Dateisystem. Docker-Image-Caches
 # dürfen dieses Dateisystem niemals bis auf wenige GB füllen. Für den
 # Optimal-Stack verlangen wir vor dem destruktiven Reset zusätzlich 15 GB
 # freien Host-Speicher. Beim späteren Cache-Speichern bleiben mindestens 10 GB.
@@ -9937,8 +9994,25 @@ prepare_image_cache_storage() {
 
         existing_path="$(storage_cfg_path "$IMAGE_CACHE_STORAGE")"
 
-        [[ "$existing_path" == "$IMAGE_CACHE_DIR" ]] || \
-            die "Storage '$IMAGE_CACHE_STORAGE' zeigt auf '$existing_path' statt '$IMAGE_CACHE_DIR'."
+        if [[ "$existing_path" == "/home/Images" &&
+              -L /home/Images &&
+              "$(readlink -f /home/Images)" == "$IMAGE_CACHE_DIR" ]]; then
+            # Bestehende V138-Storage-Definition möglichst direkt auf den
+            # neuen V139-Pfad umstellen. Der Legacy-Symlink hält den Cache
+            # auch dann funktionsfähig, falls die Pfadänderung abgelehnt wird.
+            pvesm set "$IMAGE_CACHE_STORAGE" --path "$IMAGE_CACHE_DIR" >/dev/null 2>&1 || true
+            existing_path="$(storage_cfg_path "$IMAGE_CACHE_STORAGE")"
+        fi
+
+        if [[ "$existing_path" != "$IMAGE_CACHE_DIR" ]]; then
+            if [[ "$existing_path" == "/home/Images" &&
+                  -L /home/Images &&
+                  "$(readlink -f /home/Images)" == "$IMAGE_CACHE_DIR" ]]; then
+                :
+            else
+                die "Storage '$IMAGE_CACHE_STORAGE' zeigt auf '$existing_path' statt '$IMAGE_CACHE_DIR'."
+            fi
+        fi
 
         # Permanenter Cache für LXC-Templates, Installations-ISOs
         # und Cloud-Init-Snippets.
@@ -10359,7 +10433,7 @@ if (( NEED_GUESTS )); then
           INSTALL_PANGOLIN || INSTALL_NEWT || INSTALL_GATUS ||
           INSTALL_HOMEPAGE || INSTALL_NPM || INSTALL_EMQX )); then
 
-        # LXC-Templates liegen immer persistent unter /home/Images.
+        # LXC-Templates liegen immer persistent unter /home/img.
         prepare_image_cache_storage
         TEMPLATE_STORAGE="$IMAGE_CACHE_STORAGE"
 
@@ -10682,7 +10756,7 @@ Leer lassen = abbrechen." \
                 --title "$purpose" \
                 --ok-button "Auswählen" \
                 --cancel-button "Abbrechen" \
-                --menu "ISO aus /home/Images auswählen:" \
+                --menu "ISO aus /home/img auswählen:" \
                 22 92 12 \
                 "${args[@]}" \
                 3>&1 1>&2 2>&3
@@ -11811,7 +11885,7 @@ echo "Docker-Image-Cache:"
 echo "  $TAR"
 
 if [[ -s "$TAR" ]]; then
-    echo "Lade vorhandene Images aus /home/Images ..."
+    echo "Lade vorhandene Images aus /home/img ..."
     docker load -i "$TAR" >/dev/null
 fi
 
@@ -12293,10 +12367,60 @@ PYV134LINKS
 # DASHBOARD
 # =============================================================================
 
+# V139: Die großen Dashboard-Quellen liegen als echte Dateien im Repository.
+# Der Ref zeigt auf den unveränderlichen Commit, in dem die V139-Basisdateien
+# abgelegt wurden. Dadurch kann ein späteres main-Update keinen alten Installer
+# mit inkompatiblen Dashboard-Dateien mischen.
+NODEZERO_DASHBOARD_ASSET_REF="f1005bd0a8d385b791d0a4d25cf1ab2dc67198d2"
+NODEZERO_DASHBOARD_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_DASHBOARD_ASSET_REF}/dashboard"
+
+download_dashboard_asset_v139() {
+    local name="$1"
+    local target="$2"
+    local url="${NODEZERO_DASHBOARD_RAW_BASE}/${name}"
+    local tmp="${target}.tmp"
+
+    if [[ -s "$target" ]]; then
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$target")"
+    rm -f "$tmp"
+
+    curl --fail --silent --show-error --location \
+        --retry 3 --retry-delay 2 --connect-timeout 15 \
+        "$url" -o "$tmp" ||
+        die "Dashboard-Datei konnte nicht geladen werden: $url"
+
+    [[ -s "$tmp" ]] || die "Dashboard-Datei ist leer: $url"
+    mv -f "$tmp" "$target"
+}
+
+install_nodezero_dashboard_sources_v139() {
+    local app_dir="$1"
+    local static_dir="$2"
+    local cache_dir="${NODEZERO_DOWNLOAD_DIR}/dashboard/${NODEZERO_DASHBOARD_ASSET_REF}"
+
+    mkdir -p "$cache_dir" "$app_dir" "$static_dir"
+    chmod 700 "$NODEZERO_DOWNLOAD_DIR"
+    chmod 755 "$cache_dir"
+
+    download_dashboard_asset_v139 "collector.py" "$cache_dir/collector.py"
+    download_dashboard_asset_v139 "app.py" "$cache_dir/app.py"
+    download_dashboard_asset_v139 "index.html" "$cache_dir/index.html"
+
+    install -m 0644 -o root -g root "$cache_dir/collector.py" "$app_dir/collector.py"
+    install -m 0644 -o root -g root "$cache_dir/app.py" "$app_dir/app.py"
+    install -m 0644 -o root -g root "$cache_dir/index.html" "$static_dir/index.html"
+
+    ok "Dashboard-Quellen aus GitHub/Download-Cache installiert."
+    info "Cache: $cache_dir"
+}
+
 install_dashboard() {
     header "SERVER-DASHBOARD INSTALLIEREN / AKTUALISIEREN"
 
-    local APP_DIR="/opt/pve-sensor-dashboard"
+    local APP_DIR="/opt/nodezero/dashboard"
     local DATA_DIR="/var/lib/pve-sensor-dashboard"
     local STATIC_DIR="${APP_DIR}/static"
     local CONTROL_DIR="/etc/pve-sensor-dashboard"
@@ -12397,1596 +12521,19 @@ EOF
     # Collector
     # -------------------------------------------------------------------------
 
-    cat > "${APP_DIR}/collector.py" <<'PYCOLLECTOR'
-#!/usr/bin/env python3
-
-import glob
-import grp
-import json
-import math
-import os
-import re
-import sqlite3
-import subprocess
-import time
-from pathlib import Path
-
-import psutil
-
-DB = Path("/var/lib/pve-sensor-dashboard/metrics.db")
-POWER_STATE = Path("/var/lib/pve-sensor-dashboard/power-state.json")
-RETENTION_DAYS = int(os.environ.get("PVE_MONITOR_RETENTION_DAYS", "35"))
-
-COLUMNS = {
-    "ts": "INTEGER PRIMARY KEY",
-    "cpu_percent": "REAL",
-    "iowait_percent": "REAL",
-    "load1": "REAL",
-    "load5": "REAL",
-    "load15": "REAL",
-    "ram_percent": "REAL",
-    "ram_used": "INTEGER",
-    "ram_total": "INTEGER",
-    "swap_percent": "REAL",
-    "root_percent": "REAL",
-    "root_used": "INTEGER",
-    "root_total": "INTEGER",
-    "cpu_temp": "REAL",
-    "cpu_freq": "REAL",
-    "board_temp": "REAL",
-    "vrm_temp": "REAL",
-    "chipset_temp": "REAL",
-    "drive_temp": "REAL",
-    "gpu_temp": "REAL",
-    "cpu_fan_rpm": "REAL",
-    "system_fan_rpm": "REAL",
-    "vcore": "REAL",
-    "cpu_power_w": "REAL",
-    "cpu_core_power_w": "REAL",
-    "uncore_power_w": "REAL",
-    "dram_power_w": "REAL",
-    "gpu_power_w": "REAL",
-    "system_power_w": "REAL",
-    "gpu_util_percent": "REAL",
-    "net_rx_bps": "REAL",
-    "net_tx_bps": "REAL",
-    "disk_read_bps": "REAL",
-    "disk_write_bps": "REAL",
-    "net_rx_total": "INTEGER",
-    "net_tx_total": "INTEGER",
-    "disk_read_total": "INTEGER",
-    "disk_write_total": "INTEGER",
-    "uptime": "INTEGER",
-    "process_count": "INTEGER",
-    "vm_running": "INTEGER",
-    "vm_total": "INTEGER",
-    "ct_running": "INTEGER",
-    "ct_total": "INTEGER",
-    "pihole_queries_total": "INTEGER",
-    "pihole_queries_blocked": "INTEGER",
-    "pihole_blocked_percent": "REAL",
-}
-
-INSERT_COLS = list(COLUMNS.keys())
-
-
-def run_text(cmd, timeout=3):
-    try:
-        return subprocess.check_output(
-            cmd,
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=timeout,
-        ).strip()
-    except Exception:
-        return ""
-
-
-def sane(value, low=-1e9, high=1e9):
-    try:
-        value = float(value)
-        if math.isfinite(value) and low <= value <= high:
-            return value
-    except Exception:
-        pass
-    return None
-
-
-def connect_db():
-    DB.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB, timeout=30)
-    con.execute("PRAGMA journal_mode=DELETE")
-    con.execute("PRAGMA synchronous=NORMAL")
-
-    defs = ", ".join(f"{k} {v}" for k, v in COLUMNS.items())
-    con.execute(f"CREATE TABLE IF NOT EXISTS metrics ({defs})")
-
-    existing = {
-        row[1]
-        for row in con.execute("PRAGMA table_info(metrics)").fetchall()
-    }
-    for col, coldef in COLUMNS.items():
-        if col not in existing:
-            if "PRIMARY KEY" in coldef:
-                continue
-            con.execute(f"ALTER TABLE metrics ADD COLUMN {col} {coldef}")
-
-    con.execute("CREATE INDEX IF NOT EXISTS idx_metrics_ts ON metrics(ts)")
-    con.commit()
-    return con
-
-
-def sensors_json():
-    raw = run_text(["sensors", "-j"], timeout=4)
-    if not raw:
-        return {}
-    try:
-        return json.loads(raw)
-    except Exception:
-        return {}
-
-
-def sensor_values(data):
-    values = []
-    for chip, chipdata in data.items():
-        if not isinstance(chipdata, dict):
-            continue
-        for feature, featuredata in chipdata.items():
-            if not isinstance(featuredata, dict):
-                continue
-            for key, value in featuredata.items():
-                if not key.endswith(("_input", "_average")):
-                    continue
-                val = sane(value)
-                if val is None:
-                    continue
-                values.append({
-                    "chip": str(chip),
-                    "feature": str(feature),
-                    "key": str(key),
-                    "value": val,
-                    "text": f"{chip} {feature} {key}".lower(),
-                })
-    return values
-
-
-def first_matching(values, kind, keywords, excludes=(), mode="first"):
-    found = []
-    for item in values:
-        key = item["key"].lower()
-        text = item["text"]
-
-        if kind == "temp" and not key.startswith("temp"):
-            continue
-        if kind == "fan" and not key.startswith("fan"):
-            continue
-        if kind == "voltage" and not key.startswith("in"):
-            continue
-        if kind == "power" and not key.startswith("power"):
-            continue
-
-        if keywords and not any(k in text for k in keywords):
-            continue
-        if any(k in text for k in excludes):
-            continue
-
-        found.append(item["value"])
-
-    if not found:
-        return None
-    return max(found) if mode == "max" else found[0]
-
-
-def hardware_sensors():
-    data = sensors_json()
-    vals = sensor_values(data)
-
-    # CPU-Temperatur separat mit psutil priorisieren.
-    cpu_temp = None
-    try:
-        temps = psutil.sensors_temperatures(fahrenheit=False) or {}
-        preferred = []
-        for chip, entries in temps.items():
-            for entry in entries:
-                cur = sane(entry.current, -20, 130)
-                if cur is None:
-                    continue
-                txt = f"{chip} {entry.label or ''}".lower()
-                if any(k in txt for k in (
-                    "coretemp", "package id", "tctl", "tdie", "cpu"
-                )):
-                    preferred.append(cur)
-        if preferred:
-            cpu_temp = max(preferred)
-    except Exception:
-        pass
-
-    if cpu_temp is None:
-        cpu_temp = first_matching(
-            vals, "temp",
-            ("package", "coretemp", "tctl", "tdie", "cpu temp"),
-            ("critical",),
-            "max",
-        )
-
-    board_temp = first_matching(
-        vals, "temp",
-        ("systin", "system", "motherboard", "mainboard", "board"),
-        ("cpu", "gpu", "nvme", "pch", "vrm"),
-    )
-
-    # Fallback für Boards ohne unterstützten Super-I/O-HWMON-Treiber:
-    # höchsten plausiblen ACPI-Thermalzonenwert als Mainboard/Systemwert nutzen.
-    if board_temp is None:
-        acpi_temps = [
-            item["value"]
-            for item in vals
-            if "acpitz" in item["chip"].lower()
-            and item["key"].lower().startswith("temp")
-            and -10 <= item["value"] <= 100
-        ]
-        if acpi_temps:
-            board_temp = max(acpi_temps)
-
-    vrm_temp = first_matching(
-        vals, "temp",
-        ("vrm", "mos", "mosfet"),
-        (),
-        "max",
-    )
-
-    chipset_temp = first_matching(
-        vals, "temp",
-        ("pch", "chipset"),
-        (),
-        "max",
-    )
-
-    drive_temp = first_matching(
-        vals, "temp",
-        ("nvme", "drivetemp", "composite"),
-        (),
-        "max",
-    )
-
-    cpu_fan = first_matching(
-        vals, "fan",
-        ("cpu", "cpu_fan", "cpufan"),
-    )
-
-    all_fans = [
-        x["value"] for x in vals
-        if x["key"].lower().startswith("fan") and 0 < x["value"] < 50000
-    ]
-    system_fan = max(all_fans) if all_fans else None
-
-    vcore = first_matching(
-        vals, "voltage",
-        ("vcore", "cpu vcore", "core voltage"),
-    )
-
-    # AMDGPU kann Leistung/Temp direkt über hwmon liefern.
-    amdgpu_power = first_matching(
-        vals, "power",
-        ("amdgpu",),
-        (),
-        "max",
-    )
-    amdgpu_temp = first_matching(
-        vals, "temp",
-        ("amdgpu", "edge", "junction"),
-        (),
-        "max",
-    )
-
-    return {
-        "cpu_temp": cpu_temp,
-        "board_temp": board_temp,
-        "vrm_temp": vrm_temp,
-        "chipset_temp": chipset_temp,
-        "drive_temp": drive_temp,
-        "cpu_fan_rpm": cpu_fan,
-        "system_fan_rpm": system_fan,
-        "vcore": vcore,
-        "amdgpu_power": amdgpu_power,
-        "amdgpu_temp": amdgpu_temp,
-    }
-
-
-
-def rapl_power(now):
-    """
-    Liest Intel-RAPL direkt über /sys/class/powercap/intel-rapl:*.
-
-    Wichtig: Die Einträge unter /sys/class/powercap sind auf vielen
-    Proxmox-/Debian-Systemen Symlinks. Path.rglob() folgt diesen nicht
-    zuverlässig. Deshalb werden die RAPL-Zonen direkt geglobbt.
-
-    package-0 ist bereits das gesamte CPU-Package und darf nicht mit
-    core/uncore/dram addiert werden.
-    """
-    root = Path("/sys/class/powercap")
-    if not root.exists():
-        return {
-            "package": None,
-            "core": None,
-            "uncore": None,
-            "dram": None,
-        }
-
-    zones = {}
-
-    for zone in sorted(root.glob("intel-rapl:*")):
-        try:
-            name_file = zone / "name"
-            energy_file = zone / "energy_uj"
-
-            if not name_file.is_file() or not energy_file.is_file():
-                continue
-
-            name = name_file.read_text().strip().lower()
-            energy = int(energy_file.read_text().strip())
-
-            max_file = zone / "max_energy_range_uj"
-            max_range = int(max_file.read_text().strip()) if max_file.is_file() else None
-
-            # Nur die bekannten Zonen aufnehmen.
-            if name.startswith("package"):
-                key = "package"
-            elif name == "core":
-                key = "core"
-            elif name == "uncore":
-                key = "uncore"
-            elif name == "dram":
-                key = "dram"
-            else:
-                continue
-
-            # Bei mehreren Packages das erste Package verwenden.
-            if key not in zones:
-                zones[key] = {
-                    "path": str(zone),
-                    "energy": energy,
-                    "max_range": max_range,
-                }
-
-        except Exception:
-            continue
-
-    state = {}
-    try:
-        state = json.loads(POWER_STATE.read_text())
-    except Exception:
-        pass
-
-    previous = state.get("rapl_zones", {})
-    current_state = {}
-    result = {
-        "package": None,
-        "core": None,
-        "uncore": None,
-        "dram": None,
-    }
-
-    for key, zone in zones.items():
-        current_state[key] = {
-            "path": zone["path"],
-            "ts": now,
-            "energy": zone["energy"],
-        }
-
-        prev = previous.get(key, {})
-
-        if (
-            prev.get("path") != zone["path"]
-            or prev.get("ts") is None
-            or prev.get("energy") is None
-        ):
-            continue
-
-        dt = now - float(prev["ts"])
-        delta = zone["energy"] - int(prev["energy"])
-
-        if delta < 0 and zone["max_range"]:
-            delta = (
-                int(zone["max_range"])
-                - int(prev["energy"])
-                + zone["energy"]
-            )
-
-        if not (0.2 <= dt <= 300) or delta < 0:
-            continue
-
-        watts = (delta / 1_000_000.0) / dt
-
-        if 0 <= watts <= 2000:
-            result[key] = round(watts, 2)
-
-    state["rapl_zones"] = current_state
-
-    try:
-        POWER_STATE.write_text(json.dumps(state))
-    except Exception:
-        pass
-
-    return result
-
-
-def nvidia_data():
-    out = run_text([
-        "nvidia-smi",
-        "--query-gpu=utilization.gpu,temperature.gpu,power.draw",
-        "--format=csv,noheader,nounits",
-    ], timeout=3)
-
-    if not out:
-        return None, None, None
-
-    line = out.splitlines()[0]
-    parts = [p.strip() for p in line.split(",")]
-    if len(parts) < 3:
-        return None, None, None
-
-    util = sane(parts[0], 0, 100)
-    temp = sane(parts[1], -20, 130)
-    power = sane(parts[2], 0, 2000)
-    return util, temp, power
-
-
-def ipmi_system_power():
-    out = run_text(["ipmitool", "dcmi", "power", "reading"], timeout=3)
-    if not out:
-        return None
-
-    match = re.search(
-        r"Instantaneous\s+power\s+reading\s*:\s*([0-9.]+)\s*Watts",
-        out,
-        re.IGNORECASE,
-    )
-    if not match:
-        return None
-
-    return sane(match.group(1), 0, 10000)
-
-
-def guest_counts():
-    vm_total = vm_running = 0
-    ct_total = ct_running = 0
-
-    out = run_text(["qm", "list"], timeout=4)
-    lines = [x for x in out.splitlines() if x.strip()]
-    for line in lines[1:]:
-        cols = line.split()
-        if len(cols) >= 3:
-            vm_total += 1
-            if cols[2].lower() == "running":
-                vm_running += 1
-
-    out = run_text(["pct", "list"], timeout=4)
-    lines = [x for x in out.splitlines() if x.strip()]
-    for line in lines[1:]:
-        cols = line.split()
-        if len(cols) >= 2:
-            ct_total += 1
-            if cols[1].lower() == "running":
-                ct_running += 1
-
-    return vm_running, vm_total, ct_running, ct_total
-
-
-
-def pihole_stats():
-    # Pi-hole-Statistik der letzten 24 Stunden aus pihole-FTL.db.
-    try:
-        ctid = None
-        lxc_dir = Path("/etc/pve/lxc")
-
-        if lxc_dir.exists():
-            for conf in sorted(lxc_dir.glob("*.conf")):
-                try:
-                    content = conf.read_text(
-                        encoding="utf-8",
-                        errors="ignore",
-                    )
-                except Exception:
-                    continue
-
-                if re.search(
-                    r"(?m)^hostname:\s*pihole\s*$",
-                    content,
-                ):
-                    ctid = conf.stem
-                    break
-
-        if not ctid:
-            return None, None, None
-
-        status_text = run_text(
-            ["pct", "status", ctid],
-            timeout=3,
-        )
-
-        if "status: running" not in status_text.lower():
-            return None, None, None
-
-        db_path = "/opt/pihole/etc-pihole/pihole-FTL.db"
-
-        # V105: sqlite3 without -readonly creates a missing DB as 0-byte file.
-        # During a fresh Pi-hole installation this could race with FTL startup and
-        # leave FTL with an invalid database. Therefore only query an existing,
-        # non-empty DB and always open it read-only.
-        # Probe the schema read-only; an unavailable/not-yet-initialized DB
-        # simply means that Pi-hole statistics are not ready yet.
-        schema = run_text(
-            [
-                "pct",
-                "exec",
-                ctid,
-                "--",
-                "sqlite3",
-                "-readonly",
-                db_path,
-                "SELECT name FROM sqlite_master WHERE name='queries';",
-            ],
-            timeout=5,
-        )
-
-        if schema.strip() != "queries":
-            return None, None, None
-
-        sql = (
-            "SELECT "
-            "COUNT(*),"
-            "COALESCE(SUM(CASE WHEN status IN "
-            "(1,4,5,6,7,8,9,10,11,15,16,18) "
-            "THEN 1 ELSE 0 END),0) "
-            "FROM queries "
-            "WHERE timestamp >= strftime('%s','now') - 86400;"
-        )
-
-        raw = run_text(
-            [
-                "pct",
-                "exec",
-                ctid,
-                "--",
-                "sqlite3",
-                "-readonly",
-                "-separator",
-                "|",
-                db_path,
-                sql,
-            ],
-            timeout=8,
-        )
-
-        if not raw:
-            return None, None, None
-
-        parts = raw.splitlines()[-1].strip().split("|")
-
-        if len(parts) != 2:
-            return None, None, None
-
-        total = int(parts[0])
-        blocked = int(parts[1])
-
-        percent = (
-            round((blocked * 100.0) / total, 2)
-            if total > 0
-            else 0.0
-        )
-
-        return total, blocked, percent
-    except Exception:
-        return None, None, None
-
-
-def main():
-    now = int(time.time())
-    con = connect_db()
-
-    cput = psutil.cpu_times_percent(interval=0.35)
-    cpu_percent = max(0.0, min(100.0, 100.0 - float(cput.idle)))
-    iowait = float(getattr(cput, "iowait", 0.0))
-    load1, load5, load15 = os.getloadavg()
-
-    mem = psutil.virtual_memory()
-    swap = psutil.swap_memory()
-    root = psutil.disk_usage("/")
-    net = psutil.net_io_counters()
-    dio = psutil.disk_io_counters()
-
-    net_rx_total = int(net.bytes_recv if net else 0)
-    net_tx_total = int(net.bytes_sent if net else 0)
-    disk_read_total = int(dio.read_bytes if dio else 0)
-    disk_write_total = int(dio.write_bytes if dio else 0)
-
-    prev = con.execute(
-        "SELECT ts, net_rx_total, net_tx_total, disk_read_total, disk_write_total "
-        "FROM metrics ORDER BY ts DESC LIMIT 1"
-    ).fetchone()
-
-    rx_bps = tx_bps = rd_bps = wr_bps = 0.0
-    if prev and now > prev[0]:
-        dt = float(now - prev[0])
-        if prev[1] is not None:
-            rx_bps = max(0.0, (net_rx_total - prev[1]) / dt)
-        if prev[2] is not None:
-            tx_bps = max(0.0, (net_tx_total - prev[2]) / dt)
-        if prev[3] is not None:
-            rd_bps = max(0.0, (disk_read_total - prev[3]) / dt)
-        if prev[4] is not None:
-            wr_bps = max(0.0, (disk_write_total - prev[4]) / dt)
-
-    freq = psutil.cpu_freq()
-    cpu_freq = round(float(freq.current), 0) if freq else None
-
-    hw = hardware_sensors()
-
-    rapl = rapl_power(now)
-    cpu_power = rapl.get("package")
-    cpu_core_power = rapl.get("core")
-    uncore_power = rapl.get("uncore")
-    dram_power = rapl.get("dram")
-
-    gpu_util, nvidia_temp, nvidia_power = nvidia_data()
-    gpu_temp = nvidia_temp if nvidia_temp is not None else hw["amdgpu_temp"]
-    gpu_power = nvidia_power if nvidia_power is not None else hw["amdgpu_power"]
-
-    system_power = ipmi_system_power()
-
-    vm_running, vm_total, ct_running, ct_total = guest_counts()
-
-    pihole_total, pihole_blocked, pihole_percent = pihole_stats()
-
-    values = {
-        "ts": now,
-        "cpu_percent": round(cpu_percent, 2),
-        "iowait_percent": round(iowait, 2),
-        "load1": round(load1, 3),
-        "load5": round(load5, 3),
-        "load15": round(load15, 3),
-        "ram_percent": round(mem.percent, 2),
-        "ram_used": int(mem.used),
-        "ram_total": int(mem.total),
-        "swap_percent": round(swap.percent, 2),
-        "root_percent": round(root.percent, 2),
-        "root_used": int(root.used),
-        "root_total": int(root.total),
-        "cpu_temp": sane(hw["cpu_temp"], -20, 130),
-        "cpu_freq": cpu_freq,
-        "board_temp": sane(hw["board_temp"], -20, 130),
-        "vrm_temp": sane(hw["vrm_temp"], -20, 160),
-        "chipset_temp": sane(hw["chipset_temp"], -20, 160),
-        "drive_temp": sane(hw["drive_temp"], -20, 130),
-        "gpu_temp": sane(gpu_temp, -20, 160),
-        "cpu_fan_rpm": sane(hw["cpu_fan_rpm"], 0, 50000),
-        "system_fan_rpm": sane(hw["system_fan_rpm"], 0, 50000),
-        "vcore": sane(hw["vcore"], 0, 10),
-        "cpu_power_w": sane(cpu_power, 0, 1000),
-        "cpu_core_power_w": sane(cpu_core_power, 0, 1000),
-        "uncore_power_w": sane(uncore_power, 0, 1000),
-        "dram_power_w": sane(dram_power, 0, 1000),
-        "gpu_power_w": sane(gpu_power, 0, 2000),
-        "system_power_w": sane(system_power, 0, 10000),
-        "gpu_util_percent": sane(gpu_util, 0, 100),
-        "net_rx_bps": round(rx_bps, 2),
-        "net_tx_bps": round(tx_bps, 2),
-        "disk_read_bps": round(rd_bps, 2),
-        "disk_write_bps": round(wr_bps, 2),
-        "net_rx_total": net_rx_total,
-        "net_tx_total": net_tx_total,
-        "disk_read_total": disk_read_total,
-        "disk_write_total": disk_write_total,
-        "uptime": max(0, int(now - psutil.boot_time())),
-        "process_count": len(psutil.pids()),
-        "vm_running": vm_running,
-        "vm_total": vm_total,
-        "ct_running": ct_running,
-        "ct_total": ct_total,
-        "pihole_queries_total": pihole_total,
-        "pihole_queries_blocked": pihole_blocked,
-        "pihole_blocked_percent": pihole_percent,
-    }
-
-    placeholders = ",".join("?" for _ in INSERT_COLS)
-    cols = ",".join(INSERT_COLS)
-
-    con.execute(
-        f"INSERT OR REPLACE INTO metrics ({cols}) VALUES ({placeholders})",
-        [values.get(c) for c in INSERT_COLS],
-    )
-
-    cutoff = now - RETENTION_DAYS * 86400
-    con.execute("DELETE FROM metrics WHERE ts < ?", (cutoff,))
-    con.commit()
-    con.close()
-
-    try:
-        gid = grp.getgrnam("pve-monitor").gr_gid
-        os.chown(DB.parent, 0, gid)
-        os.chmod(DB.parent, 0o750)
-        os.chown(DB, 0, gid)
-        os.chmod(DB, 0o640)
-        if POWER_STATE.exists():
-            os.chown(POWER_STATE, 0, gid)
-            os.chmod(POWER_STATE, 0o640)
-    except Exception:
-        pass
-
-
-if __name__ == "__main__":
-    main()
-PYCOLLECTOR
+    install_nodezero_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"
 
     # -------------------------------------------------------------------------
     # Flask App
     # -------------------------------------------------------------------------
 
-    cat > "${APP_DIR}/app.py" <<'PYAPP'
-#!/usr/bin/env python3
-
-import os
-import platform
-import sqlite3
-import subprocess
-import threading
-import time
-from pathlib import Path
-
-from flask import Flask, jsonify, request, send_from_directory
-from werkzeug.security import check_password_hash
-
-APP_DIR = Path("/opt/pve-sensor-dashboard")
-DB = Path("/var/lib/pve-sensor-dashboard/metrics.db")
-CONTROL_HASH_FILE = Path("/etc/pve-sensor-dashboard/control.hash")
-POWER_HELPER = "/usr/local/sbin/pve-sensor-powerctl"
-
-app = Flask(__name__, static_folder=str(APP_DIR / "static"), static_url_path="")
-
-RANGES = {
-    "1h": 3600,
-    "6h": 6 * 3600,
-    "12h": 12 * 3600,
-    "24h": 24 * 3600,
-    "7d": 7 * 86400,
-    "30d": 30 * 86400,
-}
-
-FIELDS = [
-    "ts",
-    "cpu_percent", "iowait_percent",
-    "load1", "load5", "load15",
-    "ram_percent", "ram_used", "ram_total",
-    "swap_percent",
-    "root_percent", "root_used", "root_total",
-    "cpu_temp", "cpu_freq",
-    "board_temp", "vrm_temp", "chipset_temp", "drive_temp", "gpu_temp",
-    "cpu_fan_rpm", "system_fan_rpm", "vcore",
-    "cpu_power_w", "cpu_core_power_w", "uncore_power_w", "dram_power_w",
-    "gpu_power_w", "system_power_w", "gpu_util_percent",
-    "net_rx_bps", "net_tx_bps",
-    "disk_read_bps", "disk_write_bps",
-    "uptime", "process_count",
-    "vm_running", "vm_total", "ct_running", "ct_total",
-    "pihole_queries_total", "pihole_queries_blocked",
-    "pihole_blocked_percent",
-]
-
-_failed = {}
-_failed_lock = threading.Lock()
-MAX_FAILS = 5
-LOCK_SECONDS = 300
-FAIL_WINDOW = 600
-
-
-def db_ro():
-    return sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=5)
-
-
-def pve_version():
-    try:
-        return subprocess.check_output(
-            ["pveversion"],
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=2,
-        ).strip()
-    except Exception:
-        return "Proxmox VE"
-
-
-def read_text(path):
-    try:
-        return Path(path).read_text().strip()
-    except Exception:
-        return ""
-
-
-def cpu_model():
-    try:
-        for line in Path("/proc/cpuinfo").read_text().splitlines():
-            if line.startswith("model name"):
-                return line.split(":", 1)[1].strip()
-    except Exception:
-        pass
-    return platform.processor() or "CPU"
-
-
-def board_model():
-    vendor = read_text("/sys/devices/virtual/dmi/id/board_vendor")
-    name = read_text("/sys/devices/virtual/dmi/id/board_name")
-    version = read_text("/sys/devices/virtual/dmi/id/board_version")
-    return " ".join(x for x in (vendor, name, version) if x) or "Mainboard"
-
-
-def client_ip():
-    return request.headers.get("X-Real-IP", request.remote_addr or "unknown")
-
-
-def verify_code(code):
-    try:
-        stored = CONTROL_HASH_FILE.read_text(encoding="utf-8").strip()
-        return bool(stored) and check_password_hash(stored, code)
-    except Exception:
-        return False
-
-
-def rate_state(ip):
-    now = time.time()
-    with _failed_lock:
-        entry = _failed.get(ip)
-        if not entry:
-            return False, 0
-
-        fails, first, locked_until = entry
-
-        if locked_until > now:
-            return True, int(locked_until - now) + 1
-
-        if now - first > FAIL_WINDOW:
-            _failed.pop(ip, None)
-
-        return False, 0
-
-
-def record_failure(ip):
-    now = time.time()
-
-    with _failed_lock:
-        fails, first, locked_until = _failed.get(ip, (0, now, 0))
-
-        if now - first > FAIL_WINDOW:
-            fails, first, locked_until = 0, now, 0
-
-        fails += 1
-
-        if fails >= MAX_FAILS:
-            locked_until = now + LOCK_SECONDS
-
-        _failed[ip] = (fails, first, locked_until)
-
-        return fails, locked_until
-
-
-def clear_failures(ip):
-    with _failed_lock:
-        _failed.pop(ip, None)
-
-
-@app.get("/")
-def index():
-    return send_from_directory(app.static_folder, "index.html")
-
-
-@app.get("/api/health")
-def health():
-    try:
-        con = db_ro()
-        con.execute("SELECT 1 FROM metrics LIMIT 1").fetchone()
-        con.close()
-        return jsonify({"ok": True, "database": True})
-    except Exception as exc:
-        return jsonify({"ok": False, "database": False, "error": str(exc)}), 503
-
-
-@app.get("/api/info")
-def info():
-    return jsonify({
-        "hostname": platform.node(),
-        "pve": pve_version(),
-        "cpu_model": cpu_model(),
-        "board_model": board_model(),
-        "cpu_count": os.cpu_count(),
-        "ranges": list(RANGES.keys()),
-        "power_control": True,
-        "power_note": (
-            "CPU Package/Core/Uncore/DRAM = Intel RAPL soweit verfügbar. "
-            "Package enthält bereits die CPU-Gesamtenergie und darf nicht mit den "
-            "Unterdomänen addiert werden. GPU = GPU-Telemetrie; Gesamtserver = "
-            "IPMI/DCMI soweit vom System unterstützt."
-        ),
-    })
-
-
-@app.get("/api/current")
-def current():
-    try:
-        con = db_ro()
-        cols = ",".join(FIELDS)
-        row = con.execute(
-            f"SELECT {cols} FROM metrics ORDER BY ts DESC LIMIT 1"
-        ).fetchone()
-        con.close()
-
-        if not row:
-            return jsonify({"error": "Noch keine Messdaten vorhanden."}), 503
-
-        return jsonify(dict(zip(FIELDS, row)))
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 503
-
-
-@app.get("/api/history/<period>")
-def history(period):
-    seconds = RANGES.get(period)
-    if not seconds:
-        return jsonify({"error": "Ungültiger Zeitraum."}), 400
-
-    try:
-        con = db_ro()
-
-        bucket = max(15, int(seconds / 650))
-        numeric_fields = FIELDS[1:]
-
-        select_parts = [
-            f"CAST(ts / {bucket} AS INTEGER) * {bucket} AS ts"
-        ]
-        select_parts += [f"AVG({f}) AS {f}" for f in numeric_fields]
-
-        since = int(time.time()) - seconds
-
-        rows = con.execute(
-            f"""
-            SELECT {",".join(select_parts)}
-            FROM metrics
-            WHERE ts >= ?
-            GROUP BY CAST(ts / {bucket} AS INTEGER)
-            ORDER BY ts
-            """,
-            (since,),
-        ).fetchall()
-
-        con.close()
-
-        out_fields = ["ts"] + numeric_fields
-        return jsonify([
-            dict(zip(out_fields, row))
-            for row in rows
-        ])
-
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 503
-
-
-@app.post("/api/power/<action>")
-def power(action):
-    if action not in ("reboot", "poweroff"):
-        return jsonify({"error": "Ungültige Aktion."}), 400
-
-    ip = client_ip()
-    locked, remaining = rate_state(ip)
-
-    if locked:
-        return jsonify({
-            "error": f"Zu viele Fehlversuche. Noch {remaining} Sekunden gesperrt."
-        }), 429
-
-    payload = request.get_json(silent=True) or {}
-    code = str(payload.get("code", ""))
-
-    if not verify_code(code):
-        fails, locked_until = record_failure(ip)
-
-        if locked_until > time.time():
-            return jsonify({
-                "error": "Zu viele Fehlversuche. Diese IP ist 5 Minuten gesperrt."
-            }), 429
-
-        return jsonify({
-            "error": f"Steuer-Code ist falsch. Fehlversuch {fails}/{MAX_FAILS}."
-        }), 403
-
-    clear_failures(ip)
-
-    try:
-        subprocess.run(
-            ["sudo", "-n", POWER_HELPER, action],
-            check=True,
-            timeout=5,
-        )
-    except Exception as exc:
-        return jsonify({
-            "error": f"Power-Aktion konnte nicht gestartet werden: {exc}"
-        }), 500
-
-    message = (
-        "Neustart wurde ausgelöst."
-        if action == "reboot"
-        else "Herunterfahren wurde ausgelöst."
-    )
-
-    return jsonify({
-        "ok": True,
-        "action": action,
-        "message": message,
-    })
-
-
-if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=9105)
-PYAPP
+    # V139: app.py wurde zusammen mit collector.py aus dem Repository installiert.
 
     # -------------------------------------------------------------------------
     # Frontend
     # -------------------------------------------------------------------------
 
-    cat > "${STATIC_DIR}/index.html" <<'HTML'
-<!doctype html>
-<html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PVE Hardware Monitor</title>
-<style>
-:root{
-  color-scheme:dark;
-  --bg:#08101b;
-  --panel:#101a29;
-  --panel2:#131f31;
-  --line:#28364b;
-  --text:#eef5ff;
-  --muted:#92a4bc;
-  --good:#37d996;
-  --warn:#ffbd4a;
-  --bad:#ff5f6d;
-  --accent:#64a7ff;
-  --accent2:#9b7cff;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-  background:
-    radial-gradient(circle at 10% -5%,#18345c55,transparent 32rem),
-    radial-gradient(circle at 90% 0,#2c1f5b44,transparent 30rem),
-    var(--bg);
-  color:var(--text);
-}
-.wrap{max-width:1600px;margin:auto;padding:22px}
-.top{
-  display:flex;align-items:center;justify-content:space-between;gap:18px;
-  margin-bottom:18px;flex-wrap:wrap
-}
-.brand h1{font-size:25px;margin:0 0 5px;font-weight:750}
-.brand p{margin:0;color:var(--muted);font-size:13px}
-.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.live{
-  padding:9px 13px;border:1px solid var(--line);border-radius:12px;
-  background:#0e1724;font-size:13px;font-weight:700
-}
-.dot{
-  width:9px;height:9px;border-radius:50%;display:inline-block;
-  margin-right:7px;background:var(--warn);box-shadow:0 0 14px var(--warn)
-}
-button{
-  border:1px solid var(--line);background:#121d2c;color:var(--text);
-  border-radius:11px;padding:9px 13px;font-weight:650;cursor:pointer
-}
-button:hover{background:#18263a}
-button.danger{border-color:#61303a;color:#ff9ba5}
-button.reboot{border-color:#5c4c28;color:#ffd47b}
-.cards{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px
-}
-.card{
-  background:linear-gradient(155deg,#121d2d,#0e1724);
-  border:1px solid var(--line);border-radius:15px;padding:16px;min-height:125px
-}
-.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.value{font-size:27px;font-weight:760;margin:8px 0 4px}
-.sub{font-size:12px;color:var(--muted);line-height:1.55}
-.sectionbar{
-  margin:22px 0 12px;display:flex;gap:12px;justify-content:space-between;
-  align-items:center;flex-wrap:wrap
-}
-.sectionbar h2{margin:0;font-size:17px}
-.ranges{display:flex;gap:6px;flex-wrap:wrap}
-.ranges button{padding:7px 10px;font-size:12px}
-.ranges button.active{background:#274c7d;border-color:#4a86ca}
-.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.chart{
-  background:#0e1724;border:1px solid var(--line);border-radius:15px;padding:14px
-}
-.chart h3{font-size:13px;color:#dce8f7;margin:0 0 7px}
-canvas{width:100%;height:235px;display:block}
-.note{
-  margin-top:15px;background:#0d1622;border:1px solid var(--line);
-  border-radius:13px;padding:12px 14px;color:var(--muted);font-size:12px;line-height:1.55
-}
-.modal{
-  position:fixed;inset:0;background:#03070dbb;display:none;place-items:center;
-  padding:20px;z-index:10
-}
-.modal.show{display:grid}
-.dialog{
-  width:min(440px,100%);background:#101a29;border:1px solid #35465e;
-  border-radius:18px;padding:20px;box-shadow:0 25px 80px #0009
-}
-.dialog h2{margin:0 0 8px}
-.dialog p{color:var(--muted);font-size:13px;line-height:1.5}
-.dialog input{
-  width:100%;padding:12px;margin:8px 0 10px;background:#09111c;
-  color:white;border:1px solid #35465e;border-radius:10px;font-size:16px
-}
-.modalButtons{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
-.msg{min-height:20px;font-size:12px;color:var(--muted)}
-.msg.err{color:#ff8d98}.msg.ok{color:#63e4aa}
-@media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){
-  .wrap{padding:14px}.cards,.charts{grid-template-columns:1fr}
-  canvas{height:210px}.value{font-size:24px}
-}
-</style>
-</head>
-<body>
-<div class="wrap">
-
-<div class="top">
-  <div class="brand">
-    <h1>PVE Hardware Monitor</h1>
-    <p id="hostinfo">Proxmox Server</p>
-  </div>
-  <div class="actions">
-    <div class="live"><span id="dot" class="dot"></span><span id="state">START</span></div>
-    <button class="reboot" onclick="openPower('reboot')">↻ Neustart</button>
-    <button class="danger" onclick="openPower('poweroff')">⏻ Herunterfahren</button>
-  </div>
-</div>
-
-<div class="cards">
-
-  <div class="card">
-    <div class="label">CPU</div>
-    <div class="value" id="cpu">–</div>
-    <div class="sub" id="cpuSub">–</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Mainboard / Sensorik</div>
-    <div class="value" id="board">–</div>
-    <div class="sub" id="boardSub">–</div>
-  </div>
-
-  <div class="card">
-    <div class="label">RAM / Swap</div>
-    <div class="value" id="ram">–</div>
-    <div class="sub" id="ramSub">–</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Speicher / Lüfter</div>
-    <div class="value" id="disk">–</div>
-    <div class="sub" id="diskSub">–</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Netzwerk</div>
-    <div class="value" id="net">–</div>
-    <div class="sub" id="netSub">–</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Leistungsaufnahme</div>
-    <div class="value" id="power">–</div>
-    <div class="sub" id="powerSub">Messquelle wird automatisch erkannt</div>
-  </div>
-
-  <div class="card">
-    <div class="label">VM / LXC</div>
-    <div class="value" id="guests">–</div>
-    <div class="sub" id="guestSub">–</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Geblockt in %</div>
-    <div class="value" id="piholeBlockedPct">–</div>
-    <div class="sub" id="piholeBlockedSub">Pi-hole · letzte 24 Stunden</div>
-  </div>
-
-</div>
-
-<div class="sectionbar">
-  <h2>Verlauf</h2>
-  <div class="ranges">
-    <button data-range="1h" class="active">1 Std</button>
-    <button data-range="6h">6 Std</button>
-    <button data-range="12h">12 Std</button>
-    <button data-range="24h">24 Std</button>
-    <button data-range="7d">7 Tage</button>
-    <button data-range="30d">1 Monat</button>
-  </div>
-</div>
-
-<div class="charts">
-  <div class="chart"><h3>CPU / I/O Wait</h3><canvas id="cCpu"></canvas></div>
-  <div class="chart"><h3>Temperaturen</h3><canvas id="cTemp"></canvas></div>
-  <div class="chart"><h3>RAM / Systemlaufwerk</h3><canvas id="cMem"></canvas></div>
-  <div class="chart"><h3>Leistungsaufnahme</h3><canvas id="cPower"></canvas></div>
-  <div class="chart"><h3>Netzwerk</h3><canvas id="cNet"></canvas></div>
-  <div class="chart"><h3>Disk I/O</h3><canvas id="cIO"></canvas></div>
-  <div class="chart"><h3>Load Average</h3><canvas id="cLoad"></canvas></div>
-  <div class="chart"><h3>CPU / GPU Temperatur</h3><canvas id="cCpuGpu"></canvas></div>
-</div>
-
-<div class="note" id="powerNote">
-CPU-Leistung kann nur angezeigt werden, wenn der Kernel eine passende RAPL-/hwmon-Messquelle bereitstellt.
-Gesamtverbrauch des Servers ist nur mit entsprechender Hardware-Telemetrie, z. B. IPMI/DCMI, direkt messbar.
-</div>
-
-</div>
-
-<div class="modal" id="modal">
-  <div class="dialog">
-    <h2 id="modalTitle">Serveraktion</h2>
-    <p id="modalText"></p>
-    <input id="code" type="password" autocomplete="off" placeholder="Steuer-Code">
-    <div id="msg" class="msg"></div>
-    <div class="modalButtons">
-      <button id="cancel" onclick="closePower()">Abbrechen</button>
-      <button id="confirm" class="danger" onclick="executePower()">Bestätigen</button>
-    </div>
-  </div>
-</div>
-
-<script>
-const $=id=>document.getElementById(id);
-let range='1h';
-let hist=[];
-let pending=null;
-const colors=['#64a7ff','#9b7cff','#37d996','#ffbd4a','#ff7080'];
-
-function n(v,d=1){return v==null||!Number.isFinite(Number(v))?'–':Number(v).toFixed(d)}
-function pct(v){return v==null?'–':n(v,1)+' %'}
-function temp(v){return v==null?'–':n(v,1)+' °C'}
-function watts(v){return v==null?'–':n(v,1)+' W'}
-function rpm(v){return v==null?'–':Math.round(v)+' rpm'}
-function bytes(v){
-  v=Number(v||0);
-  const u=['B','KiB','MiB','GiB','TiB'];
-  let i=0;
-  while(v>=1024&&i<u.length-1){v/=1024;i++}
-  return v.toFixed(i?1:0)+' '+u[i]
-}
-function rate(v){return bytes(v)+'/s'}
-function dur(sec){
-  sec=Number(sec||0);
-  const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);
-  return (d?d+'d ':'')+(h?h+'h ':'')+m+'m'
-}
-async function getJSON(url,opt){
-  const r=await fetch(url,opt);
-  let d={};
-  try{d=await r.json()}catch{}
-  if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
-  return d
-}
-async function info(){
-  const d=await getJSON('/api/info');
-  $('hostinfo').textContent=`${d.hostname} · ${d.pve} · ${d.cpu_model} · ${d.board_model}`;
-  $('powerNote').textContent=d.power_note;
-}
-function bestPower(d){
-  if(d.system_power_w!=null)return [watts(d.system_power_w),'Gesamtserver via IPMI/DCMI'];
-  if(d.cpu_power_w!=null)return [watts(d.cpu_power_w),'CPU-Package via RAPL'];
-  if(d.gpu_power_w!=null)return [watts(d.gpu_power_w),'GPU-Telemetrie'];
-  return ['n/v','Keine Watt-Messquelle verfügbar'];
-}
-async function current(){
-  try{
-    const d=await getJSON('/api/current');
-
-    $('cpu').textContent=pct(d.cpu_percent);
-    $('cpuSub').textContent=
-      `${temp(d.cpu_temp)} · ${d.cpu_freq==null?'–':Math.round(d.cpu_freq)+' MHz'} · Vcore ${d.vcore==null?'–':n(d.vcore,3)+' V'}`;
-
-    const boardTemps=[
-      d.board_temp!=null?'MB '+temp(d.board_temp):null,
-      d.vrm_temp!=null?'VRM '+temp(d.vrm_temp):null,
-      d.chipset_temp!=null?'PCH '+temp(d.chipset_temp):null
-    ].filter(Boolean);
-    $('board').textContent=d.board_temp!=null?temp(d.board_temp):'Sensor n/v';
-
-    const boardDetails=[
-      d.vrm_temp!=null?'VRM '+temp(d.vrm_temp):null,
-      d.chipset_temp!=null?'PCH '+temp(d.chipset_temp):null
-    ].filter(Boolean);
-
-    $('boardSub').textContent=d.board_temp!=null
-      ? ('Mainboard / ACPI'+(boardDetails.length?' · '+boardDetails.join(' · '):''))
-      : 'Mainboard stellt keine weiteren Sensoren bereit';
-
-    $('ram').textContent=pct(d.ram_percent);
-    $('ramSub').textContent=`${bytes(d.ram_used)} / ${bytes(d.ram_total)} · Swap ${pct(d.swap_percent)}`;
-
-    $('disk').textContent=pct(d.root_percent);
-    $('diskSub').textContent=
-      `${bytes(d.root_used)} / ${bytes(d.root_total)} · SSD ${temp(d.drive_temp)} · CPU-Fan ${rpm(d.cpu_fan_rpm)}`;
-
-    $('net').textContent='↓ '+rate(d.net_rx_bps);
-    $('netSub').textContent=`↑ ${rate(d.net_tx_bps)} · Disk R ${rate(d.disk_read_bps)} · W ${rate(d.disk_write_bps)}`;
-
-    const bp=bestPower(d);
-    $('power').textContent=bp[0];
-    $('powerSub').textContent=
-      `${bp[1]} · Package ${watts(d.cpu_power_w)} · Cores ${watts(d.cpu_core_power_w)} · DRAM ${watts(d.dram_power_w)} · GPU ${watts(d.gpu_power_w)} · System ${watts(d.system_power_w)}`;
-
-    $('guests').textContent=`${Number(d.vm_running||0)+Number(d.ct_running||0)} aktiv`;
-    $('guestSub').textContent=`VM ${d.vm_running}/${d.vm_total} · CT ${d.ct_running}/${d.ct_total}`;
-
-    $('piholeBlockedPct').textContent=
-      d.pihole_blocked_percent==null
-        ? 'n/v'
-        : n(d.pihole_blocked_percent,1)+' %';
-
-    const piholeNumber=v=>
-      v==null
-        ? '–'
-        : new Intl.NumberFormat('de-DE').format(Number(v));
-
-    $('piholeBlockedSub').textContent=
-      d.pihole_queries_total==null
-        ? 'Pi-hole-Daten nicht verfügbar'
-        : `Anfragen insgesamt ${piholeNumber(d.pihole_queries_total)} / Geblockte Anfragen ${piholeNumber(d.pihole_queries_blocked)}`;
-
-    $('dot').style.background='#37d996';
-    $('dot').style.boxShadow='0 0 14px #37d996';
-    $('state').textContent='LIVE';
-  }catch(e){
-    $('dot').style.background='#ff5f6d';
-    $('dot').style.boxShadow='0 0 14px #ff5f6d';
-    $('state').textContent='OFFLINE';
-  }
-}
-
-function timeLabel(ts,span){
-  const d=new Date(ts*1000);
-  if(span>=604800)return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
-  return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-}
-
-function niceMax(v){
-  if(!Number.isFinite(v)||v<=0)return 1;
-  const p=Math.pow(10,Math.floor(Math.log10(v)));
-  const n=v/p;
-  return (n<=1?1:n<=2?2:n<=5?5:10)*p;
-}
-
-function draw(id,series,opt={}){
-  const c=$(id),r=c.getBoundingClientRect(),dpr=Math.max(1,window.devicePixelRatio||1);
-  c.width=Math.floor(r.width*dpr);c.height=Math.floor(r.height*dpr);
-  const x=c.getContext('2d');x.scale(dpr,dpr);
-  const w=r.width,h=r.height,p={l:48,r:12,t:20,b:28},iw=w-p.l-p.r,ih=h-p.t-p.b;
-  x.clearRect(0,0,w,h);
-  if(!hist.length)return;
-
-  const t0=hist[0].ts,t1=hist[hist.length-1].ts||t0+1,span=Math.max(1,t1-t0);
-  let vals=[];
-  series.forEach(s=>hist.forEach(row=>{
-    const v=Number(row[s.key]);
-    if(Number.isFinite(v))vals.push(v);
-  }));
-
-  if(!vals.length){
-    x.fillStyle='#92a4bc';x.font='13px system-ui';x.textAlign='center';
-    x.fillText('Keine Messquelle verfügbar',w/2,h/2);
-    return;
-  }
-
-  const ymin=opt.min??0;
-  let ymax=opt.max??niceMax(Math.max(...vals,1)*1.08);
-  if(ymax<=ymin)ymax=ymin+1;
-
-  x.strokeStyle='#28364b';x.lineWidth=1;x.fillStyle='#92a4bc';x.font='11px system-ui';
-
-  for(let i=0;i<=4;i++){
-    const yy=p.t+ih*i/4;
-    x.beginPath();x.moveTo(p.l,yy);x.lineTo(w-p.r,yy);x.stroke();
-    const value=ymax-(ymax-ymin)*i/4;
-    x.textAlign='right';x.textBaseline='middle';
-    x.fillText(opt.y?opt.y(value):value.toFixed(0),p.l-7,yy);
-  }
-
-  for(let i=0;i<=4;i++){
-    const xx=p.l+iw*i/4;
-    x.textAlign='center';x.textBaseline='top';
-    x.fillText(timeLabel(t0+span*i/4,span),xx,h-p.b+7);
-  }
-
-  series.forEach((s,si)=>{
-    x.strokeStyle=s.color||colors[si%colors.length];
-    x.lineWidth=2;
-    x.beginPath();
-    let started=false;
-
-    hist.forEach(row=>{
-      const v=Number(row[s.key]);
-      if(!Number.isFinite(v))return;
-      const xx=p.l+(row.ts-t0)/span*iw;
-      const yy=p.t+(ymax-v)/(ymax-ymin)*ih;
-      if(!started){x.moveTo(xx,yy);started=true}else{x.lineTo(xx,yy)}
-    });
-    x.stroke();
-  });
-
-  let lx=p.l;
-  series.forEach((s,si)=>{
-    x.fillStyle=s.color||colors[si%colors.length];
-    x.fillRect(lx,p.t-13,10,3);
-    x.fillStyle='#d7e4f4';
-    x.textAlign='left';x.textBaseline='middle';
-    x.fillText(s.label,lx+15,p.t-11);
-    lx+=x.measureText(s.label).width+42;
-  });
-}
-
-function charts(){
-  draw('cCpu',[
-    {key:'cpu_percent',label:'CPU'},
-    {key:'iowait_percent',label:'I/O Wait'}
-  ],{min:0,max:100,y:v=>v.toFixed(0)+'%'});
-
-  draw('cTemp',[
-    {key:'cpu_temp',label:'CPU'},
-    {key:'board_temp',label:'Mainboard'},
-    {key:'vrm_temp',label:'VRM'},
-    {key:'chipset_temp',label:'PCH'}
-  ],{min:0,max:110,y:v=>v.toFixed(0)+'°'});
-
-  draw('cMem',[
-    {key:'ram_percent',label:'RAM'},
-    {key:'root_percent',label:'Disk'}
-  ],{min:0,max:100,y:v=>v.toFixed(0)+'%'});
-
-  draw('cPower',[
-    {key:'system_power_w',label:'System'},
-    {key:'cpu_power_w',label:'CPU Package'},
-    {key:'cpu_core_power_w',label:'Cores'},
-    {key:'dram_power_w',label:'DRAM'},
-    {key:'gpu_power_w',label:'GPU'}
-  ],{y:v=>v.toFixed(0)+' W'});
-
-  draw('cNet',[
-    {key:'net_rx_bps',label:'Download'},
-    {key:'net_tx_bps',label:'Upload'}
-  ],{y:v=>bytes(v)});
-
-  draw('cIO',[
-    {key:'disk_read_bps',label:'Lesen'},
-    {key:'disk_write_bps',label:'Schreiben'}
-  ],{y:v=>bytes(v)});
-
-  draw('cLoad',[
-    {key:'load1',label:'1 min'},
-    {key:'load5',label:'5 min'},
-    {key:'load15',label:'15 min'}
-  ]);
-
-  draw('cCpuGpu',[
-    {key:'cpu_temp',label:'CPU'},
-    {key:'gpu_temp',label:'GPU'},
-    {key:'drive_temp',label:'SSD/NVMe'}
-  ],{min:0,max:110,y:v=>v.toFixed(0)+'°'});
-}
-
-async function history(){
-  try{
-    hist=await getJSON('/api/history/'+range);
-    charts();
-  }catch(e){console.error(e)}
-}
-
-document.querySelectorAll('[data-range]').forEach(b=>{
-  b.addEventListener('click',()=>{
-    document.querySelectorAll('[data-range]').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    range=b.dataset.range;
-    history();
-  })
-});
-
-function openPower(action){
-  pending=action;
-  const reboot=action==='reboot';
-  $('modalTitle').textContent=reboot?'Proxmox neu starten':'Proxmox herunterfahren';
-  $('modalText').textContent=reboot
-    ?'Der komplette Proxmox-Host wird neu gestartet. Alle VMs und Container sind betroffen.'
-    :'Der komplette Proxmox-Host wird ausgeschaltet. Alle VMs und Container sind betroffen.';
-  $('confirm').textContent=reboot?'Neustart bestätigen':'Herunterfahren bestätigen';
-  $('code').value='';
-  $('msg').textContent='';
-  $('msg').className='msg';
-  $('modal').classList.add('show');
-  setTimeout(()=>$('code').focus(),80);
-}
-
-function closePower(){
-  $('modal').classList.remove('show');
-  pending=null;
-}
-
-async function executePower(){
-  if(!pending)return;
-  const code=$('code').value;
-
-  if(code.length<6){
-    $('msg').textContent='Bitte den vollständigen Steuer-Code eingeben.';
-    $('msg').className='msg err';
-    return;
-  }
-
-  $('confirm').disabled=true;
-  $('cancel').disabled=true;
-  $('code').disabled=true;
-  $('msg').textContent='Code wird geprüft …';
-
-  try{
-    const d=await getJSON('/api/power/'+pending,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code})
-    });
-
-    $('msg').textContent=d.message||'Aktion wurde gestartet.';
-    $('msg').className='msg ok';
-    $('state').textContent=pending==='reboot'?'NEUSTART':'SHUTDOWN';
-  }catch(e){
-    $('msg').textContent=e.message;
-    $('msg').className='msg err';
-    $('confirm').disabled=false;
-    $('cancel').disabled=false;
-    $('code').disabled=false;
-    $('code').select();
-  }
-}
-
-$('code').addEventListener('keydown',e=>{
-  if(e.key==='Enter')executePower();
-  if(e.key==='Escape')closePower();
-});
-
-$('modal').addEventListener('click',e=>{
-  if(e.target===$('modal'))closePower();
-});
-
-let rt;
-window.addEventListener('resize',()=>{
-  clearTimeout(rt);
-  rt=setTimeout(charts,120);
-});
-
-(async()=>{
-  try{await info()}catch(e){}
-  await current();
-  await history();
-  setInterval(current,15000);
-  setInterval(history,60000);
-})();
-</script>
-</body>
-</html>
-HTML
+    # V139: index.html wurde zusammen mit den Python-Quellen installiert.
 
     # -------------------------------------------------------------------------
     # Steuer-Code / Power Helper
@@ -14190,6 +12737,11 @@ EOF
     chown -R root:root "$APP_DIR"
     chmod 755 "$APP_DIR" "$STATIC_DIR"
     chmod 644 "$APP_DIR/collector.py" "$APP_DIR/app.py" "$STATIC_DIR/index.html"
+
+    # Kompatibilität für ältere Hilfsskripte/Pfade.
+    if [[ ! -e /opt/pve-sensor-dashboard ]]; then
+        ln -s "$APP_DIR" /opt/pve-sensor-dashboard
+    fi
 
     python3 -m py_compile "$APP_DIR/collector.py" "$APP_DIR/app.py"
 
@@ -15244,7 +13796,7 @@ EOF
 
     echo "Prüfe LLM-Modell auf Aktualität:"
     echo "  $OLLAMA_MODEL"
-    echo "Vorhandene Layer werden aus /home/Images/ollama wiederverwendet."
+    echo "Vorhandene Layer werden aus /home/img/ollama wiederverwendet."
 
     pct exec "$PL_ID" -- \
         docker exec paperless-ollama ollama pull "$OLLAMA_MODEL"
@@ -17557,7 +16109,7 @@ set -Eeuo pipefail
     exit 1
 }
 
-APP_DIR="/opt/pve-sensor-dashboard"
+APP_DIR="/opt/nodezero/dashboard"
 APP_FILE="${APP_DIR}/app.py"
 INDEX_FILE="${APP_DIR}/static/index.html"
 SERVICE_FILE="/etc/systemd/system/pve-sensor-web.service"
@@ -18576,7 +17128,7 @@ WEB_DIR="$(dirname "$LINKS_FILE")"
 TOOL="/usr/local/sbin/pve-dashboard-link"
 EXAMPLE="/root/pve-dashboard-links-beispiel.txt"
 
-[[ -d /opt/pve-sensor-dashboard ]] || {
+[[ -d /opt/nodezero/dashboard ]] || {
     echo "FEHLER: Das PVE Sensor Dashboard wurde nicht gefunden."
     exit 1
 }
@@ -19056,8 +17608,8 @@ set -Eeuo pipefail
     exit 1
 }
 
-APP_FILE="/opt/pve-sensor-dashboard/app.py"
-INDEX_FILE="/opt/pve-sensor-dashboard/static/index.html"
+APP_FILE="/opt/nodezero/dashboard/app.py"
+INDEX_FILE="/opt/nodezero/dashboard/static/index.html"
 LINK_TOOL="/usr/local/sbin/pve-dashboard-link"
 BACKUP="/root/backups/pve-dashboard-sort-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -19647,8 +18199,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 STAMP2="$(date +%Y%m%d-%H%M%S)"
 BACKUP="/root/backups/pve-dashboard-menu-v3-backup-${STAMP2}"
@@ -20329,7 +18881,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 BACKUP="/root/backups/pve-dashboard-router-top-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -20596,8 +19148,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 CLI="/usr/local/sbin/pve-dashboard-link"
 BACKUP="/root/backups/pve-dashboard-menu-editor-backup-$(date +%Y%m%d-%H%M%S)"
@@ -22653,8 +21205,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 NGINX_SITE="/etc/nginx/sites-available/pve-sensor-dashboard"
 SUDOERS="/etc/sudoers.d/pve-sensor-dashboard"
 SETTINGS_DIR="/etc/pve-sensor-dashboard"
@@ -22779,7 +21331,7 @@ import sys
 import time
 from pathlib import Path
 
-APP_DIR = Path("/opt/pve-sensor-dashboard")
+APP_DIR = Path("/opt/nodezero/dashboard")
 STATIC_DIR = APP_DIR / "static"
 SETTINGS_DIR = Path("/etc/pve-sensor-dashboard")
 SETTINGS_FILE = SETTINGS_DIR / "ui.json"
@@ -25460,7 +24012,7 @@ install_dashboard_settings_write_paths() {
     mkdir -p \
         "$dropin_dir" \
         /var/lib/pve-sensor-dashboard-web \
-        /opt/pve-sensor-dashboard/static \
+        /opt/nodezero/dashboard/static \
         /etc/pve-sensor-dashboard \
         /etc/nginx/sites-available \
         /etc/nginx/sites-enabled
@@ -25475,11 +24027,11 @@ install_dashboard_settings_write_paths() {
 # UI-Einstellungen und lokale TLS-Dateien gespeichert werden.
 
 ReadOnlyPaths=
-ReadOnlyPaths=/opt/pve-sensor-dashboard /var/lib/pve-sensor-dashboard
+ReadOnlyPaths=/opt/nodezero/dashboard /var/lib/pve-sensor-dashboard
 
 ReadWritePaths=
 ReadWritePaths=/var/lib/pve-sensor-dashboard-web
-ReadWritePaths=/opt/pve-sensor-dashboard/static
+ReadWritePaths=/opt/nodezero/dashboard/static
 ReadWritePaths=/etc/pve-sensor-dashboard
 ReadWritePaths=/etc/nginx/sites-available
 ReadWritePaths=/etc/nginx/sites-enabled
@@ -25514,7 +24066,7 @@ EOF
 
     for dir in \
         /var/lib/pve-sensor-dashboard-web \
-        /opt/pve-sensor-dashboard/static \
+        /opt/nodezero/dashboard/static \
         /etc/pve-sensor-dashboard \
         /etc/nginx/sites-available \
         /etc/nginx/sites-enabled
@@ -25553,7 +24105,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo "FEHLER: Bitte als root ausführen."; exit 1; }
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 BACKUP="/root/backups/pve-dashboard-einstellungen-tabs-backup-$(date +%Y%m%d-%H%M%S)"
 [[ -f "$INDEX" ]] || { echo "FEHLER: $INDEX fehlt."; exit 1; }
 
@@ -25933,8 +24485,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 DATA_DIR="/var/lib/pve-sensor-dashboard-web"
 CATEGORY_FILE="${DATA_DIR}/categories.json"
 
@@ -27861,7 +26413,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 BACKUP="/root/backups/pve-dashboard-kategorie-zuordnung-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
@@ -28632,7 +27184,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 BACKUP="/root/backups/pve-dashboard-menue-cleanup-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
@@ -28908,7 +27460,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 CATEGORIES="/var/lib/pve-sensor-dashboard-web/categories.json"
 BACKUP="/root/backups/pve-dashboard-standard-kategorien-backup-$(date +%Y%m%d-%H%M%S)"
@@ -29438,8 +27990,8 @@ Die CA gilt nur für die von diesem Installer lokal ausgestellten Zertifikate.
 EOF
     chmod 644 "${LOCAL_CA_ROOT}/README-CA.txt"
 
-    if [[ -d /opt/pve-sensor-dashboard/static ]]; then
-        install -m 0644 "$LOCAL_CA_CERT" /opt/pve-sensor-dashboard/static/nodezero-local-ca.crt
+    if [[ -d /opt/nodezero/dashboard/static ]]; then
+        install -m 0644 "$LOCAL_CA_CERT" /opt/nodezero/dashboard/static/nodezero-local-ca.crt
     fi
 
     # WICHTIG: keine Statusmeldung auf STDOUT.
@@ -30013,7 +28565,7 @@ install_pocketid_v65() {
 
     # Pocket ID erzeugt bei der Erstinstallation einen ENCRYPTION_KEY in .env.
     # Er gehört zur Installation und wird deshalb wie jedes andere Secret
-    # separat unter /home/passwd gesichert.
+    # separat unter /root/passwort gesichert.
     POCKETID_ENCRYPTION_KEY="$(
         pct exec "$POCKETID_ID" -- bash -lc \
             "sed -n 's/^ENCRYPTION_KEY=//p' /opt/pocket-id/.env | head -n1" 2>/dev/null |
@@ -31327,10 +29879,10 @@ TOKEN_CODE="$(
         2>/dev/null || true
 )"
 
-install -d -m 0700 -o root -g root /home/passwd
+install -d -m 0700 -o root -g root /root/passwort
 STAMP_SEC="$(date +%Y%m%d-%H%M%S)"
-PWFILE_ADMIN="/home/passwd/pulse-admin-pw-${STAMP_SEC}.txt"
-PWFILE_TOKEN="/home/passwd/pulse-api-token-pw-${STAMP_SEC}.txt"
+PWFILE_ADMIN="/root/passwort/pulse-admin-pw-${STAMP_SEC}.txt"
+PWFILE_TOKEN="/root/passwort/pulse-api-token-pw-${STAMP_SEC}.txt"
 
 umask 077
 cat > "$PWFILE_ADMIN" <<EOF
@@ -33141,9 +31693,9 @@ print(data.get("value") or data.get("token") or "")
 
     # Secret root-only ablegen; der Proxmox-Kommentar enthält bewusst nur
     # Token-ID + Dateipfad und NICHT das Secret im Klartext.
-    install -d -m 0700 -o root -g root /home/passwd
+    install -d -m 0700 -o root -g root /root/passwort
     TOKEN_STAMP="${INSTALL_SECRET_STAMP_V107:-$(date +%Y%m%d-%H%M%S)}"
-    TOKEN_FILE="/home/passwd/pve-ups-proxmox-api-token-pw-${TOKEN_STAMP}.txt"
+    TOKEN_FILE="/root/passwort/pve-ups-proxmox-api-token-pw-${TOKEN_STAMP}.txt"
     umask 077
     {
         echo "Komponente: PVE-UPS Proxmox API Token"
@@ -33944,8 +32496,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
 UPS_STATUS_URL="${PVE_DASHBOARD_UPS_STATUS_URL:-http://192.168.178.111/api/status}"
 
@@ -35051,8 +33603,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 WEB_DIR="/var/lib/pve-sensor-dashboard-web"
 UPS_CONFIG="${WEB_DIR}/ups-source.json"
 OLD_UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
@@ -37729,7 +36281,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 BACKUP="/root/backups/pve-dashboard-usv-ui-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
@@ -38462,8 +37014,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 SESSION_KEY="/etc/pve-sensor-dashboard/settings-session.key"
 BACKUP="/root/backups/pve-dashboard-settings-login-usv-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -39988,8 +38540,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 WEB_DATA="/var/lib/pve-sensor-dashboard-web"
 LAYOUT_FILE="${WEB_DATA}/dashboard-layout.json"
 BACKUP="/root/backups/pve-dashboard-layout-v71-backup-$(date +%Y%m%d-%H%M%S)"
@@ -41584,9 +40136,9 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-COLLECTOR="/opt/pve-sensor-dashboard/collector.py"
-APP="/opt/pve-sensor-dashboard/app.py"
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+COLLECTOR="/opt/nodezero/dashboard/collector.py"
+APP="/opt/nodezero/dashboard/app.py"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 WEB_DIR="/var/lib/pve-sensor-dashboard-web"
 CONFIG="${WEB_DIR}/pihole-source.json"
 HELPER="/usr/local/sbin/pve-dashboard-pihole-helper"
@@ -43492,7 +42044,7 @@ install_dashboard_pihole_menu_fix_v80() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 BACKUP="/root/backups/pve-dashboard-pihole-menu-v80-$(date +%Y%m%d-%H%M%S)"
 STAMP="$(date +%d-%m-%H-%M)"
 LOG="/root/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}.txt"
@@ -43801,7 +42353,7 @@ install_dashboard_settings_panels_host_v81() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-INDEX="/opt/pve-sensor-dashboard/static/index.html"
+INDEX="/opt/nodezero/dashboard/static/index.html"
 BACKUP="/root/backups/pve-dashboard-settings-panels-v81-$(date +%Y%m%d-%H%M%S)"
 STAMP="$(date +%d-%m-%H-%M)"
 LOG="/root/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}.txt"
@@ -44266,8 +42818,8 @@ __PVE_DASHBOARD_SETTINGS_PANELS_V81__
 # =============================================================================
 
 validate_dashboard_final_state_v69() {
-    local index="/opt/pve-sensor-dashboard/static/index.html"
-    local app="/opt/pve-sensor-dashboard/app.py"
+    local index="/opt/nodezero/dashboard/static/index.html"
+    local app="/opt/nodezero/dashboard/app.py"
     local marker=""
     local failed=0
 
@@ -44327,7 +42879,7 @@ validate_dashboard_final_state_v69() {
         failed=1
     }
 
-    grep -Fq 'PVE_PIHOLE_COLLECTOR_SETTINGS_V78' /opt/pve-sensor-dashboard/collector.py || {
+    grep -Fq 'PVE_PIHOLE_COLLECTOR_SETTINGS_V78' /opt/nodezero/dashboard/collector.py || {
         warn "Dashboard Finalprüfung: Pi-hole Collector V78 fehlt."
         failed=1
     }
@@ -44938,7 +43490,7 @@ fi
 
 # V134: Bei Dashboard-Updates vorhandene bekannte Web-CTs erneut erkennen.
 # Nur fehlende Links werden ergänzt; manuelle/bestehende Links bleiben erhalten.
-if (( INSTALL_DASHBOARD )) || [[ -f /opt/pve-sensor-dashboard/static/index.html ]]; then
+if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]; then
     dashboard_reconcile_existing_guests_v134
 fi
 
@@ -44971,7 +43523,7 @@ fi
 # Bei einem bereits installierten Dashboard Kategorien auch dann aktualisieren,
 # wenn in diesem Lauf nur PBS/Pulse/PVE-UPS ergänzt wurden.
 if (( INSTALL_DASHBOARD )) || {
-    [[ -f /opt/pve-sensor-dashboard/static/index.html ]] &&
+    [[ -f /opt/nodezero/dashboard/static/index.html ]] &&
     [[ -f /var/lib/pve-sensor-dashboard-web/categories.json ]];
 }; then
     install_dashboard_default_categories_v42
@@ -44980,7 +43532,7 @@ fi
 # V53: Mainboard-Karte durch USV/NAS ersetzen.
 # Bei frisch installiertem PVE-UPS dessen tatsächlich gewählte IP verwenden.
 # Bei bestehender Installation Standardquelle 192.168.178.111 verwenden.
-if (( INSTALL_DASHBOARD )) || [[ -f /opt/pve-sensor-dashboard/static/index.html ]]; then
+if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]; then
     install_dashboard_ups_card_v53
     install_dashboard_ups_settings_v55
     install_dashboard_ups_ui_fix_v56
@@ -45031,7 +43583,7 @@ fi
 # =============================================================================
 
 # V107: Passwörter/Tokens liegen nicht mehr gesammelt in einer großen Datei.
-# Jede Zugangsinformation hat ihre eigene Datei unter /home/passwd. Die Variable
+# Jede Zugangsinformation hat ihre eigene Datei unter /root/passwort. Die Variable
 # PASSWORD_FILE zeigt auf einen Index, der ausschließlich Dateipfade enthält.
 persist_install_secrets_v107
 
@@ -45267,7 +43819,7 @@ ui_section_end
 echo
 
 ui_section "Persistenz"
-ui_kv "Download-Cache" "/home/Images"
+ui_kv "Download-Cache" "/home/img"
 ui_kv "App-Daten" "/home/Data"
 ui_kv "Backups" "/root/backups/"
 ui_kv "Diagnosen" "/root/diagnose/"
@@ -45278,7 +43830,7 @@ ui_kv "Lokale TLS-CA" "/home/Data/proxmox-installer/tls/nodezero-local-ca.crt"
 (( INSTALL_PAPERLESS && PAPERLESS_EXTERNAL_STORAGE )) && ui_kv "Paperless NAS" "${PAPERLESS_NAS_IP}:${PAPERLESS_NAS_PATH} → ${PAPERLESS_NAS_MOUNT}"
 ui_note "Setup-Profile können aus /home/Data, von beliebigen Dateipfaden oder per HTTP/HTTPS geladen werden."
 ui_note "Passwörter, Tokens und Sicherheitscodes werden nicht in Setup-Profilen gespeichert."
-ui_note "\"KOMPLETT NEU\" löscht /home/Images und /home/Data nicht."
+ui_note "\"KOMPLETT NEU\" löscht /home/img und /home/Data nicht."
 ui_section_end
 echo
 

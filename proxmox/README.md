@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V118**
+Installationskandidat: **V139**
 
 Geplante Hauptdatei:
 
@@ -26,7 +26,10 @@ proxmox.sh
 - Pulse, PVE-UPS, Prometheus, PVE Exporter, Grafana und EMQX
 - Semaphore und weitere optionale Community-Erweiterungen
 - lokale HTTPS-CA und Zertifikatsverwaltung
-- getrennte Passwort-/Token-/Secret-Dateien unter `/home/passwd/`
+- aktive Passwort-/Token-/Secret-Dateien unter `/root/passwort/`
+- lokale Secret-Sicherung unter `/home/passwort/`
+- permanenter Image-/Container-Cache unter `/home/img/`
+- Download-Cache unter `/root/downloads/`
 - finale Healthchecks
 
 ## Installation
@@ -120,7 +123,7 @@ Die Zertifikate werden in die HAOS-SSL-Ablage geschrieben und in die bestehende 
 
 ## Dashboard-Fix V118
 
-Nach einem vollständigen Dashboard-Reset erzeugt der Installer automatisch einen neuen Steuer-Code, falls kein vorbereiteter Code mehr im Shell-Kontext vorhanden ist. Der Code wird anschließend wie gewohnt unter `/home/passwd/` gesichert.
+Nach einem vollständigen Dashboard-Reset erzeugt der Installer automatisch einen neuen Steuer-Code, falls kein vorbereiteter Code mehr im Shell-Kontext vorhanden ist. Der Code wird anschließend unter `/root/passwort/` gesichert und zusätzlich nach `/home/passwort/` kopiert.
 
 
 ## Pi-hole Exporter Fix V117
@@ -140,3 +143,20 @@ Home Assistant OS wird im Installer ausdrücklich als native Weboberfläche auf 
 ## Versionsanzeige im Hauptmenü
 
 Die aktuell ausgeführte Installer-Version wird im Whiptail-Hauptmenü direkt im Dialograhmen angezeigt, z. B. **HAUPTMENÜ · Version 118**.
+
+
+## Modularisierung V139
+
+V139 trennt Installerlogik und große Dashboard-Quelldateien. `collector.py`, `app.py` und `index.html` liegen im Repository unter `dashboard/`. Der Installer lädt die zu V139 gehörenden Dateien über einen unveränderlichen Commit-Ref in `/root/downloads/dashboard/<asset-ref>/` und installiert sie nach `/opt/nodezero/dashboard/`.
+
+### Verzeichnisstandard
+
+```text
+/root/passwort/          aktive Passwörter, Tokens und Secrets
+/home/passwort/          lokale Sicherung dieser Secret-Dateien
+/root/downloads/         normale Downloads / GitHub-Artefakte
+/home/img/               persistente Installationsimages und große Caches
+/opt/nodezero/            eigener installierter NodeZero-Code
+```
+
+Der bestehende Cache aus `/home/Images` und das alte Dashboard unter `/opt/pve-sensor-dashboard` werden beim Update soweit eindeutig möglich automatisch übernommen. Kompatibilitäts-Symlinks verhindern, dass ältere Helfer sofort brechen.

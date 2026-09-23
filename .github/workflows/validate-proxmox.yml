@@ -1,0 +1,40 @@
+name: Validate Proxmox Installer
+
+on:
+  pull_request:
+    paths:
+      - "proxmox/**"
+      - "dashboard/**"
+      - ".github/workflows/validate-proxmox.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "proxmox/**"
+      - "dashboard/**"
+      - ".github/workflows/validate-proxmox.yml"
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bash syntax
+        run: bash -n proxmox/proxmox.sh
+
+      - name: Dashboard Python syntax
+        run: python3 -m py_compile dashboard/collector.py dashboard/app.py
+
+      - name: V139 layout checks
+        run: |
+          grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_DOWNLOAD_DIR="/root/downloads"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
+          grep -q 'local APP_DIR="/opt/nodezero/dashboard"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_DASHBOARD_ASSET_REF="f1005bd0a8d385b791d0a4d25cf1ab2dc67198d2"' proxmox/proxmox.sh
+          test -s dashboard/collector.py
+          test -s dashboard/app.py
+          test -s dashboard/index.html

@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PVE Hardware Monitor</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#08101b;
+  --panel:#101a29;
+  --panel2:#131f31;
+  --line:#28364b;
+  --text:#eef5ff;
+  --muted:#92a4bc;
+  --good:#37d996;
+  --warn:#ffbd4a;
+  --bad:#ff5f6d;
+  --accent:#64a7ff;
+  --accent2:#9b7cff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:
+    radial-gradient(circle at 10% -5%,#18345c55,transparent 32rem),
+    radial-gradient(circle at 90% 0,#2c1f5b44,transparent 30rem),
+    var(--bg);
+  color:var(--text);
+}
+.wrap{max-width:1600px;margin:auto;padding:22px}
+.top{
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  margin-bottom:18px;flex-wrap:wrap
+}
+.brand h1{font-size:25px;margin:0 0 5px;font-weight:750}
+.brand p{margin:0;color:var(--muted);font-size:13px}
+.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.live{
+  padding:9px 13px;border:1px solid var(--line);border-radius:12px;
+  background:#0e1724;font-size:13px;font-weight:700
+}
+.dot{
+  width:9px;height:9px;border-radius:50%;display:inline-block;
+  margin-right:7px;background:var(--warn);box-shadow:0 0 14px var(--warn)
+}
+button{
+  border:1px solid var(--line);background:#121d2c;color:var(--text);
+  border-radius:11px;padding:9px 13px;font-weight:650;cursor:pointer
+}
+button:hover{background:#18263a}
+button.danger{border-color:#61303a;color:#ff9ba5}
+button.reboot{border-color:#5c4c28;color:#ffd47b}
+.cards{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px
+}
+.card{
+  background:linear-gradient(155deg,#121d2d,#0e1724);
+  border:1px solid var(--line);border-radius:15px;padding:16px;min-height:125px
+}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.value{font-size:27px;font-weight:760;margin:8px 0 4px}
+.sub{font-size:12px;color:var(--muted);line-height:1.55}
+.sectionbar{
+  margin:22px 0 12px;display:flex;gap:12px;justify-content:space-between;
+  align-items:center;flex-wrap:wrap
+}
+.sectionbar h2{margin:0;font-size:17px}
+.ranges{display:flex;gap:6px;flex-wrap:wrap}
+.ranges button{padding:7px 10px;font-size:12px}
+.ranges button.active{background:#274c7d;border-color:#4a86ca}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.chart{
+  background:#0e1724;border:1px solid var(--line);border-radius:15px;padding:14px
+}
+.chart h3{font-size:13px;color:#dce8f7;margin:0 0 7px}
+canvas{width:100%;height:235px;display:block}
+.note{
+  margin-top:15px;background:#0d1622;border:1px solid var(--line);
+  border-radius:13px;padding:12px 14px;color:var(--muted);font-size:12px;line-height:1.55
+}
+.modal{
+  position:fixed;inset:0;background:#03070dbb;display:none;place-items:center;
+  padding:20px;z-index:10
+}
+.modal.show{display:grid}
+.dialog{
+  width:min(440px,100%);background:#101a29;border:1px solid #35465e;
+  border-radius:18px;padding:20px;box-shadow:0 25px 80px #0009
+}
+.dialog h2{margin:0 0 8px}
+.dialog p{color:var(--muted);font-size:13px;line-height:1.5}
+.dialog input{
+  width:100%;padding:12px;margin:8px 0 10px;background:#09111c;
+  color:white;border:1px solid #35465e;border-radius:10px;font-size:16px
+}
+.modalButtons{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.msg{min-height:20px;font-size:12px;color:var(--muted)}
+.msg.err{color:#ff8d98}.msg.ok{color:#63e4aa}
+@media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){
+  .wrap{padding:14px}.cards,.charts{grid-template-columns:1fr}
+  canvas{height:210px}.value{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div class="brand">
+    <h1>PVE Hardware Monitor</h1>
+    <p id="hostinfo">Proxmox Server</p>
+  </div>
+  <div class="actions">
+    <div class="live"><span id="dot" class="dot"></span><span id="state">START</span></div>
+    <button class="reboot" onclick="openPower('reboot')">↻ Neustart</button>
+    <button class="danger" onclick="openPower('poweroff')">⏻ Herunterfahren</button>
+  </div>
+</div>
+
+<div class="cards">
+
+  <div class="card">
+    <div class="label">CPU</div>
+    <div class="value" id="cpu">–</div>
+    <div class="sub" id="cpuSub">–</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Mainboard / Sensorik</div>
+    <div class="value" id="board">–</div>
+    <div class="sub" id="boardSub">–</div>
+  </div>
+
+  <div class="card">
+    <div class="label">RAM / Swap</div>
+    <div class="value" id="ram">–</div>
+    <div class="sub" id="ramSub">–</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Speicher / Lüfter</div>
+    <div class="value" id="disk">–</div>
+    <div class="sub" id="diskSub">–</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Netzwerk</div>
+    <div class="value" id="net">–</div>
+    <div class="sub" id="netSub">–</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Leistungsaufnahme</div>
+    <div class="value" id="power">–</div>
+    <div class="sub" id="powerSub">Messquelle wird automatisch erkannt</div>
+  </div>
+
+  <div class="card">
+    <div class="label">VM / LXC</div>
+    <div class="value" id="guests">–</div>
+    <div class="sub" id="guestSub">–</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Geblockt in %</div>
+    <div class="value" id="piholeBlockedPct">–</div>
+    <div class="sub" id="piholeBlockedSub">Pi-hole · letzte 24 Stunden</div>
+  </div>
+
+</div>
+
+<div class="sectionbar">
+  <h2>Verlauf</h2>
+  <div class="ranges">
+    <button data-range="1h" class="active">1 Std</button>
+    <button data-range="6h">6 Std</button>
+    <button data-range="12h">12 Std</button>
+    <button data-range="24h">24 Std</button>
+    <button data-range="7d">7 Tage</button>
+    <button data-range="30d">1 Monat</button>
+  </div>
+</div>
+
+<div class="charts">
+  <div class="chart"><h3>CPU / I/O Wait</h3><canvas id="cCpu"></canvas></div>
+  <div class="chart"><h3>Temperaturen</h3><canvas id="cTemp"></canvas></div>
+  <div class="chart"><h3>RAM / Systemlaufwerk</h3><canvas id="cMem"></canvas></div>
+  <div class="chart"><h3>Leistungsaufnahme</h3><canvas id="cPower"></canvas></div>
+  <div class="chart"><h3>Netzwerk</h3><canvas id="cNet"></canvas></div>
+  <div class="chart"><h3>Disk I/O</h3><canvas id="cIO"></canvas></div>
+  <div class="chart"><h3>Load Average</h3><canvas id="cLoad"></canvas></div>
+  <div class="chart"><h3>CPU / GPU Temperatur</h3><canvas id="cCpuGpu"></canvas></div>
+</div>
+
+<div class="note" id="powerNote">
+CPU-Leistung kann nur angezeigt werden, wenn der Kernel eine passende RAPL-/hwmon-Messquelle bereitstellt.
+Gesamtverbrauch des Servers ist nur mit entsprechender Hardware-Telemetrie, z. B. IPMI/DCMI, direkt messbar.
+</div>
+
+</div>
+
+<div class="modal" id="modal">
+  <div class="dialog">
+    <h2 id="modalTitle">Serveraktion</h2>
+    <p id="modalText"></p>
+    <input id="code" type="password" autocomplete="off" placeholder="Steuer-Code">
+    <div id="msg" class="msg"></div>
+    <div class="modalButtons">
+      <button id="cancel" onclick="closePower()">Abbrechen</button>
+      <button id="confirm" class="danger" onclick="executePower()">Bestätigen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let range='1h';
+let hist=[];
+let pending=null;
+const colors=['#64a7ff','#9b7cff','#37d996','#ffbd4a','#ff7080'];
+
+function n(v,d=1){return v==null||!Number.isFinite(Number(v))?'–':Number(v).toFixed(d)}
+function pct(v){return v==null?'–':n(v,1)+' %'}
+function temp(v){return v==null?'–':n(v,1)+' °C'}
+function watts(v){return v==null?'–':n(v,1)+' W'}
+function rpm(v){return v==null?'–':Math.round(v)+' rpm'}
+function bytes(v){
+  v=Number(v||0);
+  const u=['B','KiB','MiB','GiB','TiB'];
+  let i=0;
+  while(v>=1024&&i<u.length-1){v/=1024;i++}
+  return v.toFixed(i?1:0)+' '+u[i]
+}
+function rate(v){return bytes(v)+'/s'}
+function dur(sec){
+  sec=Number(sec||0);
+  const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);
+  return (d?d+'d ':'')+(h?h+'h ':'')+m+'m'
+}
+async function getJSON(url,opt){
+  const r=await fetch(url,opt);
+  let d={};
+  try{d=await r.json()}catch{}
+  if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+  return d
+}
+async function info(){
+  const d=await getJSON('/api/info');
+  $('hostinfo').textContent=`${d.hostname} · ${d.pve} · ${d.cpu_model} · ${d.board_model}`;
+  $('powerNote').textContent=d.power_note;
+}
+function bestPower(d){
+  if(d.system_power_w!=null)return [watts(d.system_power_w),'Gesamtserver via IPMI/DCMI'];
+  if(d.cpu_power_w!=null)return [watts(d.cpu_power_w),'CPU-Package via RAPL'];
+  if(d.gpu_power_w!=null)return [watts(d.gpu_power_w),'GPU-Telemetrie'];
+  return ['n/v','Keine Watt-Messquelle verfügbar'];
+}
+async function current(){
+  try{
+    const d=await getJSON('/api/current');
+
+    $('cpu').textContent=pct(d.cpu_percent);
+    $('cpuSub').textContent=
+      `${temp(d.cpu_temp)} · ${d.cpu_freq==null?'–':Math.round(d.cpu_freq)+' MHz'} · Vcore ${d.vcore==null?'–':n(d.vcore,3)+' V'}`;
+
+    const boardTemps=[
+      d.board_temp!=null?'MB '+temp(d.board_temp):null,
+      d.vrm_temp!=null?'VRM '+temp(d.vrm_temp):null,
+      d.chipset_temp!=null?'PCH '+temp(d.chipset_temp):null
+    ].filter(Boolean);
+    $('board').textContent=d.board_temp!=null?temp(d.board_temp):'Sensor n/v';
+
+    const boardDetails=[
+      d.vrm_temp!=null?'VRM '+temp(d.vrm_temp):null,
+      d.chipset_temp!=null?'PCH '+temp(d.chipset_temp):null
+    ].filter(Boolean);
+
+    $('boardSub').textContent=d.board_temp!=null
+      ? ('Mainboard / ACPI'+(boardDetails.length?' · '+boardDetails.join(' · '):''))
+      : 'Mainboard stellt keine weiteren Sensoren bereit';
+
+    $('ram').textContent=pct(d.ram_percent);
+    $('ramSub').textContent=`${bytes(d.ram_used)} / ${bytes(d.ram_total)} · Swap ${pct(d.swap_percent)}`;
+
+    $('disk').textContent=pct(d.root_percent);
+    $('diskSub').textContent=
+      `${bytes(d.root_used)} / ${bytes(d.root_total)} · SSD ${temp(d.drive_temp)} · CPU-Fan ${rpm(d.cpu_fan_rpm)}`;
+
+    $('net').textContent='↓ '+rate(d.net_rx_bps);
+    $('netSub').textContent=`↑ ${rate(d.net_tx_bps)} · Disk R ${rate(d.disk_read_bps)} · W ${rate(d.disk_write_bps)}`;
+
+    const bp=bestPower(d);
+    $('power').textContent=bp[0];
+    $('powerSub').textContent=
+      `${bp[1]} · Package ${watts(d.cpu_power_w)} · Cores ${watts(d.cpu_core_power_w)} · DRAM ${watts(d.dram_power_w)} · GPU ${watts(d.gpu_power_w)} · System ${watts(d.system_power_w)}`;
+
+    $('guests').textContent=`${Number(d.vm_running||0)+Number(d.ct_running||0)} aktiv`;
+    $('guestSub').textContent=`VM ${d.vm_running}/${d.vm_total} · CT ${d.ct_running}/${d.ct_total}`;
+
+    $('piholeBlockedPct').textContent=
+      d.pihole_blocked_percent==null
+        ? 'n/v'
+        : n(d.pihole_blocked_percent,1)+' %';
+
+    const piholeNumber=v=>
+      v==null
+        ? '–'
+        : new Intl.NumberFormat('de-DE').format(Number(v));
+
+    $('piholeBlockedSub').textContent=
+      d.pihole_queries_total==null
+        ? 'Pi-hole-Daten nicht verfügbar'
+        : `Anfragen insgesamt ${piholeNumber(d.pihole_queries_total)} / Geblockte Anfragen ${piholeNumber(d.pihole_queries_blocked)}`;
+
+    $('dot').style.background='#37d996';
+    $('dot').style.boxShadow='0 0 14px #37d996';
+    $('state').textContent='LIVE';
+  }catch(e){
+    $('dot').style.background='#ff5f6d';
+    $('dot').style.boxShadow='0 0 14px #ff5f6d';
+    $('state').textContent='OFFLINE';
+  }
+}
+
+function timeLabel(ts,span){
+  const d=new Date(ts*1000);
+  if(span>=604800)return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+
+function niceMax(v){
+  if(!Number.isFinite(v)||v<=0)return 1;
+  const p=Math.pow(10,Math.floor(Math.log10(v)));
+  const n=v/p;
+  return (n<=1?1:n<=2?2:n<=5?5:10)*p;
+}
+
+function draw(id,series,opt={}){
+  const c=$(id),r=c.getBoundingClientRect(),dpr=Math.max(1,window.devicePixelRatio||1);
+  c.width=Math.floor(r.width*dpr);c.height=Math.floor(r.height*dpr);
+  const x=c.getContext('2d');x.scale(dpr,dpr);
+  const w=r.width,h=r.height,p={l:48,r:12,t:20,b:28},iw=w-p.l-p.r,ih=h-p.t-p.b;
+  x.clearRect(0,0,w,h);
+  if(!hist.length)return;
+
+  const t0=hist[0].ts,t1=hist[hist.length-1].ts||t0+1,span=Math.max(1,t1-t0);
+  let vals=[];
+  series.forEach(s=>hist.forEach(row=>{
+    const v=Number(row[s.key]);
+    if(Number.isFinite(v))vals.push(v);
+  }));
+
+  if(!vals.length){
+    x.fillStyle='#92a4bc';x.font='13px system-ui';x.textAlign='center';
+    x.fillText('Keine Messquelle verfügbar',w/2,h/2);
+    return;
+  }
+
+  const ymin=opt.min??0;
+  let ymax=opt.max??niceMax(Math.max(...vals,1)*1.08);
+  if(ymax<=ymin)ymax=ymin+1;
+
+  x.strokeStyle='#28364b';x.lineWidth=1;x.fillStyle='#92a4bc';x.font='11px system-ui';
+
+  for(let i=0;i<=4;i++){
+    const yy=p.t+ih*i/4;
+    x.beginPath();x.moveTo(p.l,yy);x.lineTo(w-p.r,yy);x.stroke();
+    const value=ymax-(ymax-ymin)*i/4;
+    x.textAlign='right';x.textBaseline='middle';
+    x.fillText(opt.y?opt.y(value):value.toFixed(0),p.l-7,yy);
+  }
+
+  for(let i=0;i<=4;i++){
+    const xx=p.l+iw*i/4;
+    x.textAlign='center';x.textBaseline='top';
+    x.fillText(timeLabel(t0+span*i/4,span),xx,h-p.b+7);
+  }
+
+  series.forEach((s,si)=>{
+    x.strokeStyle=s.color||colors[si%colors.length];
+    x.lineWidth=2;
+    x.beginPath();
+    let started=false;
+
+    hist.forEach(row=>{
+      const v=Number(row[s.key]);
+      if(!Number.isFinite(v))return;
+      const xx=p.l+(row.ts-t0)/span*iw;
+      const yy=p.t+(ymax-v)/(ymax-ymin)*ih;
+      if(!started){x.moveTo(xx,yy);started=true}else{x.lineTo(xx,yy)}
+    });
+    x.stroke();
+  });
+
+  let lx=p.l;
+  series.forEach((s,si)=>{
+    x.fillStyle=s.color||colors[si%colors.length];
+    x.fillRect(lx,p.t-13,10,3);
+    x.fillStyle='#d7e4f4';
+    x.textAlign='left';x.textBaseline='middle';
+    x.fillText(s.label,lx+15,p.t-11);
+    lx+=x.measureText(s.label).width+42;
+  });
+}
+
+function charts(){
+  draw('cCpu',[
+    {key:'cpu_percent',label:'CPU'},
+    {key:'iowait_percent',label:'I/O Wait'}
+  ],{min:0,max:100,y:v=>v.toFixed(0)+'%'});
+
+  draw('cTemp',[
+    {key:'cpu_temp',label:'CPU'},
+    {key:'board_temp',label:'Mainboard'},
+    {key:'vrm_temp',label:'VRM'},
+    {key:'chipset_temp',label:'PCH'}
+  ],{min:0,max:110,y:v=>v.toFixed(0)+'°'});
+
+  draw('cMem',[
+    {key:'ram_percent',label:'RAM'},
+    {key:'root_percent',label:'Disk'}
+  ],{min:0,max:100,y:v=>v.toFixed(0)+'%'});
+
+  draw('cPower',[
+    {key:'system_power_w',label:'System'},
+    {key:'cpu_power_w',label:'CPU Package'},
+    {key:'cpu_core_power_w',label:'Cores'},
+    {key:'dram_power_w',label:'DRAM'},
+    {key:'gpu_power_w',label:'GPU'}
+  ],{y:v=>v.toFixed(0)+' W'});
+
+  draw('cNet',[
+    {key:'net_rx_bps',label:'Download'},
+    {key:'net_tx_bps',label:'Upload'}
+  ],{y:v=>bytes(v)});
+
+  draw('cIO',[
+    {key:'disk_read_bps',label:'Lesen'},
+    {key:'disk_write_bps',label:'Schreiben'}
+  ],{y:v=>bytes(v)});
+
+  draw('cLoad',[
+    {key:'load1',label:'1 min'},
+    {key:'load5',label:'5 min'},
+    {key:'load15',label:'15 min'}
+  ]);
+
+  draw('cCpuGpu',[
+    {key:'cpu_temp',label:'CPU'},
+    {key:'gpu_temp',label:'GPU'},
+    {key:'drive_temp',label:'SSD/NVMe'}
+  ],{min:0,max:110,y:v=>v.toFixed(0)+'°'});
+}
+
+async function history(){
+  try{
+    hist=await getJSON('/api/history/'+range);
+    charts();
+  }catch(e){console.error(e)}
+}
+
+document.querySelectorAll('[data-range]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('[data-range]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    range=b.dataset.range;
+    history();
+  })
+});
+
+function openPower(action){
+  pending=action;
+  const reboot=action==='reboot';
+  $('modalTitle').textContent=reboot?'Proxmox neu starten':'Proxmox herunterfahren';
+  $('modalText').textContent=reboot
+    ?'Der komplette Proxmox-Host wird neu gestartet. Alle VMs und Container sind betroffen.'
+    :'Der komplette Proxmox-Host wird ausgeschaltet. Alle VMs und Container sind betroffen.';
+  $('confirm').textContent=reboot?'Neustart bestätigen':'Herunterfahren bestätigen';
+  $('code').value='';
+  $('msg').textContent='';
+  $('msg').className='msg';
+  $('modal').classList.add('show');
+  setTimeout(()=>$('code').focus(),80);
+}
+
+function closePower(){
+  $('modal').classList.remove('show');
+  pending=null;
+}
+
+async function executePower(){
+  if(!pending)return;
+  const code=$('code').value;
+
+  if(code.length<6){
+    $('msg').textContent='Bitte den vollständigen Steuer-Code eingeben.';
+    $('msg').className='msg err';
+    return;
+  }
+
+  $('confirm').disabled=true;
+  $('cancel').disabled=true;
+  $('code').disabled=true;
+  $('msg').textContent='Code wird geprüft …';
+
+  try{
+    const d=await getJSON('/api/power/'+pending,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code})
+    });
+
+    $('msg').textContent=d.message||'Aktion wurde gestartet.';
+    $('msg').className='msg ok';
+    $('state').textContent=pending==='reboot'?'NEUSTART':'SHUTDOWN';
+  }catch(e){
+    $('msg').textContent=e.message;
+    $('msg').className='msg err';
+    $('confirm').disabled=false;
+    $('cancel').disabled=false;
+    $('code').disabled=false;
+    $('code').select();
+  }
+}
+
+$('code').addEventListener('keydown',e=>{
+  if(e.key==='Enter')executePower();
+  if(e.key==='Escape')closePower();
+});
+
+$('modal').addEventListener('click',e=>{
+  if(e.target===$('modal'))closePower();
+});
+
+let rt;
+window.addEventListener('resize',()=>{
+  clearTimeout(rt);
+  rt=setTimeout(charts,120);
+});
+
+(async()=>{
+  try{await info()}catch(e){}
+  await current();
+  await history();
+  setInterval(current,15000);
+  setInterval(history,60000);
+})();
+</script>
+</body>
+</html>

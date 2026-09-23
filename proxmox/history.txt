@@ -1,6 +1,31 @@
 Verfolgung der Änderungen
 ==========================
 
+23.09.2026 – V139
+-----------------
+- Installer-Dateilayout auf feste NodeZero-Pfade umgestellt:
+  * aktive Passwörter/Tokens/Secrets: /root/passwort/
+  * lokale Secret-Sicherung: /home/passwort/
+  * normale Downloads und wiederverwendbare kleine Artefakte: /root/downloads/
+  * permanente Installations-/Image-Caches: /home/img/
+  * eigener installierter Anwendungscode: /opt/nodezero/
+- Bestehende Daten werden beim Start kompatibel übernommen:
+  * /home/Images wird, wenn eindeutig möglich, nach /home/img migriert,
+  * ein Legacy-Symlink /home/Images -> /home/img hält alte Pfade kompatibel,
+  * /home/passwd wird nach /root/passwort und /home/passwort übernommen,
+  * /opt/pve-sensor-dashboard wird nach /opt/nodezero/dashboard verschoben und per Legacy-Symlink erreichbar gehalten.
+- Der Proxmox image-cache Storage wird auf /home/img umgestellt bzw. akzeptiert während der Migration den Legacy-Symlink.
+- Docker-/Paperless-/Ollama-/HAOS-/LXC-/ISO-Caches liegen damit dauerhaft unter /home/img und bleiben bei KOMPLETT NEU erhalten.
+- Dashboard-Grundquellen aus proxmox.sh ausgelagert:
+  * dashboard/collector.py
+  * dashboard/app.py
+  * dashboard/index.html
+- Der Installer lädt diese Dateien versionsgebunden von einem unveränderlichen Git-Commit nach /root/downloads/dashboard/<asset-ref>/ und installiert sie nach /opt/nodezero/dashboard/.
+- Bereits heruntergeladene Dashboard-Dateien werden wiederverwendet; GitHub muss bei Folgeläufen nicht erneut geladen werden.
+- Die bisherigen Dashboard-Migrations-/Patchfunktionen bleiben im Installer erhalten, damit bestehende Installationen weiterhin aktualisiert werden können.
+- Durch die erste Modularisierung sinkt proxmox.sh um rund 1.450 eingebettete Dashboard-Zeilen.
+- OpenRGB, Paperless V138, Pi-hole, PVE-UPS und die übrigen Installationsmodule bleiben funktional erhalten.
+
 20.09.2026 – V138
 -----------------
 - Paperless-NAS-Inbox wird bei externer Ablage jetzt zuverlässig per Polling überwacht.
