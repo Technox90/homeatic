@@ -35,7 +35,7 @@ jobs:
           bash -n proxmox/tools/proxmox-auto-updater-config
           bash -n proxmox/tools/proxmox-pushover-config
 
-      - name: V140 modularization checks
+      - name: V141 installer checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
@@ -59,5 +59,5 @@ jobs:
           grep -q 'TOOLS_REF="5ee7b364e0ecb52d446a73c53aefc835087ce316"' proxmox/proxmox.sh
           grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
           grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
-          grep -q 'proxmox-auto-updater.timer.d' proxmox/tools/proxmox-auto-updater-config
+          grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
           test "$(wc -c < proxmox/proxmox.sh)" -lt 700000
