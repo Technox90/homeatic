@@ -30,6 +30,11 @@ jobs:
       - name: Dashboard Python syntax
         run: python3 -m py_compile dashboard/collector.py dashboard/app.py
 
+      - name: Updater tool Bash syntax
+        run: |
+          bash -n proxmox/tools/proxmox-auto-updater-config
+          bash -n proxmox/tools/proxmox-pushover-config
+
       - name: V140 modularization checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
@@ -50,4 +55,9 @@ jobs:
           test -s dashboard/collector.py
           test -s dashboard/app.py
           test -s dashboard/index.html
+          grep -q '"20" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
+          grep -q 'TOOLS_REF="5ee7b364e0ecb52d446a73c53aefc835087ce316"' proxmox/proxmox.sh
+          grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
+          grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
+          grep -q 'proxmox-auto-updater.timer.d' proxmox/tools/proxmox-auto-updater-config
           test "$(wc -c < proxmox/proxmox.sh)" -lt 700000

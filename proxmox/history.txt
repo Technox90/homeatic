@@ -1,6 +1,29 @@
 Verfolgung der Änderungen
 ==========================
 
+24.09.2026 – V141
+-----------------
+- Auto-Updater und Pushover unter Wartung & Einstellungen vollständig getrennt.
+- Menü:
+  * 11 = Auto-Updater · Zeitplan / Status / Sofortlauf
+  * 20 = Pushover · Empfänger / Test / Ein-Aus
+- Separate Werkzeuge im Repository:
+  * proxmox/tools/proxmox-auto-updater-config
+  * proxmox/tools/proxmox-pushover-config
+- Beide Werkzeuge werden versionsgebunden aus einem unveränderlichen Git-Commit nach /root/downloads/nodezero/tools/<git-ref>/ geladen.
+- Vor Installation wird jedes Werkzeug mit bash -n geprüft.
+- Auto-Updater-Menü an den Whiptail/TUI-Stil des Master-Installers angepasst.
+- Tägliche Update-Uhrzeit kann nachträglich im Format HH:MM geändert werden; Standard bleibt 05:00 Uhr.
+- Eigene Zeit wird unter /root/.config/proxmox-auto-updater/schedule.env gespeichert.
+- systemd-Drop-in: /etc/systemd/system/proxmox-auto-updater.timer.d/schedule.conf.
+- Die geänderte Uhrzeit bleibt bei späteren Master-Installer-Läufen erhalten.
+- Auto-Updater-Menü: Status/nächster Lauf, Uhrzeit ändern, Sofortlauf, letztes Log.
+- Pushover-Menü: Status/Empfänger, Zugangsdaten ändern, Testnachricht, Aktivieren, Deaktivieren.
+- Bestehender API-Token und User Keys können beim Bearbeiten durch Leerlassen beibehalten werden.
+- Zweiter Pushover-Empfänger kann beibehalten, neu eingerichtet oder entfernt werden.
+- Reset entfernt das Timer-Drop-in und das separate Pushover-Werkzeug.
+- CI prüft Master-Installer, beide separaten Tools, Dashboard-Modul und Dashboard-Python-Dateien.
+
 23.09.2026 – V140
 -----------------
 - Vollständige Dashboard-Logik aus proxmox/proxmox.sh ausgelagert.

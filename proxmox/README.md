@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V140**
+Installationskandidat: **V141**
 
 Geplante Hauptdatei:
 
@@ -171,3 +171,13 @@ proxmox/modules/dashboard.sh
 ```
 
 Der Master-Installer enthält nur noch den Modul-Loader. Das Modul wird über einen unveränderlichen Git-Commit nach `/root/downloads/nodezero/modules/<git-ref>/dashboard.sh` geladen, mit `bash -n` geprüft und anschließend per `source` eingebunden. Die separaten Dashboard-Basisdateien unter `dashboard/` bleiben bestehen.
+
+
+## Auto-Updater / Pushover getrennt · V141
+
+Unter **Wartung & Einstellungen** sind Auto-Updater und Pushover zwei getrennte Menüpunkte. Die Update-Uhrzeit kann im Auto-Updater-Menü geändert werden und wird persistent per systemd-Drop-in gespeichert. Pushover besitzt ein eigenes Whiptail-Menü im Stil des restlichen Installers.
+
+```bash
+proxmox-auto-updater-config
+proxmox-pushover-config
+```
