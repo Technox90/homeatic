@@ -1,0 +1,361 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[[ ${EUID:-$(id -u)} -eq 0 ]] || {
+    echo "FEHLER: Bitte als root ausführen."
+    exit 1
+}
+
+CONF_DIR="/root/.config/proxmox-auto-updater"
+CONF="${CONF_DIR}/pushover.env"
+
+mkdir -p "$CONF_DIR"
+chmod 700 "$CONF_DIR"
+
+TUI_AVAILABLE=0
+if command -v whiptail >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    TUI_AVAILABLE=1
+fi
+
+BACKTITLE="Proxmox · Pushover"
+
+ui_msg() {
+    local title="$1"
+    shift
+    local message="$*"
+
+    if (( TUI_AVAILABLE )); then
+        whiptail --backtitle "$BACKTITLE" --title "$title" --msgbox "$message" 16 84
+    else
+        echo
+        echo "============================================================"
+        echo " $title"
+        echo "============================================================"
+        printf '%s\n' "$message"
+    fi
+}
+
+load_values() {
+    PUSHOVER_ENABLED=0
+    PUSHOVER_APP_TOKEN=""
+    PUSHOVER_NAME_1="Empfänger 1"
+    PUSHOVER_USER_KEY_1=""
+    PUSHOVER_DEVICE_1=""
+    PUSHOVER_NAME_2="Empfänger 2"
+    PUSHOVER_USER_KEY_2=""
+    PUSHOVER_DEVICE_2=""
+
+    if [[ -f "$CONF" ]]; then
+        # shellcheck disable=SC1090
+        source "$CONF"
+    fi
+
+    PUSHOVER_NAME_1="${PUSHOVER_NAME_1:-${PUSHOVER_NAME:-Empfänger 1}}"
+    PUSHOVER_USER_KEY_1="${PUSHOVER_USER_KEY_1:-${PUSHOVER_USER_KEY:-}}"
+    PUSHOVER_DEVICE_1="${PUSHOVER_DEVICE_1:-${PUSHOVER_DEVICE:-}}"
+    PUSHOVER_NAME_2="${PUSHOVER_NAME_2:-Empfänger 2}"
+}
+
+save_values() {
+    {
+        printf 'PUSHOVER_ENABLED=%q\n' "${PUSHOVER_ENABLED:-1}"
+        printf 'PUSHOVER_APP_TOKEN=%q\n' "$PUSHOVER_APP_TOKEN"
+        printf 'PUSHOVER_NAME_1=%q\n' "$PUSHOVER_NAME_1"
+        printf 'PUSHOVER_USER_KEY_1=%q\n' "$PUSHOVER_USER_KEY_1"
+        printf 'PUSHOVER_DEVICE_1=%q\n' "$PUSHOVER_DEVICE_1"
+        printf 'PUSHOVER_NAME_2=%q\n' "$PUSHOVER_NAME_2"
+        printf 'PUSHOVER_USER_KEY_2=%q\n' "$PUSHOVER_USER_KEY_2"
+        printf 'PUSHOVER_DEVICE_2=%q\n' "$PUSHOVER_DEVICE_2"
+    } > "$CONF"
+    chmod 600 "$CONF"
+}
+
+test_pushover_values() {
+    local token="$1"
+    local user="$2"
+    local device="${3:-}"
+    local label="${4:-Empfänger}"
+
+    [[ -n "$token" ]] || {
+        ui_msg "PUSHOVER · TEST" "Application/API Token fehlt."
+        return 1
+    }
+
+    [[ -n "$user" ]] || {
+        ui_msg "PUSHOVER · TEST" "User/Group Key für '$label' fehlt."
+        return 1
+    }
+
+    local args=(
+        -fsS
+        --connect-timeout 10
+        --max-time 20
+        -X POST
+        --data-urlencode "token=${token}"
+        --data-urlencode "user=${user}"
+        --data-urlencode "title=Proxmox Auto-Updater"
+        --data-urlencode "message=Pushover-Verbindung für ${label} erfolgreich."
+    )
+    [[ -z "$device" ]] || args+=(--data-urlencode "device=${device}")
+
+    local response=""
+    response="$(curl "${args[@]}" https://api.pushover.net/1/messages.json)" || {
+        ui_msg "PUSHOVER · TEST" "Verbindung zu Pushover für '$label' fehlgeschlagen."
+        return 1
+    }
+
+    if printf '%s' "$response" | grep -q '"status":1'; then
+        return 0
+    fi
+
+    ui_msg "PUSHOVER · TEST" "Pushover-Test für '$label' fehlgeschlagen.
+
+$response"
+    return 1
+}
+
+prompt_input() {
+    local title="$1"
+    local text="$2"
+    local default="${3:-}"
+    local value=""
+
+    if (( TUI_AVAILABLE )); then
+        value="$(
+            whiptail --backtitle "$BACKTITLE" --title "$title" \
+                --ok-button "Weiter" --cancel-button "Abbrechen" \
+                --inputbox "$text" 12 78 "$default" \
+                3>&1 1>&2 2>&3
+        )" || return 1
+    else
+        read -rp "$text [$default]: " value
+        value="${value:-$default}"
+    fi
+
+    printf '%s' "$value"
+}
+
+prompt_secret_keep() {
+    local title="$1"
+    local text="$2"
+    local old="${3:-}"
+    local value=""
+
+    if (( TUI_AVAILABLE )); then
+        value="$(
+            whiptail --backtitle "$BACKTITLE" --title "$title" \
+                --ok-button "Weiter" --cancel-button "Abbrechen" \
+                --passwordbox "$text
+
+Leer lassen = vorhandenen Wert beibehalten." 14 78 \
+                3>&1 1>&2 2>&3
+        )" || return 1
+    else
+        read -rsp "$text (ENTER = vorhandenen Wert behalten): " value
+        echo >&2
+    fi
+
+    [[ -n "$value" ]] || value="$old"
+    printf '%s' "$value"
+}
+
+configure_pushover() {
+    load_values
+
+    local token="" name1="" user1="" device1=""
+    local name2="" user2="" device2=""
+    local use_second=0
+
+    token="$(prompt_secret_keep "PUSHOVER · API TOKEN" "Application/API Token eingeben" "$PUSHOVER_APP_TOKEN")" || return 0
+    [[ -n "$token" ]] || {
+        ui_msg "PUSHOVER · KONFIGURATION" "Ein Application/API Token ist erforderlich."
+        return 1
+    }
+
+    name1="$(prompt_input "PUSHOVER · EMPFÄNGER 1" "Name / Bezeichnung" "$PUSHOVER_NAME_1")" || return 0
+    name1="${name1:-Empfänger 1}"
+
+    user1="$(prompt_secret_keep "PUSHOVER · EMPFÄNGER 1" "User/Group Key für $name1" "$PUSHOVER_USER_KEY_1")" || return 0
+    [[ -n "$user1" ]] || {
+        ui_msg "PUSHOVER · KONFIGURATION" "Empfänger 1 benötigt einen User/Group Key."
+        return 1
+    }
+
+    device1="$(prompt_input "PUSHOVER · EMPFÄNGER 1" "Device-Name (leer = alle Geräte)" "$PUSHOVER_DEVICE_1")" || return 0
+
+    if (( TUI_AVAILABLE )); then
+        if [[ -n "$PUSHOVER_USER_KEY_2" ]]; then
+            if whiptail --backtitle "$BACKTITLE" --title "PUSHOVER · EMPFÄNGER 2" \
+                --defaultyes --yes-button "Ja" --no-button "Nein" \
+                --yesno "Zweiten Empfänger beibehalten / ändern?" 10 68; then
+                use_second=1
+            fi
+        else
+            if whiptail --backtitle "$BACKTITLE" --title "PUSHOVER · EMPFÄNGER 2" \
+                --yes-button "Ja" --no-button "Nein" \
+                --yesno "Zweiten Empfänger zusätzlich einrichten?" 10 68; then
+                use_second=1
+            fi
+        fi
+    else
+        local answer=""
+        read -rp "Zweiten Empfänger verwenden? [j/N]: " answer
+        [[ "$answer" =~ ^[JjYy]$ ]] && use_second=1
+    fi
+
+    if (( use_second )); then
+        name2="$(prompt_input "PUSHOVER · EMPFÄNGER 2" "Name / Bezeichnung" "${PUSHOVER_NAME_2:-Empfänger 2}")" || return 0
+        name2="${name2:-Empfänger 2}"
+
+        user2="$(prompt_secret_keep "PUSHOVER · EMPFÄNGER 2" "User/Group Key für $name2" "$PUSHOVER_USER_KEY_2")" || return 0
+        [[ -n "$user2" ]] || {
+            ui_msg "PUSHOVER · KONFIGURATION" "Empfänger 2 benötigt einen User/Group Key."
+            return 1
+        }
+
+        device2="$(prompt_input "PUSHOVER · EMPFÄNGER 2" "Device-Name (leer = alle Geräte)" "$PUSHOVER_DEVICE_2")" || return 0
+    fi
+
+    test_pushover_values "$token" "$user1" "$device1" "$name1" || return 1
+    if [[ -n "$user2" ]]; then
+        test_pushover_values "$token" "$user2" "$device2" "$name2" || return 1
+    fi
+
+    PUSHOVER_ENABLED=1
+    PUSHOVER_APP_TOKEN="$token"
+    PUSHOVER_NAME_1="$name1"
+    PUSHOVER_USER_KEY_1="$user1"
+    PUSHOVER_DEVICE_1="$device1"
+    PUSHOVER_NAME_2="${name2:-Empfänger 2}"
+    PUSHOVER_USER_KEY_2="$user2"
+    PUSHOVER_DEVICE_2="$device2"
+    save_values
+
+    local result="Pushover wurde gespeichert und aktiviert.
+
+Empfänger 1: $PUSHOVER_NAME_1
+Device: ${PUSHOVER_DEVICE_1:-alle Geräte}"
+
+    if [[ -n "$PUSHOVER_USER_KEY_2" ]]; then
+        result+="
+
+Empfänger 2: $PUSHOVER_NAME_2
+Device: ${PUSHOVER_DEVICE_2:-alle Geräte}"
+    fi
+
+    ui_msg "PUSHOVER · GESPEICHERT" "$result"
+}
+
+status_text() {
+    load_values
+
+    local state="deaktiviert"
+    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] && state="aktiviert"
+
+    local out="Status: $state
+API Token: $([[ -n "$PUSHOVER_APP_TOKEN" ]] && echo vorhanden || echo fehlt)
+
+Empfänger 1: ${PUSHOVER_NAME_1:-nicht eingerichtet}
+Device: ${PUSHOVER_DEVICE_1:-alle Geräte}"
+
+    if [[ -n "$PUSHOVER_USER_KEY_2" ]]; then
+        out+="
+
+Empfänger 2: ${PUSHOVER_NAME_2:-Empfänger 2}
+Device: ${PUSHOVER_DEVICE_2:-alle Geräte}"
+    else
+        out+="
+
+Empfänger 2: nicht eingerichtet"
+    fi
+
+    printf '%s' "$out"
+}
+
+test_configured_pushover() {
+    load_values
+
+    [[ -n "$PUSHOVER_APP_TOKEN" && -n "$PUSHOVER_USER_KEY_1" ]] || {
+        ui_msg "PUSHOVER · TEST" "Pushover ist noch nicht vollständig konfiguriert."
+        return 1
+    }
+
+    test_pushover_values "$PUSHOVER_APP_TOKEN" "$PUSHOVER_USER_KEY_1" "$PUSHOVER_DEVICE_1" "$PUSHOVER_NAME_1" || return 1
+
+    if [[ -n "$PUSHOVER_USER_KEY_2" ]]; then
+        test_pushover_values "$PUSHOVER_APP_TOKEN" "$PUSHOVER_USER_KEY_2" "$PUSHOVER_DEVICE_2" "$PUSHOVER_NAME_2" || return 1
+    fi
+
+    ui_msg "PUSHOVER · TEST" "Testnachricht wurde erfolgreich an alle eingerichteten Empfänger gesendet."
+}
+
+set_enabled() {
+    local wanted="$1"
+    load_values
+
+    if [[ "$wanted" == "1" ]]; then
+        [[ -n "$PUSHOVER_APP_TOKEN" && -n "$PUSHOVER_USER_KEY_1" ]] || {
+            ui_msg "PUSHOVER" "Pushover kann erst aktiviert werden, wenn Token und Empfänger 1 konfiguriert sind."
+            return 1
+        }
+    fi
+
+    PUSHOVER_ENABLED="$wanted"
+    save_values
+
+    if [[ "$wanted" == "1" ]]; then
+        ui_msg "PUSHOVER" "Pushover wurde aktiviert."
+    else
+        ui_msg "PUSHOVER" "Pushover wurde deaktiviert. Die Zugangsdaten bleiben gespeichert."
+    fi
+}
+
+while true; do
+    load_values
+    state="deaktiviert"
+    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] && state="aktiviert"
+
+    if (( TUI_AVAILABLE )); then
+        choice="$(
+            whiptail \
+                --backtitle "$BACKTITLE" \
+                --title "PUSHOVER" \
+                --ok-button "Auswählen" \
+                --cancel-button "Zurück" \
+                --menu "Status: ${state}" \
+                20 88 7 \
+                "1" "Status / Empfänger anzeigen" \
+                "2" "Zugangsdaten / Empfänger konfigurieren" \
+                "3" "Testnachricht an alle Empfänger senden" \
+                "4" "Pushover aktivieren" \
+                "5" "Pushover deaktivieren" \
+                "0" "Zurück" \
+                3>&1 1>&2 2>&3
+        )" || exit 0
+    else
+        echo
+        echo "============================================================"
+        echo " PUSHOVER"
+        echo "============================================================"
+        echo "Status: $state"
+        echo
+        echo "1) Status / Empfänger anzeigen"
+        echo "2) Zugangsdaten / Empfänger konfigurieren"
+        echo "3) Testnachricht senden"
+        echo "4) Aktivieren"
+        echo "5) Deaktivieren"
+        echo "0) Zurück"
+        read -rp "Auswahl [1]: " choice
+        choice="${choice:-1}"
+    fi
+
+    case "$choice" in
+        1) ui_msg "PUSHOVER · STATUS" "$(status_text)" ;;
+        2) configure_pushover ;;
+        3) test_configured_pushover || true ;;
+        4) set_enabled 1 ;;
+        5) set_enabled 0 ;;
+        0) exit 0 ;;
+        *) ui_msg "PUSHOVER" "Ungültige Auswahl." ;;
+    esac
+done

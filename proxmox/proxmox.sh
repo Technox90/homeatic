@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V140
+# PROXMOX MODULARER KOMPLETT-INSTALLER V141
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -55,6 +55,7 @@ set -Eeuo pipefail
 #   V138: Paperless NAS-Inbox auf NFS per Consumer-Polling überwachen; Inbox-Zugriff bei Installation prüfen
 #   V139: NodeZero-Dateilayout + externes Dashboard-Quellpaket; Secrets/Downloads/Image-Cache sauber getrennt
 #   V140: vollständige Dashboard-Logik als versionsgebundenes GitHub-Modul ausgelagert
+#   V141: Auto-Updater und Pushover getrennt; Update-Uhrzeit frei änderbar; Pushover-Menü im TUI-Stil
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -812,8 +813,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V140"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V140"
+TUI_TITLE="PROXMOX INSTALLER V141"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V141"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1131,7 +1132,8 @@ tui_maintenance_menu_v106() {
                 24 94 10 \
                 "8"  "Pi-hole Authentifizierung / Home Assistant" \
                 "10" "Pi-hole Sprache · DE / EN" \
-                "11" "Auto-Updater / Pushover konfigurieren" \
+                "11" "Auto-Updater · Zeitplan / Status / Sofortlauf" \
+                "20" "Pushover · Empfänger / Test / Ein-Aus" \
                 "12" "Installations-Passwörter anzeigen" \
                 "15" "PVE Storage-Share-Helper" \
                 "17" "Setup-Profile · laden / verwalten" \
@@ -1142,7 +1144,7 @@ tui_maintenance_menu_v106() {
         return 0
     fi
 
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater/Pushover\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  Z Zurück\nAuswahl: '
+    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  Z Zurück\nAuswahl: '
     read -r result
     [[ "${result^^}" == "Z" ]] && return 1
     printf '%s' "$result"
@@ -2064,6 +2066,8 @@ remove_master_host_components_v72() {
         /etc/sudoers.d/pve-sensor-dashboard \
         /etc/modules-load.d/pve-sensor-dashboard.conf
 
+    rm -rf /etc/systemd/system/proxmox-auto-updater.timer.d
+
     # Master-Helfer entfernen.
     rm -f \
         /usr/local/sbin/pve-dashboard-set-code \
@@ -2072,6 +2076,7 @@ remove_master_host_components_v72() {
         /usr/local/sbin/pve-pihole-dns-sync \
         /usr/local/sbin/proxmox-auto-updater \
         /usr/local/sbin/proxmox-auto-updater-config \
+        /usr/local/sbin/proxmox-pushover-config \
         /usr/local/sbin/proxmox-master-tls-renew \
         /usr/local/sbin/pihole-reset-password \
         /usr/local/sbin/pihole-ha-app-password \
@@ -5535,7 +5540,7 @@ install_pihole_language_tool
 
 
 # -----------------------------------------------------------------------------
-# Täglicher Auto-Updater 05:00 Uhr + Pushover
+# Auto-Updater mit änderbarer Tageszeit + getrennte Pushover-Konfiguration
 # -----------------------------------------------------------------------------
 
 install_proxmox_auto_updater() {
@@ -6560,315 +6565,57 @@ echo "Log: $LOGFILE"
 
 __UPDATER__
 
-cat > /usr/local/sbin/proxmox-auto-updater-config <<'__CONFIG__'
-#!/usr/bin/env bash
-set -Eeuo pipefail
+TOOLS_REF="5ee7b364e0ecb52d446a73c53aefc835087ce316"
+TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
+TOOLS_CACHE="/root/downloads/nodezero/tools/${TOOLS_REF}"
 
-CONF_DIR="/root/.config/proxmox-auto-updater"
-CONF="${CONF_DIR}/pushover.env"
-UPDATER="/usr/local/sbin/proxmox-auto-updater"
+install_nodezero_tool_v141() {
+    local name="$1"
+    local cached="${TOOLS_CACHE}/${name}"
+    local target="/usr/local/sbin/${name}"
+    local tmp="${cached}.tmp"
 
-mkdir -p "$CONF_DIR"
-chmod 700 "$CONF_DIR"
+    install -d -m 0755 -o root -g root "$TOOLS_CACHE"
 
-test_pushover_values() {
-    local token="$1"
-    local user="$2"
-    local device="${3:-}"
-    local label="${4:-Empfänger}"
+    if [[ ! -s "$cached" ]]; then
+        rm -f "$tmp"
+        curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 2 --connect-timeout 15 \
+            "${TOOLS_RAW_BASE}/${name}" -o "$tmp" ||
+            {
+                echo "FEHLER: NodeZero-Werkzeug konnte nicht geladen werden: ${name}" >&2
+                exit 1
+            }
 
-    [[ -n "$token" ]] || {
-        echo "FEHLER: Application/API Token fehlt."
-        return 1
-    }
-
-    [[ -n "$user" ]] || {
-        echo "FEHLER: User/Group Key für '$label' fehlt."
-        return 1
-    }
-
-    local args=(
-        -fsS
-        --connect-timeout 10
-        --max-time 20
-        -X POST
-        --data-urlencode "token=${token}"
-        --data-urlencode "user=${user}"
-        --data-urlencode "title=Proxmox Auto-Updater"
-        --data-urlencode "message=Pushover-Verbindung für ${label} erfolgreich."
-    )
-
-    [[ -z "$device" ]] || args+=(--data-urlencode "device=${device}")
-
-    local response
-
-    response="$(
-        curl "${args[@]}" \
-            https://api.pushover.net/1/messages.json
-    )"
-
-    if printf '%s' "$response" | grep -q '"status":1'; then
-        echo "[OK] Testnachricht gesendet an: $label"
-        return 0
-    fi
-
-    echo "FEHLER: Pushover-Test für '$label' fehlgeschlagen."
-    echo "$response"
-    return 1
-}
-
-configure_pushover() {
-    local token
-    local name1 user1 device1
-    local name2="" user2="" device2=""
-    local add_second="n"
-
-    echo
-    echo "Pushover benötigt:"
-    echo "  - einen Application/API Token"
-    echo "  - mindestens einen User/Group Key"
-    echo "  - optional einen zweiten User/Group Key"
-    echo "  - optional pro Empfänger einen Device-Namen"
-    echo
-
-    read -rsp "Pushover Application/API Token: " token
-    echo
-
-    [[ -n "$token" ]] || {
-        echo "Token darf nicht leer sein."
-        return 1
-    }
-
-    echo
-    echo "=== Empfänger 1 ==="
-    read -rp "Name/Bezeichnung [Empfänger 1]: " name1
-    name1="${name1:-Empfänger 1}"
-
-    read -rsp "User/Group Key für ${name1}: " user1
-    echo
-    read -rp "Device für ${name1} (ENTER = alle Geräte): " device1
-
-    [[ -n "$user1" ]] || {
-        echo "User/Group Key für Empfänger 1 darf nicht leer sein."
-        return 1
-    }
-
-    echo
-    read -rp "Zweiten Pushover-Empfänger einrichten? [j/N]: " add_second
-    add_second="${add_second:-n}"
-
-    if [[ "$add_second" =~ ^[JjYy]$ ]]; then
-        echo
-        echo "=== Empfänger 2 ==="
-
-        read -rp "Name/Bezeichnung [Empfänger 2]: " name2
-        name2="${name2:-Empfänger 2}"
-
-        read -rsp "User/Group Key für ${name2}: " user2
-        echo
-        read -rp "Device für ${name2} (ENTER = alle Geräte): " device2
-
-        [[ -n "$user2" ]] || {
-            echo "User/Group Key für Empfänger 2 darf nicht leer sein."
-            return 1
+        [[ -s "$tmp" ]] || {
+            echo "FEHLER: NodeZero-Werkzeug ist leer: ${name}" >&2
+            exit 1
         }
+
+        mv -f "$tmp" "$cached"
+        chmod 0755 "$cached"
     fi
 
-    echo
-    echo "Teste Empfänger ..."
-
-    test_pushover_values \
-        "$token" \
-        "$user1" \
-        "$device1" \
-        "$name1" || return 1
-
-    if [[ -n "$user2" ]]; then
-        test_pushover_values \
-            "$token" \
-            "$user2" \
-            "$device2" \
-            "$name2" || return 1
-    fi
-
-    {
-        echo 'PUSHOVER_ENABLED=1'
-        printf 'PUSHOVER_APP_TOKEN=%q\n' "$token"
-
-        printf 'PUSHOVER_NAME_1=%q\n' "$name1"
-        printf 'PUSHOVER_USER_KEY_1=%q\n' "$user1"
-        printf 'PUSHOVER_DEVICE_1=%q\n' "$device1"
-
-        printf 'PUSHOVER_NAME_2=%q\n' "$name2"
-        printf 'PUSHOVER_USER_KEY_2=%q\n' "$user2"
-        printf 'PUSHOVER_DEVICE_2=%q\n' "$device2"
-    } > "$CONF"
-
-    chmod 600 "$CONF"
-
-    echo
-    echo "[OK] Pushover-Konfiguration gespeichert:"
-    echo "  $CONF"
-    echo
-    echo "Aktive Empfänger:"
-    echo "  1) $name1"
-    [[ -z "$user2" ]] || echo "  2) $name2"
-}
-
-test_configured_pushover() {
-    if [[ ! -f "$CONF" ]]; then
-        echo "Pushover ist noch nicht konfiguriert."
-        return 1
-    fi
-
-    # shellcheck disable=SC1090
-    source "$CONF"
-
-    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] || {
-        echo "Pushover ist deaktiviert."
-        return 1
+    bash -n "$cached" || {
+        echo "FEHLER: Syntaxprüfung fehlgeschlagen: ${cached}" >&2
+        exit 1
     }
 
-    local token="${PUSHOVER_APP_TOKEN:-}"
-    local user1="${PUSHOVER_USER_KEY_1:-${PUSHOVER_USER_KEY:-}}"
-    local device1="${PUSHOVER_DEVICE_1:-${PUSHOVER_DEVICE:-}}"
-    local name1="${PUSHOVER_NAME_1:-${PUSHOVER_NAME:-Empfänger 1}}"
-
-    local user2="${PUSHOVER_USER_KEY_2:-}"
-    local device2="${PUSHOVER_DEVICE_2:-}"
-    local name2="${PUSHOVER_NAME_2:-Empfänger 2}"
-
-    test_pushover_values \
-        "$token" \
-        "$user1" \
-        "$device1" \
-        "$name1" || return 1
-
-    if [[ -n "$user2" ]]; then
-        test_pushover_values \
-            "$token" \
-            "$user2" \
-            "$device2" \
-            "$name2" || return 1
-    fi
+    install -m 0755 -o root -g root "$cached" "$target"
 }
 
-show_status() {
-    echo
-    echo "Timer:"
-    systemctl status proxmox-auto-updater.timer --no-pager || true
-    echo
-    systemctl list-timers proxmox-auto-updater.timer --no-pager || true
-    echo
-
-    if [[ -f "$CONF" ]]; then
-        # shellcheck disable=SC1090
-        source "$CONF"
-
-        if [[ "${PUSHOVER_ENABLED:-0}" == "1" ]]; then
-            local user1="${PUSHOVER_USER_KEY_1:-${PUSHOVER_USER_KEY:-}}"
-            local device1="${PUSHOVER_DEVICE_1:-${PUSHOVER_DEVICE:-}}"
-            local name1="${PUSHOVER_NAME_1:-${PUSHOVER_NAME:-Empfänger 1}}"
-
-            local user2="${PUSHOVER_USER_KEY_2:-}"
-            local device2="${PUSHOVER_DEVICE_2:-}"
-            local name2="${PUSHOVER_NAME_2:-Empfänger 2}"
-
-            echo "Pushover: aktiviert"
-
-            if [[ -n "$user1" ]]; then
-                echo "Empfänger 1: $name1"
-                echo "  Device: ${device1:-alle Geräte}"
-            fi
-
-            if [[ -n "$user2" ]]; then
-                echo "Empfänger 2: $name2"
-                echo "  Device: ${device2:-alle Geräte}"
-            else
-                echo "Empfänger 2: nicht eingerichtet"
-            fi
-        else
-            echo "Pushover: deaktiviert"
-        fi
-    else
-        echo "Pushover: nicht konfiguriert"
-    fi
-}
-
-while true; do
-    echo
-    echo "============================================================"
-    echo " PROXMOX AUTO-UPDATER"
-    echo "============================================================"
-    echo
-    echo "Täglich automatisch: 05:00 Uhr"
-    echo
-    echo "1) Status anzeigen"
-    echo "2) Pushover konfigurieren / ändern"
-    echo "3) Pushover Testnachricht senden"
-    echo "4) Pushover deaktivieren"
-    echo "5) Update-Lauf JETZT starten"
-    echo "6) Letztes Update-Log anzeigen"
-    echo "0) Beenden"
-    echo
-
-    read -rp "Auswahl [1]: " choice
-    choice="${choice:-1}"
-
-    case "$choice" in
-        1)
-            show_status
-            ;;
-        2)
-            configure_pushover
-            ;;
-        3)
-            test_configured_pushover || true
-            ;;
-        4)
-            if [[ -f "$CONF" ]]; then
-                sed -i 's/^PUSHOVER_ENABLED=.*/PUSHOVER_ENABLED=0/' "$CONF"
-                chmod 600 "$CONF"
-            fi
-            echo "[OK] Pushover deaktiviert."
-            ;;
-        5)
-            "$UPDATER"
-            ;;
-        6)
-            latest="$(
-                find /var/log/proxmox-auto-updater \
-                    -maxdepth 1 -type f -name 'update-*.txt' \
-                    -printf '%T@ %p\n' 2>/dev/null |
-                sort -nr |
-                head -n1 |
-                cut -d' ' -f2-
-            )"
-
-            if [[ -n "$latest" && -f "$latest" ]]; then
-                less "$latest"
-            else
-                echo "Noch kein Update-Log vorhanden."
-            fi
-            ;;
-        0)
-            exit 0
-            ;;
-        *)
-            echo "Ungültige Auswahl."
-            ;;
-    esac
-done
-
-__CONFIG__
+install_nodezero_tool_v141 "proxmox-auto-updater-config"
+install_nodezero_tool_v141 "proxmox-pushover-config"
 
 chmod 700 \
     /usr/local/sbin/proxmox-auto-updater \
-    /usr/local/sbin/proxmox-auto-updater-config
+    /usr/local/sbin/proxmox-auto-updater-config \
+    /usr/local/sbin/proxmox-pushover-config
 
 chown root:root \
     /usr/local/sbin/proxmox-auto-updater \
-    /usr/local/sbin/proxmox-auto-updater-config
+    /usr/local/sbin/proxmox-auto-updater-config \
+    /usr/local/sbin/proxmox-pushover-config
 
 cat > /etc/systemd/system/proxmox-auto-updater.service <<'EOF'
 [Unit]
@@ -6886,7 +6633,7 @@ EOF
 
 cat > /etc/systemd/system/proxmox-auto-updater.timer <<'EOF'
 [Unit]
-Description=Proxmox Auto-Updater täglich um 05:00 Uhr
+Description=Proxmox Auto-Updater · täglicher Zeitplan konfigurierbar
 
 [Timer]
 OnCalendar=*-*-* 05:00:00
@@ -6898,6 +6645,29 @@ Unit=proxmox-auto-updater.service
 WantedBy=timers.target
 EOF
 
+# V141: Benutzerdefinierte Update-Uhrzeit bei Installer-Updates erhalten.
+SCHEDULE_CONF="/root/.config/proxmox-auto-updater/schedule.env"
+TIMER_DROPIN_DIR="/etc/systemd/system/proxmox-auto-updater.timer.d"
+TIMER_DROPIN_FILE="${TIMER_DROPIN_DIR}/schedule.conf"
+
+if [[ -f "$SCHEDULE_CONF" ]]; then
+    # shellcheck disable=SC1090
+    source "$SCHEDULE_CONF"
+
+    if [[ "${AUTO_UPDATE_TIME:-}" =~ ^([0-9]{2}):([0-9]{2})$ ]] &&
+       (( 10#${BASH_REMATCH[1]} <= 23 && 10#${BASH_REMATCH[2]} <= 59 )); then
+        install -d -m 0755 -o root -g root "$TIMER_DROPIN_DIR"
+
+        cat > "$TIMER_DROPIN_FILE" <<EOF_V141_TIMER
+[Timer]
+OnCalendar=
+OnCalendar=*-*-* ${AUTO_UPDATE_TIME}:00
+EOF_V141_TIMER
+
+        chmod 644 "$TIMER_DROPIN_FILE"
+    fi
+fi
+
 systemctl daemon-reload
 systemctl enable --now proxmox-auto-updater.timer
 
@@ -6907,13 +6677,17 @@ echo
 echo "Zeitplan:"
 systemctl list-timers proxmox-auto-updater.timer --no-pager || true
 echo
-echo "Konfiguration:"
+echo "Auto-Updater konfigurieren:"
 echo "  proxmox-auto-updater-config"
+echo
+echo "Pushover konfigurieren:"
+echo "  proxmox-pushover-config"
 echo
 echo "Manueller Lauf:"
 echo "  proxmox-auto-updater"
 echo
-echo "Pushover ist optional und zunächst deaktiviert."
+echo "Standard-Zeit: 05:00 Uhr. Die Uhrzeit kann im Auto-Updater-Menü geändert werden."
+echo "Pushover ist optional und wird über ein eigenes Menü verwaltet."
 
 __AUTO_UPDATER_INSTALLER__
 
@@ -8700,7 +8474,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V140",
+    "installer_version": "V141",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9174,7 +8948,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V140 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V141 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9298,6 +9072,11 @@ while true; do
 
     if [[ "$INSTALL_SELECTION" == "11" ]]; then
         /usr/local/sbin/proxmox-auto-updater-config
+        exit 0
+    fi
+
+    if [[ "$INSTALL_SELECTION" == "20" ]]; then
+        /usr/local/sbin/proxmox-pushover-config
         exit 0
     fi
 
@@ -20680,6 +20459,7 @@ ui_kv "Passwörter" "$PASSWORD_FILE"
 ui_kv "Übersicht" "$OVERVIEW_FILE"
 ui_kv "Passwort-Tool" "proxmox-passwoerter"
 ui_kv "Auto-Updater" "proxmox-auto-updater-config"
+ui_kv "Pushover" "proxmox-pushover-config"
 ui_kv "Setup-Profile" "Hauptmenü → 17"
 (( INSTALL_PIHOLE )) && ui_kv "Pi-hole PW" "pihole-reset-password"
 (( INSTALL_PIHOLE )) && ui_kv "Pi-hole Sprache" "pihole-language"

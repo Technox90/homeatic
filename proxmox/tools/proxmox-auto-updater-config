@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[[ ${EUID:-$(id -u)} -eq 0 ]] || {
+    echo "FEHLER: Bitte als root ausführen."
+    exit 1
+}
+
+CONF_DIR="/root/.config/proxmox-auto-updater"
+SCHEDULE_CONF="${CONF_DIR}/schedule.env"
+TIMER="proxmox-auto-updater.timer"
+DROPIN_DIR="/etc/systemd/system/${TIMER}.d"
+DROPIN_FILE="${DROPIN_DIR}/schedule.conf"
+UPDATER="/usr/local/sbin/proxmox-auto-updater"
+LOG_DIR="/var/log/proxmox-auto-updater"
+
+mkdir -p "$CONF_DIR"
+chmod 700 "$CONF_DIR"
+
+TUI_AVAILABLE=0
+if command -v whiptail >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    TUI_AVAILABLE=1
+fi
+
+BACKTITLE="Proxmox · Auto-Updater"
+
+ui_msg() {
+    local title="$1"
+    shift
+    local message="$*"
+
+    if (( TUI_AVAILABLE )); then
+        whiptail --backtitle "$BACKTITLE" --title "$title" --msgbox "$message" 15 82
+    else
+        echo
+        echo "============================================================"
+        echo " $title"
+        echo "============================================================"
+        printf '%s\n' "$message"
+    fi
+}
+
+normalize_time() {
+    local value="$1"
+    local h="" m=""
+
+    if [[ "$value" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+        h="${BASH_REMATCH[1]}"
+        m="${BASH_REMATCH[2]}"
+
+        if (( 10#$h <= 23 && 10#$m <= 59 )); then
+            printf '%02d:%02d\n' "$((10#$h))" "$((10#$m))"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+current_schedule_time() {
+    local value=""
+
+    if [[ -f "$SCHEDULE_CONF" ]]; then
+        # shellcheck disable=SC1090
+        source "$SCHEDULE_CONF"
+        value="${AUTO_UPDATE_TIME:-}"
+        if value="$(normalize_time "$value" 2>/dev/null)"; then
+            printf '%s\n' "$value"
+            return 0
+        fi
+    fi
+
+    if [[ -f "$DROPIN_FILE" ]]; then
+        value="$(
+            sed -n 's/^[[:space:]]*OnCalendar=[*]-[*]-[*][[:space:]]\([0-9][0-9]:[0-9][0-9]\):[0-9][0-9][[:space:]]*$/\1/p' "$DROPIN_FILE" |
+            tail -n1
+        )"
+        if value="$(normalize_time "$value" 2>/dev/null)"; then
+            printf '%s\n' "$value"
+            return 0
+        fi
+    fi
+
+    printf '05:00\n'
+}
+
+apply_schedule_time() {
+    local requested="$1"
+    local value=""
+
+    value="$(normalize_time "$requested" 2>/dev/null)" || {
+        ui_msg "AUTO-UPDATER · ZEITPLAN" "Ungültige Uhrzeit: $requested
+
+Bitte HH:MM verwenden, z. B. 05:00 oder 23:30."
+        return 1
+    }
+
+    install -d -m 0700 -o root -g root "$CONF_DIR"
+    install -d -m 0755 -o root -g root "$DROPIN_DIR"
+
+    printf 'AUTO_UPDATE_TIME=%q\n' "$value" > "$SCHEDULE_CONF"
+    chmod 600 "$SCHEDULE_CONF"
+
+    cat > "$DROPIN_FILE" <<EOF
+[Timer]
+OnCalendar=
+OnCalendar=*-*-* ${value}:00
+EOF
+    chmod 644 "$DROPIN_FILE"
+
+    systemctl daemon-reload
+    systemctl enable "$TIMER" >/dev/null 2>&1 || true
+    systemctl restart "$TIMER"
+
+    ui_msg "AUTO-UPDATER · ZEITPLAN" "Neue tägliche Update-Zeit gespeichert:
+
+$value Uhr
+
+Die Einstellung bleibt auch bei einem erneuten Lauf des Master-Installers erhalten."
+}
+
+change_schedule_time() {
+    local current="" value=""
+    current="$(current_schedule_time)"
+
+    if (( TUI_AVAILABLE )); then
+        value="$(
+            whiptail \
+                --backtitle "$BACKTITLE" \
+                --title "AUTO-UPDATER · UHRZEIT" \
+                --ok-button "Speichern" \
+                --cancel-button "Zurück" \
+                --inputbox "Tägliche Startzeit im Format HH:MM" 11 66 "$current" \
+                3>&1 1>&2 2>&3
+        )" || return 0
+    else
+        read -rp "Tägliche Startzeit [$current]: " value
+        value="${value:-$current}"
+    fi
+
+    apply_schedule_time "$value"
+}
+
+status_text() {
+    local current="" next_line="" active="" enabled=""
+    current="$(current_schedule_time)"
+    active="$(systemctl is-active "$TIMER" 2>/dev/null || true)"
+    enabled="$(systemctl is-enabled "$TIMER" 2>/dev/null || true)"
+    next_line="$(systemctl list-timers "$TIMER" --no-pager 2>/dev/null | awk 'NR==2 {print}' || true)"
+
+    printf 'Konfigurierte Uhrzeit: %s Uhr\nTimer aktiv: %s\nAutostart: %s\n\nNächster Lauf:\n%s\n' \
+        "$current" "${active:-unbekannt}" "${enabled:-unbekannt}" "${next_line:-nicht ermittelbar}"
+}
+
+show_status() {
+    ui_msg "AUTO-UPDATER · STATUS" "$(status_text)"
+}
+
+run_now() {
+    if (( TUI_AVAILABLE )); then
+        whiptail \
+            --backtitle "$BACKTITLE" \
+            --title "AUTO-UPDATER · JETZT STARTEN" \
+            --yes-button "Starten" \
+            --no-button "Abbrechen" \
+            --yesno "Update-Lauf jetzt manuell starten?" 10 64 || return 0
+        clear 2>/dev/null || true
+    fi
+
+    "$UPDATER"
+
+    ui_msg "AUTO-UPDATER" "Der manuelle Update-Lauf ist beendet.
+
+Logs:
+$LOG_DIR"
+}
+
+show_latest_log() {
+    local latest=""
+    latest="$(
+        find "$LOG_DIR" -maxdepth 1 -type f -name 'update-*.txt' \
+            -printf '%T@ %p\n' 2>/dev/null |
+        sort -nr |
+        head -n1 |
+        cut -d' ' -f2-
+    )"
+
+    if [[ -z "$latest" || ! -f "$latest" ]]; then
+        ui_msg "AUTO-UPDATER · LOG" "Noch kein Update-Log vorhanden."
+        return 0
+    fi
+
+    if (( TUI_AVAILABLE )); then
+        whiptail --backtitle "$BACKTITLE" --title "AUTO-UPDATER · LETZTES LOG" \
+            --scrolltext --textbox "$latest" 30 110
+    else
+        less "$latest"
+    fi
+}
+
+while true; do
+    current="$(current_schedule_time)"
+
+    if (( TUI_AVAILABLE )); then
+        choice="$(
+            whiptail \
+                --backtitle "$BACKTITLE" \
+                --title "AUTO-UPDATER" \
+                --ok-button "Auswählen" \
+                --cancel-button "Zurück" \
+                --menu "Tägliche Startzeit: ${current} Uhr" \
+                18 86 6 \
+                "1" "Status / nächsten Lauf anzeigen" \
+                "2" "Tägliche Uhrzeit ändern" \
+                "3" "Update-Lauf JETZT starten" \
+                "4" "Letztes Update-Log anzeigen" \
+                "0" "Zurück" \
+                3>&1 1>&2 2>&3
+        )" || exit 0
+    else
+        echo
+        echo "============================================================"
+        echo " PROXMOX AUTO-UPDATER"
+        echo "============================================================"
+        echo "Tägliche Startzeit: ${current} Uhr"
+        echo
+        echo "1) Status anzeigen"
+        echo "2) Tägliche Uhrzeit ändern"
+        echo "3) Update-Lauf JETZT starten"
+        echo "4) Letztes Update-Log anzeigen"
+        echo "0) Zurück"
+        read -rp "Auswahl [1]: " choice
+        choice="${choice:-1}"
+    fi
+
+    case "$choice" in
+        1) show_status ;;
+        2) change_schedule_time ;;
+        3) run_now ;;
+        4) show_latest_log ;;
+        0) exit 0 ;;
+        *) ui_msg "AUTO-UPDATER" "Ungültige Auswahl." ;;
+    esac
+done
