@@ -13,7 +13,7 @@ Dieses Repository bündelt meine Home-Assistant-, Proxmox- und Pi-hole-Konfigura
 
 Der Proxmox-Bereich enthält meinen modularen Komplett-Installer für Proxmox VE. Er kann unter anderem Home Assistant, Paperless-ngx + Ollama, Pi-hole + Unbound, NetAlertX, Uptime Kuma, Caddy, Prometheus, Grafana, PVE-UPS, EMQX und weitere Dienste installieren und konfigurieren.
 
-Aktueller Installationskandidat: **V141**
+Aktueller Installationskandidat: **V142**
 
 ### Schnellinstallation
 
@@ -145,3 +145,7 @@ Die komplette Dashboard-Installations- und Migrationslogik liegt ab V140 in `pro
 ## V141 Auto-Updater und Pushover
 
 Auto-Updater und Pushover sind jetzt getrennte Wartungsmenüs. Der Auto-Updater verwaltet Zeitplan, Status, Sofortlauf und Logs. Die tägliche Uhrzeit ist im Format `HH:MM` frei änderbar und bleibt bei Installer-Updates erhalten. Pushover besitzt ein separates TUI-Menü für Empfänger, Testnachrichten sowie Aktivieren/Deaktivieren.
+
+## V142 Navigation
+
+Beim Verlassen von **Auto-Updater** oder **Pushover** mit „Zurück“ wird der Master-Installer nicht mehr beendet. Beide Untermenüs kehren wieder in das Installer-Menü zurück.
