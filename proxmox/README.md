@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V141**
+Installationskandidat: **V142**
 
 Geplante Hauptdatei:
 
@@ -181,3 +181,8 @@ Unter **Wartung & Einstellungen** sind Auto-Updater und Pushover zwei getrennte 
 proxmox-auto-updater-config
 proxmox-pushover-config
 ```
+
+
+## Navigation-Fix V142
+
+Die Wartungspunkte **Auto-Updater** und **Pushover** kehren nach „Zurück“ wieder in den Master-Installer zurück. Die bisherigen `exit 0`-Anweisungen nach Auswahl 11 und 20 wurden durch `continue` ersetzt.
