@@ -35,6 +35,21 @@ jobs:
           bash -n proxmox/tools/proxmox-auto-updater-config
           bash -n proxmox/tools/proxmox-pushover-config
 
+      - name: V142 maintenance navigation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
+
+          for choice in ("11", "20"):
+              marker = f'if [[ "$INSTALL_SELECTION" == "{choice}" ]]; then'
+              start = text.index(marker)
+              end = text.index("\n    fi", start) + len("\n    fi")
+              block = text[start:end]
+              assert "continue" in block, f"choice {choice} must return to installer with continue"
+              assert "exit 0" not in block, f"choice {choice} must not terminate the master installer"
+          PY
+
       - name: V141 installer checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
