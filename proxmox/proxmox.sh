@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V141
+# PROXMOX MODULARER KOMPLETT-INSTALLER V142
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -56,6 +56,7 @@ set -Eeuo pipefail
 #   V139: NodeZero-Dateilayout + externes Dashboard-Quellpaket; Secrets/Downloads/Image-Cache sauber getrennt
 #   V140: vollständige Dashboard-Logik als versionsgebundenes GitHub-Modul ausgelagert
 #   V141: Auto-Updater und Pushover getrennt; Update-Uhrzeit frei änderbar; Pushover-Menü im TUI-Stil
+#   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -813,8 +814,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V141"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V141"
+TUI_TITLE="PROXMOX INSTALLER V142"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V142"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -8474,7 +8475,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V141",
+    "installer_version": "V142",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8948,7 +8949,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V141 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V142 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9071,13 +9072,17 @@ while true; do
     fi
 
     if [[ "$INSTALL_SELECTION" == "11" ]]; then
-        /usr/local/sbin/proxmox-auto-updater-config
-        exit 0
+        if ! /usr/local/sbin/proxmox-auto-updater-config; then
+            warn "Auto-Updater-Konfiguration wurde mit einem Fehler beendet."
+        fi
+        continue
     fi
 
     if [[ "$INSTALL_SELECTION" == "20" ]]; then
-        /usr/local/sbin/proxmox-pushover-config
-        exit 0
+        if ! /usr/local/sbin/proxmox-pushover-config; then
+            warn "Pushover-Konfiguration wurde mit einem Fehler beendet."
+        fi
+        continue
     fi
 
     if [[ "$INSTALL_SELECTION" == "12" ]]; then

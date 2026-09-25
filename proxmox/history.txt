@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+25.09.2026 – V142
+-----------------
+- Navigation nach Auto-Updater/Pushover korrigiert.
+- Ursache: Menüpunkt 11 und 20 haben nach dem Beenden des jeweiligen Untermenüs im Master-Installer noch `exit 0` ausgeführt.
+- Dadurch hat "Zurück" zwar das Untermenü korrekt beendet, anschließend aber den gesamten Master-Installer geschlossen.
+- Auto-Updater-Konfiguration kehrt jetzt mit `continue` in den Master-Installer zurück.
+- Pushover-Konfiguration kehrt ebenfalls mit `continue` in den Master-Installer zurück.
+- Ein Fehler in einem der beiden Unterprogramme beendet den Master-Installer ebenfalls nicht mehr; stattdessen wird eine Warnung angezeigt.
+- CI prüft ab V142 explizit, dass die Auswahlblöcke 11 und 20 `continue` enthalten und kein `exit 0`.
+
 24.09.2026 – V141
 -----------------
 - Auto-Updater und Pushover unter Wartung & Einstellungen vollständig getrennt.
