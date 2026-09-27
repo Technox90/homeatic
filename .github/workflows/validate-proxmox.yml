@@ -50,6 +50,28 @@ jobs:
               assert "exit 0" not in block, f"choice {choice} must not terminate the master installer"
           PY
 
+      - name: V143 Paperless direct NFS checks
+        run: |
+          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V143' proxmox/proxmox.sh
+          grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
+          grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
+          grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
+          grep -q 'paperless_features="nesting=1,mount=nfs;nfs4"' proxmox/proxmox.sh
+          grep -q 'RequiresMountsFor=$ct_mount' proxmox/proxmox.sh
+          grep -q 'cleanup_legacy_paperless_host_mount_v143' proxmox/proxmox.sh
+          if grep -q 'prepare_paperless_external_storage_v89' proxmox/proxmox.sh; then
+            echo "Legacy PVE-host Paperless NFS setup is still referenced"
+            exit 1
+          fi
+          if grep -q 'paperless_external_mp' proxmox/proxmox.sh; then
+            echo "Legacy Paperless mp4 bind-mount logic is still present"
+            exit 1
+          fi
+          if grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-nas"' proxmox/proxmox.sh; then
+            echo "Legacy PVE-host Paperless mountpoint is still the active default"
+            exit 1
+          fi
+
       - name: V141 installer checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh

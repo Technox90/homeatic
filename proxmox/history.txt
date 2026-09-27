@@ -1,6 +1,20 @@
 Verfolgung der Änderungen
 ==========================
 
+27.09.2026 – V143
+-----------------
+- Paperless-NAS-Ablage grundlegend auf direkten NFS-Mount im Paperless-LXC umgestellt.
+- Bei externer NAS-Ablage wird der Paperless-CT jetzt bewusst privilegiert erstellt; lokale Paperless-Installationen bleiben unprivilegiert.
+- CT-Features bei externer Ablage: nesting=1,mount=nfs;nfs4. keyctl wird nur noch beim unprivilegierten lokalen Paperless-CT verwendet.
+- Der bisherige PVE-Host-Mount /mnt/paperless-nas und der mp4-Bind-Mount nach /mnt/paperless-storage entfallen bei Neuinstallationen vollständig.
+- Der feste Mountpunkt im Paperless-CT ist /mnt/paperless-storage.
+- nfs-common wird im Paperless-CT installiert; die Synology-Freigabe wird dort über /etc/fstab als NFSv4.1 mit systemd-Automount dauerhaft eingetragen.
+- Docker erhält RequiresMountsFor=/mnt/paperless-storage, damit der Paperless-Stack nach CT-Neustarts nicht vor dem NAS-Mount startet.
+- Installation prüft die tatsächliche NFS-Quelle/FSTYPE und einen Schreibtest als UID/GID 1000.
+- Bei fehlender NFS-Berechtigung nennt der Installer ausdrücklich die Paperless-CT-IP, die auf der Synology als NFS-Client Schreibzugriff erhalten muss.
+- Alte, vom Installer erzeugte PVE-fstab-Einträge für /mnt/paperless-nas werden nach erfolgreichem direkten CT-Mount automatisch entfernt, sofern kein anderer LXC diesen Legacy-Pfad noch verwendet.
+- Keine direkte Änderung von arch oder anderen CT-Grundfeldern; die fehlerhafte Mount-Erkennung aus dem manuellen Reparaturversuch ist damit nicht Bestandteil des Installers.
+
 25.09.2026 – V142
 -----------------
 - Navigation nach Auto-Updater/Pushover korrigiert.
