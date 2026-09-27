@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V142
+# PROXMOX MODULARER KOMPLETT-INSTALLER V143
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -57,6 +57,7 @@ set -Eeuo pipefail
 #   V140: vollständige Dashboard-Logik als versionsgebundenes GitHub-Modul ausgelagert
 #   V141: Auto-Updater und Pushover getrennt; Update-Uhrzeit frei änderbar; Pushover-Menü im TUI-Stil
 #   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
+#   V143: Paperless-NAS wird bei externer Ablage direkt im Paperless-CT per NFS4 gemountet; kein PVE-Host-Mount/mp4 mehr
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -814,8 +815,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V142"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V142"
+TUI_TITLE="PROXMOX INSTALLER V143"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V143"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -8475,7 +8476,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V142",
+    "installer_version": "V143",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8949,7 +8950,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V142 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V143 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -10753,7 +10754,7 @@ OLLAMA_EMBED_MODEL=""
 PAPERLESS_EXTERNAL_STORAGE=0
 PAPERLESS_NAS_IP="192.168.178.20"
 PAPERLESS_NAS_PATH="/volume1/Rechnungen"
-PAPERLESS_NAS_MOUNT="/mnt/paperless-nas"
+PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"
 PAPERLESS_DATA_SUBDIR="data"
 PAPERLESS_MEDIA_SUBDIR="media"
 PAPERLESS_EXPORT_SUBDIR="export"
@@ -10796,7 +10797,8 @@ if (( INSTALL_PAPERLESS )); then
         PAPERLESS_EXTERNAL_STORAGE=1
         PAPERLESS_NAS_IP="$(get_value_interactive "Paperless NAS · IP/Hostname" "192.168.178.20")"
         PAPERLESS_NAS_PATH="$(get_value_interactive "Paperless NAS · NFS-Pfad" "/volume1/Rechnungen")"
-        PAPERLESS_NAS_MOUNT="$(get_value_interactive "Paperless NAS · lokaler Mountpunkt auf Proxmox" "/mnt/paperless-nas")"
+        PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"
+        info "Paperless NAS · Mountpunkt im CT: $PAPERLESS_NAS_MOUNT"
         PAPERLESS_DATA_SUBDIR="$(get_value_interactive "Paperless NAS · Unterordner Daten" "data")"
         PAPERLESS_MEDIA_SUBDIR="$(get_value_interactive "Paperless NAS · Unterordner Media" "media")"
         PAPERLESS_EXPORT_SUBDIR="$(get_value_interactive "Paperless NAS · Unterordner Export" "export")"
@@ -10804,7 +10806,7 @@ if (( INSTALL_PAPERLESS )); then
 
         [[ -n "$PAPERLESS_NAS_IP" ]] || die "Paperless NAS: IP/Hostname darf nicht leer sein."
         [[ "$PAPERLESS_NAS_PATH" == /* ]] || die "Paperless NAS: NFS-Pfad muss absolut sein (z. B. /volume1/Rechnungen)."
-        [[ "$PAPERLESS_NAS_MOUNT" == /* ]] || die "Paperless NAS: lokaler Mountpunkt muss absolut sein."
+        [[ "$PAPERLESS_NAS_MOUNT" == /* ]] || die "Paperless NAS: Mountpunkt im CT muss absolut sein."
         [[ "$PAPERLESS_NAS_PATH" != *[[:space:]]* ]] || die "Paperless NAS: NFS-Pfad darf in dieser Version keine Leerzeichen enthalten."
         [[ "$PAPERLESS_NAS_MOUNT" != *[[:space:]]* ]] || die "Paperless NAS: lokaler Mountpunkt darf keine Leerzeichen enthalten."
 
@@ -12534,107 +12536,198 @@ PY
 # PAPERLESS + OLLAMA
 # =============================================================================
 
-prepare_paperless_external_storage_v89() {
+cleanup_legacy_paperless_host_mount_v143() {
     (( PAPERLESS_EXTERNAL_STORAGE )) || return 0
 
-    header "PAPERLESS NAS-SPEICHER VORBEREITEN"
-
-    # V97: Ein unbenutztes Ceph-Repo darf die NFS-Paketinstallation nicht blockieren.
-    disable_unused_ceph_repositories_v97
-
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
-    apt-get install -y -qq nfs-common >/dev/null
-
-    mkdir -p "$PAPERLESS_NAS_MOUNT"
-
+    local legacy_mount="/mnt/paperless-nas"
     local nfs_source="${PAPERLESS_NAS_IP}:${PAPERLESS_NAS_PATH}"
-    local fstab_opts="rw,_netdev,nofail,x-systemd.automount,x-systemd.device-timeout=15s,x-systemd.mount-timeout=30s"
-    local fstab_line="${nfs_source} ${PAPERLESS_NAS_MOUNT} nfs ${fstab_opts} 0 0"
-    local fstab_tmp="/tmp/fstab.paperless.$$"
-    local fstab_backup="${BACKUP_ROOT}/fstab-before-paperless-nas-$(date +%Y%m%d-%H%M%S)"
+    local fstab_tmp=""
+    local fstab_backup=""
+    local mount_unit=""
+    local automount_unit=""
 
+    # V143: Alte Installer-Versionen haben das NAS auf dem PVE-Host gemountet
+    # und per mp4 in den Paperless-LXC gereicht. Neue Installationen mounten
+    # NFS direkt im privilegierten Paperless-CT. Legacy nur entfernen, wenn
+    # kein anderer LXC den alten Host-Pfad noch verwendet.
+    if grep -RqsF "${legacy_mount},mp=" /etc/pve/lxc 2>/dev/null; then
+        warn "Legacy-Paperless-Mount ${legacy_mount} wird noch von einer LXC-Konfiguration verwendet und bleibt auf dem PVE-Host bestehen."
+        return 0
+    fi
+
+    if ! awk -v src="$nfs_source" -v mp="$legacy_mount" '
+        NF >= 2 && $1 == src && $2 == mp { found=1 }
+        END { exit(found ? 0 : 1) }
+    ' /etc/fstab; then
+        return 0
+    fi
+
+    header "PAPERLESS LEGACY-HOST-MOUNT ENTFERNEN"
+
+    fstab_backup="${BACKUP_ROOT}/fstab-before-paperless-direct-nfs-$(date +%Y%m%d-%H%M%S)"
+    fstab_tmp="/tmp/fstab.paperless-v143.$$"
     cp -a /etc/fstab "$fstab_backup"
 
-    # Vorhandene Einträge für genau diesen Mountpunkt ersetzen.
-    awk -v mp="$PAPERLESS_NAS_MOUNT" '
-        BEGIN { OFS=" " }
-        /^[[:space:]]*#/ { print; next }
-        NF >= 2 && $2 == mp { next }
-        { print }
+    awk -v src="$nfs_source" -v mp="$legacy_mount" '
+        !(NF >= 2 && $1 == src && $2 == mp) { print }
     ' /etc/fstab > "$fstab_tmp"
 
-    printf '%s\n' "$fstab_line" >> "$fstab_tmp"
     install -m 0644 "$fstab_tmp" /etc/fstab
     rm -f "$fstab_tmp"
 
+    mount_unit="$(systemd-escape --path --suffix=mount "$legacy_mount" 2>/dev/null || true)"
+    automount_unit="$(systemd-escape --path --suffix=automount "$legacy_mount" 2>/dev/null || true)"
+
+    [[ -n "$automount_unit" ]] && systemctl stop "$automount_unit" >/dev/null 2>&1 || true
+    [[ -n "$mount_unit" ]] && systemctl stop "$mount_unit" >/dev/null 2>&1 || true
+    umount "$legacy_mount" >/dev/null 2>&1 || true
     systemctl daemon-reload
+    rmdir "$legacy_mount" >/dev/null 2>&1 || true
 
-    if mountpoint -q "$PAPERLESS_NAS_MOUNT"; then
-        local current_source=""
-        current_source="$(findmnt -n -o SOURCE --target "$PAPERLESS_NAS_MOUNT" 2>/dev/null || true)"
-        if [[ "$current_source" != "$nfs_source" ]]; then
-            umount "$PAPERLESS_NAS_MOUNT" 2>/dev/null || true
-        fi
+    ok "Alter Paperless-NFS-Mount auf dem PVE-Host entfernt."
+}
+
+prepare_paperless_external_storage_v143() {
+    (( PAPERLESS_EXTERNAL_STORAGE )) || return 0
+
+    local ctid="${1:-}"
+    local nfs_source="${PAPERLESS_NAS_IP}:${PAPERLESS_NAS_PATH}"
+    local setup_script="/tmp/paperless-direct-nfs-${ctid}.sh"
+
+    [[ "$ctid" =~ ^[0-9]+$ ]] || die "Paperless V143: ungültige CT-ID für NFS-Setup: $ctid"
+
+    header "PAPERLESS NAS DIREKT IM CT EINBINDEN"
+
+    cat > "$setup_script" <<'CTV143'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+nfs_source="$1"
+ct_mount="$2"
+data_subdir="$3"
+media_subdir="$4"
+export_subdir="$5"
+consume_subdir="$6"
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq nfs-common util-linux >/dev/null
+
+install -d -m 0755 "$ct_mount"
+
+fstab_tmp="$(mktemp)"
+awk -v src="$nfs_source" -v mp="$ct_mount" '
+    /^[[:space:]]*#/ { print; next }
+    NF >= 2 && ($1 == src || $2 == mp) { next }
+    { print }
+' /etc/fstab > "$fstab_tmp"
+
+printf '%s %s nfs4 rw,vers=4.1,_netdev,nofail,x-systemd.automount,x-systemd.device-timeout=15s,x-systemd.mount-timeout=30s,hard,timeo=600,retrans=2 0 0\n' \
+    "$nfs_source" "$ct_mount" >> "$fstab_tmp"
+
+install -m 0644 "$fstab_tmp" /etc/fstab
+rm -f "$fstab_tmp"
+
+# Docker darf nach einem CT-Neustart erst loslaufen, wenn der NAS-Pfad
+# als Mount-Abhängigkeit bekannt ist. Der erste Zugriff triggert automount.
+install -d -m 0755 /etc/systemd/system/docker.service.d
+cat > /etc/systemd/system/docker.service.d/20-paperless-nfs.conf <<EOF
+[Unit]
+RequiresMountsFor=$ct_mount
+After=network-online.target remote-fs.target
+EOF
+
+systemctl daemon-reload
+
+# Automount auslösen und maximal 30 Sekunden auf die Synology warten.
+if ! timeout 30 ls -la "$ct_mount" >/dev/null 2>&1; then
+    echo "FEHLER: NFS-Zugriff auf $nfs_source über $ct_mount fehlgeschlagen." >&2
+    exit 20
+fi
+
+actual_source="$(findmnt -rn -T "$ct_mount" -o SOURCE | tail -n1)"
+fstype="$(findmnt -rn -T "$ct_mount" -o FSTYPE | tail -n1)"
+
+[[ "$actual_source" == "$nfs_source" ]] || {
+    echo "FEHLER: Falsche NFS-Quelle: $actual_source (erwartet $nfs_source)." >&2
+    exit 21
+}
+
+[[ "$fstype" == "nfs4" || "$fstype" == "nfs" ]] || {
+    echo "FEHLER: $ct_mount ist kein NFS-Dateisystem (FSTYPE=$fstype)." >&2
+    exit 22
+}
+
+mkdir -p \
+    "$ct_mount/$data_subdir" \
+    "$ct_mount/$media_subdir" \
+    "$ct_mount/$export_subdir" \
+    "$ct_mount/$consume_subdir"
+
+testfile="$ct_mount/$consume_subdir/.paperless-direct-nfs-write-test.$$"
+if ! setpriv --reuid=1000 --regid=1000 --clear-groups \
+    sh -c 'touch "$1" && rm -f "$1"' _ "$testfile"; then
+    echo "FEHLER: UID/GID 1000 kann im direkten NFS-Mount nicht schreiben." >&2
+    exit 23
+fi
+
+echo "NFS_SOURCE=$actual_source"
+echo "NFS_FSTYPE=$fstype"
+echo "NFS_TARGET=$ct_mount"
+CTV143
+
+    chmod 0755 "$setup_script"
+    pct push "$ctid" "$setup_script" /root/paperless-direct-nfs-setup.sh
+
+    if ! pct exec "$ctid" -- bash /root/paperless-direct-nfs-setup.sh \
+        "$nfs_source" \
+        "$PAPERLESS_NAS_MOUNT" \
+        "$PAPERLESS_DATA_SUBDIR" \
+        "$PAPERLESS_MEDIA_SUBDIR" \
+        "$PAPERLESS_EXPORT_SUBDIR" \
+        "$PAPERLESS_CONSUME_SUBDIR"; then
+        rm -f "$setup_script"
+        pct exec "$ctid" -- rm -f /root/paperless-direct-nfs-setup.sh >/dev/null 2>&1 || true
+        warn "Synology NFS muss die Paperless-CT-IP ${PAPERLESS_IP} als Client mit Schreibzugriff erlauben."
+        die "Paperless NAS konnte nicht direkt im CT ${ctid} gemountet werden: ${nfs_source} -> ${PAPERLESS_NAS_MOUNT}"
     fi
 
-    if ! mountpoint -q "$PAPERLESS_NAS_MOUNT"; then
-        mount "$PAPERLESS_NAS_MOUNT" || \
-            die "Paperless NAS konnte nicht gemountet werden: ${nfs_source} -> ${PAPERLESS_NAS_MOUNT}. Prüfe NFS-Freigabe und Berechtigungen auf dem NAS."
-    fi
+    rm -f "$setup_script"
+    pct exec "$ctid" -- rm -f /root/paperless-direct-nfs-setup.sh >/dev/null 2>&1 || true
 
-    findmnt --target "$PAPERLESS_NAS_MOUNT" >/dev/null 2>&1 || \
-        die "Paperless NAS-Mount wurde nach dem Mount nicht gefunden."
+    pct exec "$ctid" -- findmnt -T "$PAPERLESS_NAS_MOUNT" || \
+        die "Paperless V143: direkter NFS-Mount im CT ist nach dem Setup nicht vorhanden."
 
-    mkdir -p \
-        "$PAPERLESS_NAS_MOUNT/$PAPERLESS_DATA_SUBDIR" \
-        "$PAPERLESS_NAS_MOUNT/$PAPERLESS_MEDIA_SUBDIR" \
-        "$PAPERLESS_NAS_MOUNT/$PAPERLESS_EXPORT_SUBDIR" \
-        "$PAPERLESS_NAS_MOUNT/$PAPERLESS_CONSUME_SUBDIR" || \
-        die "Paperless-Unterordner konnten auf dem NAS nicht angelegt werden."
+    cleanup_legacy_paperless_host_mount_v143
 
-    # In einem unprivilegierten LXC entspricht UID/GID 1000 auf Host-Seite
-    # standardmäßig 101000. Schreibtest verhindert eine Installation, die erst
-    # später beim Dokumentimport an NFS-Rechten scheitert.
-    local testfile="${PAPERLESS_NAS_MOUNT}/${PAPERLESS_CONSUME_SUBDIR}/.paperless-write-test.$$"
-    if command -v setpriv >/dev/null 2>&1; then
-        if ! setpriv --reuid=101000 --regid=101000 --clear-groups \
-            sh -c 'touch "$1" && rm -f "$1"' _ "$testfile" 2>/dev/null; then
-            warn "NAS ist gemountet, aber UID/GID 101000 kann nicht schreiben."
-            warn "Bei Synology NFS bitte die Freigabe so konfigurieren, dass der Proxmox-Host Schreibzugriff hat (Squash/Zuordnung beachten)."
-            die "Paperless NAS-Schreibtest fehlgeschlagen: $PAPERLESS_NAS_MOUNT"
-        fi
-    else
-        touch "$testfile" && rm -f "$testfile" || \
-            die "Paperless NAS ist nicht beschreibbar: $PAPERLESS_NAS_MOUNT"
-    fi
-
-    ok "Paperless NAS eingebunden: ${nfs_source}"
-    info "Daten:   ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_DATA_SUBDIR}"
-    info "Media:   ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_MEDIA_SUBDIR}"
-    info "Export:  ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_EXPORT_SUBDIR}"
-    info "Inbox: ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_CONSUME_SUBDIR}"
+    ok "Paperless NAS direkt im CT ${ctid} eingebunden: ${nfs_source}"
+    info "CT-Mount: ${PAPERLESS_NAS_MOUNT}"
+    info "Daten:    ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_DATA_SUBDIR}"
+    info "Media:    ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_MEDIA_SUBDIR}"
+    info "Export:   ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_EXPORT_SUBDIR}"
+    info "Inbox:    ${PAPERLESS_NAS_MOUNT}/${PAPERLESS_CONSUME_SUBDIR}"
 }
 
 install_paperless() {
     header "PAPERLESS-NGX + OLLAMA INSTALLIEREN"
 
     prepare_ct_cache_dirs "paperless"
-    prepare_paperless_external_storage_v89
 
-    local paperless_external_mp=()
+    local paperless_unprivileged=1
+    local paperless_features="nesting=1,keyctl=1"
+
     if (( PAPERLESS_EXTERNAL_STORAGE )); then
-        paperless_external_mp=(
-            --mp4
-            "${PAPERLESS_NAS_MOUNT},mp=/mnt/paperless-storage"
-        )
+        # V143: Ein direkter NFS-Mount benötigt einen privilegierten LXC.
+        # keyctl ist laut Proxmox nur für unprivilegierte Container vorgesehen.
+        paperless_unprivileged=0
+        paperless_features="nesting=1,mount=nfs;nfs4"
     fi
 
     pct create "$PL_ID" "$TEMPLATE_VOL" \
         --hostname paperless \
         --ostype debian \
-        --unprivileged 1 \
-        --features nesting=1,keyctl=1 \
+        --unprivileged "$paperless_unprivileged" \
+        --features "$paperless_features" \
         --cores "$PL_CORES" \
         --memory "$PL_MEMORY" \
         --swap 2048 \
@@ -12643,7 +12736,6 @@ install_paperless() {
         --mp1 "${DOCKER_IMAGE_CACHE_DIR},mp=/mnt/docker-image-cache" \
         --mp2 "${CT_APT_ARCHIVES},mp=/var/cache/apt/archives" \
         --mp3 "${CT_APT_LISTS},mp=/var/lib/apt/lists" \
-        "${paperless_external_mp[@]}" \
         --net0 "name=eth0,bridge=${BRIDGE},ip=${PAPERLESS_CIDR},gw=${GATEWAY},type=veth" \
         --nameserver "$GATEWAY" \
         --onboot 1 \
@@ -12651,7 +12743,16 @@ install_paperless() {
 
     sleep 5
 
+    if (( PAPERLESS_EXTERNAL_STORAGE )); then
+        prepare_paperless_external_storage_v143 "$PL_ID"
+    fi
+
     install_docker_in_ct "$PL_ID"
+
+    if (( PAPERLESS_EXTERNAL_STORAGE )); then
+        pct exec "$PL_ID" -- systemctl daemon-reload
+        pct exec "$PL_ID" -- systemctl restart docker
+    fi
 
     # V102: Der Compose-Arbeitsordner muss unabhängig davon existieren,
     # ob Paperless seine Daten lokal oder auf dem NAS speichert.
@@ -12664,11 +12765,11 @@ install_paperless() {
     if (( PAPERLESS_EXTERNAL_STORAGE )); then
         pct exec "$PL_ID" -- bash -lc '
             set -Eeuo pipefail
-            test -d /mnt/paperless-storage
+            findmnt -rn -T "'"$PAPERLESS_NAS_MOUNT"'" -t nfs,nfs4 >/dev/null
             command -v setpriv >/dev/null 2>&1
-            testfile="/mnt/paperless-storage/'"$PAPERLESS_CONSUME_SUBDIR"'/.paperless-lxc-write-test.$$"
+            testfile="'"$PAPERLESS_NAS_MOUNT"'/'"$PAPERLESS_CONSUME_SUBDIR"'/.paperless-lxc-write-test.$$"
             setpriv --reuid=1000 --regid=1000 --clear-groups sh -c '"'"'touch "$1" && rm -f "$1"'"'"' _ "$testfile"
-        ' || die "Paperless NAS ist im unprivilegierten LXC für UID/GID 1000 nicht beschreibbar."
+        ' || die "Paperless NAS ist im privilegierten LXC nicht direkt als NFS gemountet oder für UID/GID 1000 nicht beschreibbar."
     fi
 
     local paperless_data_path="/opt/paperless/data"
@@ -12678,10 +12779,10 @@ install_paperless() {
     local paperless_consumer_polling_interval="0"
 
     if (( PAPERLESS_EXTERNAL_STORAGE )); then
-        paperless_data_path="/mnt/paperless-storage/${PAPERLESS_DATA_SUBDIR}"
-        paperless_media_path="/mnt/paperless-storage/${PAPERLESS_MEDIA_SUBDIR}"
-        paperless_export_path="/mnt/paperless-storage/${PAPERLESS_EXPORT_SUBDIR}"
-        paperless_consume_path="/mnt/paperless-storage/${PAPERLESS_CONSUME_SUBDIR}"
+        paperless_data_path="${PAPERLESS_NAS_MOUNT}/${PAPERLESS_DATA_SUBDIR}"
+        paperless_media_path="${PAPERLESS_NAS_MOUNT}/${PAPERLESS_MEDIA_SUBDIR}"
+        paperless_export_path="${PAPERLESS_NAS_MOUNT}/${PAPERLESS_EXPORT_SUBDIR}"
+        paperless_consume_path="${PAPERLESS_NAS_MOUNT}/${PAPERLESS_CONSUME_SUBDIR}"
 
         # NFS/SMB liefern Dateisystem-Ereignisse nicht zuverlässig an inotify.
         # Paperless soll die NAS-Inbox deshalb aktiv abfragen.
@@ -20480,7 +20581,7 @@ ui_kv "Setup zuletzt" "/home/Data/proxmox-installer/last-setup.json"
 ui_kv "Setup erfolgreich" "/home/Data/proxmox-installer/last-success.json"
 ui_kv "Setup-Historie" "/home/Data/proxmox-installer/profiles/"
 ui_kv "Lokale TLS-CA" "/home/Data/proxmox-installer/tls/nodezero-local-ca.crt"
-(( INSTALL_PAPERLESS && PAPERLESS_EXTERNAL_STORAGE )) && ui_kv "Paperless NAS" "${PAPERLESS_NAS_IP}:${PAPERLESS_NAS_PATH} → ${PAPERLESS_NAS_MOUNT}"
+(( INSTALL_PAPERLESS && PAPERLESS_EXTERNAL_STORAGE )) && ui_kv "Paperless NAS" "${PAPERLESS_NAS_IP}:${PAPERLESS_NAS_PATH} → CT ${PL_ID}:${PAPERLESS_NAS_MOUNT}"
 ui_note "Setup-Profile können aus /home/Data, von beliebigen Dateipfaden oder per HTTP/HTTPS geladen werden."
 ui_note "Passwörter, Tokens und Sicherheitscodes werden nicht in Setup-Profilen gespeichert."
 ui_note "\"KOMPLETT NEU\" löscht /home/img und /home/Data nicht."
