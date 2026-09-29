@@ -425,7 +425,7 @@ EOF
           -f "$CONTROL_HASH" ||
           -d /var/lib/pve-sensor-dashboard-web ]]; then
 
-        local backup="/root/backups/pve-sensor-dashboard-backup-$(date +%Y%m%d-%H%M%S)"
+        local backup="/home/backups/pve-sensor-dashboard-backup-$(date +%Y%m%d-%H%M%S)"
         mkdir -p "$backup"
 
         [[ -d "$APP_DIR" ]] && cp -a "$APP_DIR" "$backup/app" 2>/dev/null || true
@@ -845,7 +845,7 @@ INDEX_FILE="${APP_DIR}/static/index.html"
 SERVICE_FILE="/etc/systemd/system/pve-sensor-web.service"
 WEB_DATA="/var/lib/pve-sensor-dashboard-web"
 LINKS_FILE="${WEB_DATA}/links.json"
-BACKUP="/root/backups/pve-dashboard-menu-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-menu-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP_FILE" ]] || { echo "FEHLER: $APP_FILE nicht gefunden."; exit 1; }
 [[ -f "$INDEX_FILE" ]] || { echo "FEHLER: $INDEX_FILE nicht gefunden."; exit 1; }
@@ -2341,7 +2341,7 @@ set -Eeuo pipefail
 APP_FILE="/opt/nodezero/dashboard/app.py"
 INDEX_FILE="/opt/nodezero/dashboard/static/index.html"
 LINK_TOOL="/usr/local/sbin/pve-dashboard-link"
-BACKUP="/root/backups/pve-dashboard-sort-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-sort-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP_FILE" ]] || { echo "FEHLER: $APP_FILE nicht gefunden."; exit 1; }
 [[ -f "$INDEX_FILE" ]] || { echo "FEHLER: $INDEX_FILE nicht gefunden."; exit 1; }
@@ -2914,13 +2914,13 @@ install_dashboard_router_domain_fix() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-menu-fix-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-menu-fix-${STAMP}.txt"
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-menu-fix-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-menu-fix-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-menu-fix-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-menu-fix-${STAMP}-${N}.txt"
 fi
 exec > >(tee -a "$LOGFILE") 2>&1
 
@@ -2933,7 +2933,7 @@ APP="/opt/nodezero/dashboard/app.py"
 INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 STAMP2="$(date +%Y%m%d-%H%M%S)"
-BACKUP="/root/backups/pve-dashboard-menu-v3-backup-${STAMP2}"
+BACKUP="/home/backups/pve-dashboard-menu-v3-backup-${STAMP2}"
 
 [[ -f "$APP" ]] || { echo "FEHLER: $APP nicht gefunden."; exit 1; }
 [[ -f "$INDEX" ]] || { echo "FEHLER: $INDEX nicht gefunden."; exit 1; }
@@ -3594,14 +3594,14 @@ install_dashboard_router_top_link() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-router-top-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-router-top-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-router-top-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-router-top-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-router-top-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-router-top-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -3613,7 +3613,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
-BACKUP="/root/backups/pve-dashboard-router-top-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-router-top-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
     echo "FEHLER: $INDEX nicht gefunden."
@@ -3861,14 +3861,14 @@ install_dashboard_menu_editor_v4() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-menu-editor-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-menu-editor-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-menu-editor-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-menu-editor-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-menu-editor-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-menu-editor-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -3882,7 +3882,7 @@ APP="/opt/nodezero/dashboard/app.py"
 INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 CLI="/usr/local/sbin/pve-dashboard-link"
-BACKUP="/root/backups/pve-dashboard-menu-editor-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-menu-editor-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP nicht gefunden."
@@ -5918,14 +5918,14 @@ install_dashboard_settings_v4() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-einstellungen-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-einstellungen-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-einstellungen-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-einstellungen-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-einstellungen-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-einstellungen-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -5942,7 +5942,7 @@ SUDOERS="/etc/sudoers.d/pve-sensor-dashboard"
 SETTINGS_DIR="/etc/pve-sensor-dashboard"
 SETTINGS_FILE="${SETTINGS_DIR}/ui.json"
 SETTINGS_HELPER="/usr/local/sbin/pve-dashboard-settings-helper"
-BACKUP="/root/backups/pve-dashboard-settings-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-settings-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP nicht gefunden."
@@ -8825,18 +8825,18 @@ install_dashboard_settings_hub_v42() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-einstellungen-tabs-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-einstellungen-tabs-${STAMP}.txt"
 if [[ -e "$LOGFILE" ]]; then
   N=2
-  while [[ -e "/root/diagnose/diagnose-dashboard-einstellungen-tabs-${STAMP}-${N}.txt" ]]; do N=$((N+1)); done
-  LOGFILE="/root/diagnose/diagnose-dashboard-einstellungen-tabs-${STAMP}-${N}.txt"
+  while [[ -e "/home/diagnose/diagnose-dashboard-einstellungen-tabs-${STAMP}-${N}.txt" ]]; do N=$((N+1)); done
+  LOGFILE="/home/diagnose/diagnose-dashboard-einstellungen-tabs-${STAMP}-${N}.txt"
 fi
 exec > >(tee -a "$LOGFILE") 2>&1
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo "FEHLER: Bitte als root ausführen."; exit 1; }
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
-BACKUP="/root/backups/pve-dashboard-einstellungen-tabs-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-einstellungen-tabs-backup-$(date +%Y%m%d-%H%M%S)"
 [[ -f "$INDEX" ]] || { echo "FEHLER: $INDEX fehlt."; exit 1; }
 
 echo "============================================================"
@@ -9198,14 +9198,14 @@ install_dashboard_categories_v42() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-kategorien-test-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-kategorien-test-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-kategorien-test-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-kategorien-test-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-kategorien-test-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-kategorien-test-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -9220,7 +9220,7 @@ INDEX="/opt/nodezero/dashboard/static/index.html"
 DATA_DIR="/var/lib/pve-sensor-dashboard-web"
 CATEGORY_FILE="${DATA_DIR}/categories.json"
 
-BACKUP="/root/backups/pve-dashboard-kategorien-test-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-kategorien-test-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP fehlt."
@@ -11126,14 +11126,14 @@ install_dashboard_category_assignment_v42() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-kategorie-zuordnung-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-kategorie-zuordnung-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-kategorie-zuordnung-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-kategorie-zuordnung-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-kategorie-zuordnung-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-kategorie-zuordnung-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -11144,7 +11144,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 }
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
-BACKUP="/root/backups/pve-dashboard-kategorie-zuordnung-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-kategorie-zuordnung-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
     echo "FEHLER: $INDEX fehlt."
@@ -11897,14 +11897,14 @@ install_dashboard_menu_cleanup_v42() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-feste-menuepunkte-entfernen-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-feste-menuepunkte-entfernen-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-feste-menuepunkte-entfernen-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-feste-menuepunkte-entfernen-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-feste-menuepunkte-entfernen-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-feste-menuepunkte-entfernen-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -11915,7 +11915,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 }
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
-BACKUP="/root/backups/pve-dashboard-menue-cleanup-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-menue-cleanup-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
     echo "FEHLER: $INDEX fehlt."
@@ -12173,14 +12173,14 @@ install_dashboard_default_categories_v42() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-standard-kategorien-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-standard-kategorien-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-standard-kategorien-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-standard-kategorien-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-standard-kategorien-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-standard-kategorien-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -12193,7 +12193,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 INDEX="/opt/nodezero/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 CATEGORIES="/var/lib/pve-sensor-dashboard-web/categories.json"
-BACKUP="/root/backups/pve-dashboard-standard-kategorien-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-standard-kategorien-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
     echo "FEHLER: $INDEX fehlt."
@@ -12662,14 +12662,14 @@ install_dashboard_ups_card_v53() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-usv-karte-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-usv-karte-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-usv-karte-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-usv-karte-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-usv-karte-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-usv-karte-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -12684,7 +12684,7 @@ INDEX="/opt/nodezero/dashboard/static/index.html"
 UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
 UPS_STATUS_URL="${PVE_DASHBOARD_UPS_STATUS_URL:-http://192.168.178.111/api/status}"
 
-BACKUP="/root/backups/pve-dashboard-usv-karte-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-usv-karte-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP fehlt."
@@ -13769,14 +13769,14 @@ install_dashboard_ups_settings_v55() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-usv-einstellungen-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-usv-einstellungen-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-usv-einstellungen-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-usv-einstellungen-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-usv-einstellungen-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-usv-einstellungen-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -13792,7 +13792,7 @@ WEB_DIR="/var/lib/pve-sensor-dashboard-web"
 UPS_CONFIG="${WEB_DIR}/ups-source.json"
 OLD_UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
 
-BACKUP="/root/backups/pve-dashboard-usv-einstellungen-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-usv-einstellungen-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP fehlt."
@@ -16447,14 +16447,14 @@ install_dashboard_ups_ui_fix_v56() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-usv-ui-fix-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-usv-ui-fix-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-usv-ui-fix-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-usv-ui-fix-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-usv-ui-fix-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-usv-ui-fix-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -16465,7 +16465,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 }
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
-BACKUP="/root/backups/pve-dashboard-usv-ui-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-usv-ui-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
     echo "FEHLER: $INDEX fehlt."
@@ -17180,14 +17180,14 @@ install_dashboard_settings_remember_v57() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-settings-login-usv-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-settings-login-usv-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-settings-login-usv-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-settings-login-usv-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-settings-login-usv-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-settings-login-usv-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -17200,7 +17200,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 APP="/opt/nodezero/dashboard/app.py"
 INDEX="/opt/nodezero/dashboard/static/index.html"
 SESSION_KEY="/etc/pve-sensor-dashboard/settings-session.key"
-BACKUP="/root/backups/pve-dashboard-settings-login-usv-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-settings-login-usv-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP fehlt."
@@ -18700,14 +18700,14 @@ install_dashboard_layout_editor_v71() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-layout-v71-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-layout-v71-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-layout-v71-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-layout-v71-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-layout-v71-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-layout-v71-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -18721,7 +18721,7 @@ APP="/opt/nodezero/dashboard/app.py"
 INDEX="/opt/nodezero/dashboard/static/index.html"
 WEB_DATA="/var/lib/pve-sensor-dashboard-web"
 LAYOUT_FILE="${WEB_DATA}/dashboard-layout.json"
-BACKUP="/root/backups/pve-dashboard-layout-v71-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-layout-v71-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$APP" ]] || {
     echo "FEHLER: $APP fehlt."
@@ -20296,14 +20296,14 @@ install_dashboard_pihole_settings_v78() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-dashboard-pihole-settings-v78-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-dashboard-pihole-settings-v78-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-pihole-settings-v78-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-pihole-settings-v78-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-dashboard-pihole-settings-v78-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-dashboard-pihole-settings-v78-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -20320,7 +20320,7 @@ WEB_DIR="/var/lib/pve-sensor-dashboard-web"
 CONFIG="${WEB_DIR}/pihole-source.json"
 HELPER="/usr/local/sbin/pve-dashboard-pihole-helper"
 SUDOERS="/etc/sudoers.d/pve-sensor-dashboard-pihole"
-BACKUP="/root/backups/pve-dashboard-pihole-v78-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-pihole-v78-backup-$(date +%Y%m%d-%H%M%S)"
 
 for f in "$COLLECTOR" "$APP" "$INDEX"; do
     [[ -f "$f" ]] || {
@@ -22222,16 +22222,16 @@ install_dashboard_pihole_menu_fix_v80() {
 set -Eeuo pipefail
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
-BACKUP="/root/backups/pve-dashboard-pihole-menu-v80-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-pihole-menu-v80-$(date +%Y%m%d-%H%M%S)"
 STAMP="$(date +%d-%m-%H-%M)"
-LOG="/root/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}.txt"
+LOG="/home/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}.txt"
 
 if [[ -e "$LOG" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOG="/root/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}-${N}.txt"
+    LOG="/home/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOG") 2>&1
@@ -22531,16 +22531,16 @@ install_dashboard_settings_panels_host_v81() {
 set -Eeuo pipefail
 
 INDEX="/opt/nodezero/dashboard/static/index.html"
-BACKUP="/root/backups/pve-dashboard-settings-panels-v81-$(date +%Y%m%d-%H%M%S)"
+BACKUP="/home/backups/pve-dashboard-settings-panels-v81-$(date +%Y%m%d-%H%M%S)"
 STAMP="$(date +%d-%m-%H-%M)"
-LOG="/root/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}.txt"
+LOG="/home/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}.txt"
 
 if [[ -e "$LOG" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOG="/root/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}-${N}.txt"
+    LOG="/home/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOG") 2>&1

@@ -50,9 +50,9 @@ jobs:
               assert "exit 0" not in block, f"choice {choice} must not terminate the master installer"
           PY
 
-      - name: V143 Paperless direct NFS checks
+      - name: Paperless direct NFS checks
         run: |
-          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V143' proxmox/proxmox.sh
+          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V144' proxmox/proxmox.sh
           grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
           grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
           grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
@@ -72,13 +72,37 @@ jobs:
             exit 1
           fi
 
+      - name: V144 home layout checks
+        run: |
+          grep -q 'BACKUP_ROOT="/home/backups"' proxmox/proxmox.sh
+          grep -q 'DIAGNOSE_ROOT="/home/diagnose"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
+          grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/proxmox.sh
+          grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/tools/proxmox-auto-updater-config
+          grep -q '/home/backups' proxmox/modules/dashboard.sh
+          grep -q '/home/diagnose' proxmox/modules/dashboard.sh
+          if grep -q '/root/backups' proxmox/modules/dashboard.sh; then
+            echo "Dashboard module still writes backups below /root"
+            exit 1
+          fi
+          if grep -q '/root/diagnose' proxmox/modules/dashboard.sh; then
+            echo "Dashboard module still writes diagnostics below /root"
+            exit 1
+          fi
+          grep -q '"/root/backups:$BACKUP_ROOT"' proxmox/proxmox.sh
+          grep -q '"/root/diagnose:$DIAGNOSE_ROOT"' proxmox/proxmox.sh
+          grep -q '"/root/downloads:$NODEZERO_DOWNLOAD_DIR"' proxmox/proxmox.sh
+
       - name: V141 installer checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_DOWNLOAD_DIR="/root/downloads"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="44722c61915c6bcce5b0257962a03a3774db440a"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
@@ -93,7 +117,7 @@ jobs:
           test -s dashboard/app.py
           test -s dashboard/index.html
           grep -q '"20" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
-          grep -q 'TOOLS_REF="5ee7b364e0ecb52d446a73c53aefc835087ce316"' proxmox/proxmox.sh
+          grep -q 'TOOLS_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"' proxmox/proxmox.sh
           grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
           grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
           grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config

@@ -12,7 +12,7 @@ TIMER="proxmox-auto-updater.timer"
 DROPIN_DIR="/etc/systemd/system/${TIMER}.d"
 DROPIN_FILE="${DROPIN_DIR}/schedule.conf"
 UPDATER="/usr/local/sbin/proxmox-auto-updater"
-LOG_DIR="/var/log/proxmox-auto-updater"
+LOG_DIR="/home/diagnose/proxmox-auto-updater"
 
 mkdir -p "$CONF_DIR"
 chmod 700 "$CONF_DIR"
