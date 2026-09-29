@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V143
+# PROXMOX MODULARER KOMPLETT-INSTALLER V144
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -58,6 +58,7 @@ set -Eeuo pipefail
 #   V141: Auto-Updater und Pushover getrennt; Update-Uhrzeit frei änderbar; Pushover-Menü im TUI-Stil
 #   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
 #   V143: Paperless-NAS wird bei externer Ablage direkt im Paperless-CT per NFS4 gemountet; kein PVE-Host-Mount/mp4 mehr
+#   V144: Installer-Artefakte konsistent unter /home: downloads, backups, diagnose; aktive Secrets bleiben unter /root/passwort
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -108,16 +109,16 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 # -----------------------------------------------------------------------------
-# V70 · geordnete Root-Ausgaben
+# V70/V144 · geordnete Host-Ausgaben
 # -----------------------------------------------------------------------------
-# Backups und Diagnoseberichte sollen nicht mehr direkt /root zumüllen.
-BACKUP_ROOT="/root/backups"
-DIAGNOSE_ROOT="/root/diagnose"
+# Backups, Diagnosen und Downloads liegen persistent unter /home.
+BACKUP_ROOT="/home/backups"
+DIAGNOSE_ROOT="/home/diagnose"
 
-# V139 · feste NodeZero-Dateistruktur
+# V139/V144 · feste NodeZero-Dateistruktur
 NODEZERO_SECRET_DIR="/root/passwort"
 NODEZERO_SECRET_BACKUP_DIR="/home/passwort"
-NODEZERO_DOWNLOAD_DIR="/root/downloads"
+NODEZERO_DOWNLOAD_DIR="/home/downloads"
 NODEZERO_IMAGE_DIR="/home/img"
 NODEZERO_APP_ROOT="/opt/nodezero"
 
@@ -142,6 +143,30 @@ migrate_nodezero_layout_v139() {
     install -d -m 0755 -o root -g root \
         "$NODEZERO_IMAGE_DIR" \
         "$NODEZERO_APP_ROOT"
+
+    # V144: alte Installer-Artefakte aus /root einmalig in die neue /home-Struktur
+    # übernehmen. Nur echte Verzeichnisse werden migriert; vorhandene neuere
+    # Dateien im Ziel bleiben durch cp -au erhalten.
+    local _legacy_src=""
+    local _legacy_dst=""
+    local _legacy_pair=""
+    for _legacy_pair in \
+        "/root/backups:$BACKUP_ROOT" \
+        "/root/diagnose:$DIAGNOSE_ROOT" \
+        "/root/downloads:$NODEZERO_DOWNLOAD_DIR"
+    do
+        _legacy_src="${_legacy_pair%%:*}"
+        _legacy_dst="${_legacy_pair#*:}"
+
+        if [[ -d "$_legacy_src" && ! -L "$_legacy_src" ]]; then
+            if cp -au "$_legacy_src"/. "$_legacy_dst"/ 2>/dev/null; then
+                rm -rf -- "$_legacy_src"
+                echo "  [V144] Migriert: $_legacy_src -> $_legacy_dst"
+            else
+                warn "V144: Migration von $_legacy_src nach $_legacy_dst unvollständig; Quelle bleibt erhalten."
+            fi
+        fi
+    done
 
     # Alter permanenter Image-Cache -> neuer Standardpfad.
     if [[ -d /home/Images && ! -L /home/Images ]]; then
@@ -815,8 +840,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V143"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V143"
+TUI_TITLE="PROXMOX INSTALLER V144"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V144"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1849,7 +1874,7 @@ optimal_install_reset_v100() {
     header "OPTIMALE INSTALLATION · GUEST-RESET"
 
     echo "${RED}${BOLD}V101 Optimalmodus: alle vorhandenen VMs und LXC werden jetzt ohne Rückfrage gelöscht.${RESET}"
-    echo "Erhalten bleiben: /home/img, /home/Data, /root/backups, /root/diagnose."
+    echo "Erhalten bleiben: /home/img, /home/Data, /home/backups, /home/diagnose."
     echo
 
     local id=""
@@ -1894,8 +1919,8 @@ optimal_install_reset_v100() {
 #   - Persistente Benutzer-/Installer-Daten werden NICHT gelöscht:
 #       /home/img
 #       /home/Data
-#       /root/backups
-#       /root/diagnose
+#       /home/backups
+#       /home/diagnose
 #       /root/passwort
 #       /root/pw-*.txt (Legacy)
 #
@@ -2109,7 +2134,7 @@ remove_master_host_components_v72() {
     # Auto-Updater Laufzeitdaten/Secrets entfernen.
     rm -rf \
         /var/lib/proxmox-auto-updater \
-        /var/log/proxmox-auto-updater \
+        /home/diagnose/proxmox-auto-updater \
         /root/.config/proxmox-auto-updater
 
     # Dashboard-nginx-Logs entfernen.
@@ -2205,8 +2230,8 @@ proxmox_zero_v72() {
     echo "  - Proxmox Storage-Konfiguration"
     echo "  - /home/img"
     echo "  - /home/Data inkl. Setup-Profile und Local-CA-Quelldateien"
-    echo "  - /root/backups"
-    echo "  - /root/diagnose"
+    echo "  - /home/backups"
+    echo "  - /home/diagnose"
     echo "  - /root/passwort (V107) + alte /root/pw-*.txt"
     echo
     echo "Danach wird NICHT automatisch neu installiert."
@@ -2328,8 +2353,8 @@ proxmox_zero_v72() {
     echo "Erhaltene Daten:"
     echo "  /home/img"
     echo "  /home/Data"
-    echo "  /root/backups"
-    echo "  /root/diagnose"
+    echo "  /home/backups"
+    echo "  /home/diagnose"
     echo
     echo "Reset-Backup:"
     echo "  $backup"
@@ -2363,15 +2388,15 @@ install_openrgb_manager_v74() {
     mkdir -p \
         /usr/local/sbin \
         /usr/local/lib \
-        /root/backups \
-        /root/diagnose
+        /home/backups \
+        /home/diagnose
 
     cat > "$manager" <<'__OPENRGB_MANAGER_V74__'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-BACKUP_ROOT="/root/backups"
-DIAGNOSE_ROOT="/root/diagnose"
+BACKUP_ROOT="/home/backups"
+DIAGNOSE_ROOT="/home/diagnose"
 
 OPENRGB_BIN="/usr/bin/openrgb"
 OPENRGB_SERVER_SERVICE="openrgb-proxmox-server.service"
@@ -4533,8 +4558,8 @@ fi
 }
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP="/root/backups/pihole-compose-ct${CTID}-pw-v84-${STAMP}.yml"
-mkdir -p /root/backups
+BACKUP="/home/backups/pihole-compose-ct${CTID}-pw-v84-${STAMP}.yml"
+mkdir -p /home/backups
 
 pct exec "$CTID" -- cat "$COMPOSE" > "$BACKUP"
 chmod 600 "$BACKUP"
@@ -5072,7 +5097,7 @@ install_pihole_language_tool() {
 set -Eeuo pipefail
 
 TRANSLATE_URL="https://raw.githubusercontent.com/pimanDE/translate2german/master/translate2german.sh"
-CACHE_DIR="/root/downloads/pihole-language"
+CACHE_DIR="/home/downloads/pihole-language"
 SOURCE_FILE="${CACHE_DIR}/translate2german.sh"
 CONVERTED_FILE="${CACHE_DIR}/translate2german.docker.sh"
 
@@ -5563,12 +5588,12 @@ echo "============================================================"
 echo
 
 mkdir -p \
-    /var/log/proxmox-auto-updater \
+    /home/diagnose/proxmox-auto-updater \
     /var/lib/proxmox-auto-updater \
     /root/.config/proxmox-auto-updater
 
 chmod 700 \
-    /var/log/proxmox-auto-updater \
+    /home/diagnose/proxmox-auto-updater \
     /var/lib/proxmox-auto-updater \
     /root/.config/proxmox-auto-updater
 
@@ -5589,7 +5614,7 @@ cat > /usr/local/sbin/proxmox-auto-updater <<'__UPDATER__'
 set -Eeuo pipefail
 
 LOCKFILE="/run/proxmox-auto-updater.lock"
-LOG_DIR="/var/log/proxmox-auto-updater"
+LOG_DIR="/home/diagnose/proxmox-auto-updater"
 STATE_DIR="/var/lib/proxmox-auto-updater"
 PUSH_CONF="/root/.config/proxmox-auto-updater/pushover.env"
 
@@ -5598,8 +5623,8 @@ HAOS_CACHE="${IMAGE_DIR}/haos"
 LXC_CACHE="${IMAGE_DIR}/template/cache"
 DOCKER_CACHE="${IMAGE_DIR}/docker"
 OLLAMA_CACHE="${IMAGE_DIR}/ollama"
-DOWNLOAD_CACHE="/root/downloads"
-PIHOLE_LANG_CACHE="/root/downloads/pihole-language"
+DOWNLOAD_CACHE="/home/downloads"
+PIHOLE_LANG_CACHE="/home/downloads/pihole-language"
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 chmod 700 "$LOG_DIR" "$STATE_DIR"
@@ -6569,7 +6594,7 @@ __UPDATER__
 
 TOOLS_REF="5ee7b364e0ecb52d446a73c53aefc835087ce316"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
-TOOLS_CACHE="/root/downloads/nodezero/tools/${TOOLS_REF}"
+TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
 install_nodezero_tool_v141() {
     local name="$1"
@@ -8214,7 +8239,7 @@ setup_profile_manager_v64() {
 
 Beispiele:
 /mnt/usb/proxmox-setup.json
-/root/backups/setup.json
+/home/backups/setup.json
 /home/Data/proxmox-installer/profiles/mein-profil.json" \
                         ""
                 )" || return 1
@@ -8476,7 +8501,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V143",
+    "installer_version": "V144",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8950,7 +8975,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V143 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V144 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9532,7 +9557,7 @@ OLLAMA_CACHE_DIR="${IMAGE_CACHE_DIR}/ollama"
 
 DOCKER_IMAGE_CACHE_DIR="${IMAGE_CACHE_DIR}/docker"
 APT_CACHE_DIR="${IMAGE_CACHE_DIR}/apt"
-DOWNLOAD_CACHE_DIR="/root/downloads"
+DOWNLOAD_CACHE_DIR="/home/downloads"
 
 HOST_APT_ARCHIVES="${APT_CACHE_DIR}/host/archives"
 DOCKER_GPG_CACHE="${DOCKER_IMAGE_CACHE_DIR}/docker.asc"
@@ -11844,9 +11869,9 @@ verify_web_v107() {
 # V140 · NODEZERO DASHBOARD-MODUL
 # =============================================================================
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
-# Sie wird über einen unveränderlichen Git-Commit in /root/downloads gecacht
+# Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="44722c61915c6bcce5b0257962a03a3774db440a"
+NODEZERO_MODULE_REF="7b065018b2b82c27244c19e3a93c7799e1e0284e"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
@@ -16887,8 +16912,8 @@ set -Eeuo pipefail
 }
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGDIR="/root/diagnose"
-BACKUPDIR="/root/backups"
+LOGDIR="/home/diagnose"
+BACKUPDIR="/home/backups"
 LOG="${LOGDIR}/pulse-security-repair-v87-${STAMP}.txt"
 
 mkdir -p "$LOGDIR" "$BACKUPDIR"
@@ -17250,14 +17275,14 @@ configure_pve_ups_policy_and_report_v58() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-pve-ups-konfiguration-statusbericht-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-pve-ups-konfiguration-statusbericht-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-pve-ups-konfiguration-statusbericht-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-pve-ups-konfiguration-statusbericht-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-pve-ups-konfiguration-statusbericht-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-pve-ups-konfiguration-statusbericht-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -17415,7 +17440,7 @@ pct exec "$CTID" -- test -f /etc/pve-usv/config.yaml || {
     exit 1
 }
 
-BACKUP_DIR="/root/backups/pve-ups-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP_DIR="/home/backups/pve-ups-backup-$(date +%Y%m%d-%H%M%S)"
 pct exec "$CTID" -- mkdir -p "$BACKUP_DIR"
 pct exec "$CTID" -- cp -a /etc/pve-usv/config.yaml "$BACKUP_DIR/config.yaml"
 
@@ -19180,14 +19205,14 @@ configure_pve_ups_notifications_de_v59() {
 set -Eeuo pipefail
 
 STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/diagnose/diagnose-pve-ups-benachrichtigungen-de-${STAMP}.txt"
+LOGFILE="/home/diagnose/diagnose-pve-ups-benachrichtigungen-de-${STAMP}.txt"
 
 if [[ -e "$LOGFILE" ]]; then
     N=2
-    while [[ -e "/root/diagnose/diagnose-pve-ups-benachrichtigungen-de-${STAMP}-${N}.txt" ]]; do
+    while [[ -e "/home/diagnose/diagnose-pve-ups-benachrichtigungen-de-${STAMP}-${N}.txt" ]]; do
         N=$((N + 1))
     done
-    LOGFILE="/root/diagnose/diagnose-pve-ups-benachrichtigungen-de-${STAMP}-${N}.txt"
+    LOGFILE="/home/diagnose/diagnose-pve-ups-benachrichtigungen-de-${STAMP}-${N}.txt"
 fi
 
 exec > >(tee -a "$LOGFILE") 2>&1
@@ -20573,10 +20598,11 @@ ui_section_end
 echo
 
 ui_section "Persistenz"
-ui_kv "Download-Cache" "/home/img"
+ui_kv "Downloads" "/home/downloads"
+ui_kv "Image-Cache" "/home/img"
 ui_kv "App-Daten" "/home/Data"
-ui_kv "Backups" "/root/backups/"
-ui_kv "Diagnosen" "/root/diagnose/"
+ui_kv "Backups" "/home/backups/"
+ui_kv "Diagnosen" "/home/diagnose/"
 ui_kv "Setup zuletzt" "/home/Data/proxmox-installer/last-setup.json"
 ui_kv "Setup erfolgreich" "/home/Data/proxmox-installer/last-success.json"
 ui_kv "Setup-Historie" "/home/Data/proxmox-installer/profiles/"
