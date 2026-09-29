@@ -53,7 +53,9 @@ Der Installer kümmert sich unter anderem um:
 - aktive Passwort-, Token- und Secret-Ablage unter `/root/passwort/`
 - lokale Secret-Sicherung unter `/home/passwort/`
 - permanente Installations-/Image-Caches unter `/home/img/`
-- Download-Cache unter `/root/downloads/`
+- Downloads und wiederverwendbare Artefakte unter `/home/downloads/`
+- Backups unter `/home/backups/`
+- Diagnose-/Laufprotokolle unter `/home/diagnose/`
 - Pi-hole + Unbound + Pi-hole Exporter
 - automatische Pi-hole Block-/Allowlisten
 - Prometheus-/Grafana-Monitoring
@@ -131,7 +133,9 @@ V139 trennt Secrets, Downloads, große Images und installierten Eigen-Code klar 
 ```text
 /root/passwort/          aktive Secrets
 /home/passwort/          lokale Secret-Sicherung
-/root/downloads/         Downloads und wiederverwendbare Artefakte
+/home/downloads/         Downloads und wiederverwendbare Artefakte
+/home/backups/           Konfigurations- und Reparatur-Backups
+/home/diagnose/          Diagnoseberichte und Installer-Logs
 /home/img/               HAOS/LXC/ISO/Docker/Ollama/Image-Cache
 /opt/nodezero/dashboard/ installiertes Dashboard
 ```
@@ -140,7 +144,7 @@ Die Dashboard-Basisdateien werden aus `dashboard/` versionsgebunden geladen. Alt
 
 ## V140 Dashboard-Modul
 
-Die komplette Dashboard-Installations- und Migrationslogik liegt ab V140 in `proxmox/modules/dashboard.sh`. Der Master-Installer lädt das Modul versionsgebunden nach `/root/downloads/nodezero/modules/<git-ref>/dashboard.sh` und bindet es erst danach ein. Dadurch enthält `proxmox.sh` nicht mehr zehntausende Zeilen Dashboard-HTML-/Python-/Patchlogik.
+Die komplette Dashboard-Installations- und Migrationslogik liegt ab V140 in `proxmox/modules/dashboard.sh`. Der Master-Installer lädt das Modul versionsgebunden nach `/home/downloads/nodezero/modules/<git-ref>/dashboard.sh` und bindet es erst danach ein. Dadurch enthält `proxmox.sh` nicht mehr zehntausende Zeilen Dashboard-HTML-/Python-/Patchlogik.
 
 ## V141 Auto-Updater und Pushover
 
