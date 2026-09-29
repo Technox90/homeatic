@@ -20,7 +20,7 @@ Seit **V140** wird größere Installationslogik aus dem Master-Installer ausgela
 Der Master-Installer lädt das Modul versionsgebunden nach:
 
 ```text
-/root/downloads/nodezero/modules/<git-ref>/dashboard.sh
+/home/downloads/nodezero/modules/<git-ref>/dashboard.sh
 ```
 
 und bindet es anschließend mit `source` ein.
