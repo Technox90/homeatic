@@ -29,7 +29,9 @@ proxmox.sh
 - aktive Passwort-/Token-/Secret-Dateien unter `/root/passwort/`
 - lokale Secret-Sicherung unter `/home/passwort/`
 - permanenter Image-/Container-Cache unter `/home/img/`
-- Download-Cache unter `/root/downloads/`
+- Downloads und wiederverwendbare Artefakte unter `/home/downloads/`
+- Backups unter `/home/backups/`
+- Diagnose-/Laufprotokolle unter `/home/diagnose/`
 - finale Healthchecks
 
 ## Installation
@@ -147,14 +149,16 @@ Die aktuell ausgeführte Installer-Version wird im Whiptail-Hauptmenü direkt im
 
 ## Modularisierung V139
 
-V139 trennt Installerlogik und große Dashboard-Quelldateien. `collector.py`, `app.py` und `index.html` liegen im Repository unter `dashboard/`. Der Installer lädt die zu V139 gehörenden Dateien über einen unveränderlichen Commit-Ref in `/root/downloads/dashboard/<asset-ref>/` und installiert sie nach `/opt/nodezero/dashboard/`.
+V139 trennt Installerlogik und große Dashboard-Quelldateien. `collector.py`, `app.py` und `index.html` liegen im Repository unter `dashboard/`. Der Installer lädt die zu V139 gehörenden Dateien über einen unveränderlichen Commit-Ref in `/home/downloads/dashboard/<asset-ref>/` und installiert sie nach `/opt/nodezero/dashboard/`.
 
 ### Verzeichnisstandard
 
 ```text
 /root/passwort/          aktive Passwörter, Tokens und Secrets
 /home/passwort/          lokale Sicherung dieser Secret-Dateien
-/root/downloads/         normale Downloads / GitHub-Artefakte
+/home/downloads/         normale Downloads / GitHub-Artefakte
+/home/backups/           Konfigurations- und Reparatur-Backups
+/home/diagnose/          Diagnoseberichte und Installer-Logs
 /home/img/               persistente Installationsimages und große Caches
 /opt/nodezero/            eigener installierter NodeZero-Code
 ```
@@ -170,7 +174,7 @@ Ab V140 befindet sich die komplette Dashboard-Logik in:
 proxmox/modules/dashboard.sh
 ```
 
-Der Master-Installer enthält nur noch den Modul-Loader. Das Modul wird über einen unveränderlichen Git-Commit nach `/root/downloads/nodezero/modules/<git-ref>/dashboard.sh` geladen, mit `bash -n` geprüft und anschließend per `source` eingebunden. Die separaten Dashboard-Basisdateien unter `dashboard/` bleiben bestehen.
+Der Master-Installer enthält nur noch den Modul-Loader. Das Modul wird über einen unveränderlichen Git-Commit nach `/home/downloads/nodezero/modules/<git-ref>/dashboard.sh` geladen, mit `bash -n` geprüft und anschließend per `source` eingebunden. Die separaten Dashboard-Basisdateien unter `dashboard/` bleiben bestehen.
 
 
 ## Auto-Updater / Pushover getrennt · V141
