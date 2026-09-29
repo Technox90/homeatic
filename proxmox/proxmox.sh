@@ -6592,7 +6592,7 @@ echo "Log: $LOGFILE"
 
 __UPDATER__
 
-TOOLS_REF="5ee7b364e0ecb52d446a73c53aefc835087ce316"
+TOOLS_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -11871,7 +11871,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="7b065018b2b82c27244c19e3a93c7799e1e0284e"
+NODEZERO_MODULE_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
