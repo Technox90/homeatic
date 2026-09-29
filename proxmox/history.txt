@@ -1,6 +1,24 @@
 Verfolgung der Änderungen
 ==========================
 
+29.09.2026 – V144
+-----------------
+- Installer-Verzeichnisstruktur vereinheitlicht: verwaltete Artefakte liegen künftig unter /home.
+- Neue Standardpfade:
+  * /home/downloads für Downloads und wiederverwendbare GitHub-/Tool-Artefakte,
+  * /home/backups für Konfigurations- und Reparatur-Backups,
+  * /home/diagnose für Diagnoseberichte und Installer-/Hilfstool-Logs,
+  * /home/img für Image-/Docker-/Ollama-/Template-Caches,
+  * /home/passwort für die lokale Secret-Sicherung,
+  * /root/passwort bleibt ausschließlich für aktive Passwörter/Tokens/Secrets.
+- Bestehende Verzeichnisse /root/downloads, /root/backups und /root/diagnose werden beim Start einmalig nach /home migriert und danach entfernt, sofern die Migration erfolgreich war.
+- Pi-hole-Sprachlogs landen nicht mehr direkt unter /root, sondern in /home/diagnose.
+- Auto-Updater-Logs wurden von /var/log/proxmox-auto-updater nach /home/diagnose/proxmox-auto-updater verschoben.
+- Dashboard-Modul vollständig auf /home/backups und /home/diagnose umgestellt.
+- OpenRGB-, Pulse-, PVE-UPS- und Pi-hole-Hilfswerkzeuge verwenden ebenfalls die neue /home-Struktur.
+- Modul- und Tool-Caches werden aus /home/downloads geladen.
+- Dokumentation und CI-Prüfungen auf das V144-Layout aktualisiert.
+
 27.09.2026 – V143
 -----------------
 - Paperless-NAS-Ablage grundlegend auf direkten NFS-Mount im Paperless-LXC umgestellt.
