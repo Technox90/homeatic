@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V144
+# PROXMOX MODULARER KOMPLETT-INSTALLER V145
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -59,6 +59,7 @@ set -Eeuo pipefail
 #   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
 #   V143: Paperless-NAS wird bei externer Ablage direkt im Paperless-CT per NFS4 gemountet; kein PVE-Host-Mount/mp4 mehr
 #   V144: Installer-Artefakte konsistent unter /home: downloads, backups, diagnose; aktive Secrets bleiben unter /root/passwort
+#   V145: AzuraCast-EXTRAS als Ubuntu-VM, NFS-Guard und Musik-Sync
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -840,8 +841,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V144"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V144"
+TUI_TITLE="PROXMOX INSTALLER V145"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V145"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1024,10 +1025,12 @@ tui_apps_menu_v106() {
                 --ok-button "Auswählen" \
                 --cancel-button "Zurück" \
                 --menu "Wie möchtest du Apps auswählen?" \
-                17 86 5 \
+                21 92 7 \
                 "APPS_REC" "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" \
                 "APPS"     "Apps einzeln auswählen · Checkliste" \
                 "APPS_ALL" "Alle Apps & Dienste auswählen" \
+                "AZURA" "EXTRAS · AzuraCast installieren · VM 110" \
+                "AZURAMENU" "EXTRAS · AzuraCast verwalten" \
                 "9"        "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
                 3>&1 1>&2 2>&3
         )" || return 1
@@ -1035,13 +1038,15 @@ tui_apps_menu_v106() {
         return 0
     fi
 
-    printf >&2 '\nAPPS & DIENSTE\n  1 Empfohlene Apps\n  2 Apps auswählen\n  3 Alle Apps\n  4 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [1]: '
+    printf >&2 '\nAPPS & DIENSTE\n  1 Empfohlene Apps\n  2 Apps auswählen\n  3 Alle Apps\n  4 Freie Gesamtauswahl\n  5 AzuraCast installieren\n  6 AzuraCast verwalten\n  Z Zurück\nAuswahl [1]: '
     read -r result
     case "${result:-1}" in
         1) printf 'APPS_REC' ;;
         2) printf 'APPS' ;;
         3) printf 'APPS_ALL' ;;
         4) printf '9' ;;
+        5) printf 'AZURA' ;;
+        6) printf 'AZURAMENU' ;;
         [Zz]) return 1 ;;
         *) return 1 ;;
     esac
@@ -1214,7 +1219,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 138" \
+                    --title "HAUPTMENÜ · Version 145" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -7263,6 +7268,7 @@ select_addon_components_v94() {
                 "8"  "Speedtest Tracker" OFF \
                 "9"  "Scrutiny" OFF \
                 "10" "Mealie" OFF \
+                "11" "AzuraCast · VM 110" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
@@ -7277,6 +7283,7 @@ select_addon_components_v94() {
         echo " 8) Speedtest Tracker"
         echo " 9) Scrutiny"
         echo "10) Mealie"
+        echo "11) AzuraCast Musikserver (VM 110)"
         echo
         read -rp "Zusatzanwendungen auswählen (z.B. 1,4,10; ENTER = keine): " selected
         [[ -n "$selected" ]] || return 1
@@ -7297,6 +7304,7 @@ select_addon_components_v94() {
             8)  INSTALL_SPEEDTEST=1 ;;
             9)  INSTALL_SCRUTINY=1 ;;
             10) INSTALL_MEALIE=1 ;;
+            11) INSTALL_AZURACAST=1 ;;
             *)
                 warn "Ungültige Zusatzanwendungs-Auswahl: $choice"
                 ;;
@@ -7387,6 +7395,7 @@ reset_install_flags() {
     INSTALL_SPEEDTEST=0
     INSTALL_SCRUTINY=0
     INSTALL_MEALIE=0
+    INSTALL_AZURACAST=0
 
     # Community-Scripts Erweiterungen
     INSTALL_PBS=0
@@ -7434,12 +7443,13 @@ select_apps_compact_v106() {
                 "8"  "Speedtest Tracker" ON \
                 "9"  "Scrutiny" ON \
                 "10" "Mealie" OFF \
+                "11" "AzuraCast · VM 110" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
         header "APPS & DIENSTE AUSWÄHLEN"
         echo "1 Uptime · 2 Vaultwarden · 3 Caddy · 4 Stirling · 5 ntfy"
-        echo "6 Forgejo · 7 Syncthing · 8 Speedtest · 9 Scrutiny · 10 Mealie"
+        echo "6 Forgejo · 7 Syncthing · 8 Speedtest · 9 Scrutiny · 10 Mealie · 11 AzuraCast"
         read -rp "Auswahl kommasepariert [1,3,4,8,9]: " selected
         selected="${selected:-1,3,4,8,9}"
         selected="$(printf '%s' "$selected" | tr ',' '\n')"
@@ -7459,13 +7469,14 @@ select_apps_compact_v106() {
             8)  INSTALL_SPEEDTEST=1 ;;
             9)  INSTALL_SCRUTINY=1 ;;
             10) INSTALL_MEALIE=1 ;;
+            11) INSTALL_AZURACAST=1 ;;
             *) warn "Unbekannte App-Auswahl ignoriert: $choice" ;;
         esac
     done <<<"$selected"
 
     (( INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
        INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-       INSTALL_SCRUTINY || INSTALL_MEALIE )) || return 1
+       INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_AZURACAST )) || return 1
 
     return 0
 }
@@ -8501,7 +8512,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V144",
+    "installer_version": "V145",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8975,7 +8986,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V144 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V145 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
