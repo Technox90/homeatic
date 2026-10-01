@@ -1,6 +1,19 @@
 Verfolgung der Änderungen
 ==========================
 
+02.10.2026 – V145 (Entwicklungszweig; noch nicht produktionsreif)
+----------------------------------------------------------------
+- AzuraCast als EXTRAS-Anwendung in Apps & Dienste ergänzt (Einzelinstallation, Mehrfachauswahl, APPS_ALL) sowie Wartungsmenü mit Status, NAS-Test, Medienimport, Playlist-Sync, Timer, Update, Reparatur und Logs.
+- AzuraCast optional in O - Optimale Installation vorgemerkt; reservierte VM-ID 110 und erhöhte Speicherplanung (350 GB gesamt). O erst nach vollständiger Ende-zu-Ende-Verifikation produktiv nutzen.
+- Eigenständige Ubuntu-Server-22.04-VM 110, 4 CPU / 4 GB / 64 GB, IP 192.168.178.110, SSH-Schlüssel/Cloud-Init und QEMU Guest Agent.
+- Image-Cache unter /home/img/os; SHA256SUMS-Prüfung; keine automatische Löschung vorhandener VM 110.
+- NFSv4.1-Musikbibliothek 192.168.178.20:/volume1/music wird in der VM nach /mnt/music gemountet; Docker stoppt bei fehlendem NAS-Zugriff statt auf leeres lokales Verzeichnis auszuweichen.
+- AzuraCast-Docker-Stable-Installer und ein Compose-Override für den Medienordner; Installationslogs unter /home/log/azuracast.
+- Stündlicher Medien-Scan und fünfminütiger Aufgaben-/Playlist-Timer mit flock.
+- Modulare Dateien proxmox/modules/azuracast.sh und azuracast-guest.sh, um den Masterinstaller kompakt zu halten.
+- OFFEN: Die offizielle Erstinstallation verlangt Superadmin-Anlage im Web. Es gibt keinen dokumentierten CLI-Befehl für die Kontoerstellung. Station Home, Default-Playlist, AutoDJ und vollständige Playlist-Media-Zuordnung müssen nach einem admin-autorisierten API-Test gegen die tatsächlich installierte Stable-Version ergänzt werden. Keine ungetesteten direkten SQL-Eingriffe, kein Vendor-Patching.
+- Die neue VM-/Docker-/NFS-Installation konnte noch nicht auf dem Proxmox-System ausgeführt werden; CI prüft derzeit nur Shell-Syntax und statische Integration.
+
 29.09.2026 – V144
 -----------------
 - Installer-Verzeichnisstruktur vereinheitlicht: verwaltete Artefakte liegen künftig unter /home.
