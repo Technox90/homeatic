@@ -9,6 +9,18 @@ azura_load_config() {
 }
 azura_configure_v145() {
   (( INSTALL_AZURACAST )) || return 0
+  # Existing AzuraCast installations must keep their original sizing/media
+  # configuration. Never rewrite mount credentials or persist a changed IP.
+  if qm status 110 >/dev/null 2>&1 || pct status 110 >/dev/null 2>&1; then
+    if qm config 110 2>/dev/null | grep -Fxq 'name: azuracast' &&
+       [[ -s "$(azura_config_file)" ]]; then
+      azura_load_config
+      azura_note_v145 "Bestehende VM 110: gespeicherte Konfiguration beibehalten."
+      return 0
+    fi
+    echo "VM/CT-ID 110 bereits belegt oder keine originale AzuraCast-Konfiguration gespeichert." >&2
+    return 1
+  fi
   header "AZURACAST · RESSOURCEN / MEDIENVERWALTUNG"
   AZURA_CORES="$(get_cpu_cores "AzuraCast CPU-Kerne" 4)"
   AZURA_MEMORY="$(get_ram_mb "AzuraCast RAM in GB" 4)"
