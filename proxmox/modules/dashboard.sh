@@ -23156,6 +23156,7 @@ count_install_steps() {
     (( INSTALL_SPEEDTEST )) && total=$((total + 1))
     (( INSTALL_SCRUTINY )) && total=$((total + 1))
     (( INSTALL_MEALIE )) && total=$((total + 1))
+    (( INSTALL_AZURACAST )) && total=$((total + 1))
     (( INSTALL_PBS )) && total=$((total + 1))
     (( INSTALL_PULSE )) && total=$((total + 1))
     (( INSTALL_PVEUPS )) && total=$((total + 1))

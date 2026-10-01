@@ -52,7 +52,7 @@ jobs:
 
       - name: Paperless direct NFS checks
         run: |
-          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V144' proxmox/proxmox.sh
+          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V145' proxmox/proxmox.sh
           grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
           grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
           grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
@@ -71,6 +71,112 @@ jobs:
             echo "Legacy PVE-host Paperless mountpoint is still the active default"
             exit 1
           fi
+
+      - name: AzuraCast extras module checks
+        run: |
+          bash -n proxmox/modules/azuracast.sh
+          bash -n proxmox/modules/azuracast-config.sh
+          bash -n proxmox/modules/azuracast-guest.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('proxmox/proxmox.sh').read_text()
+          guest=Path('proxmox/modules/azuracast-guest.sh').read_text()
+          host=Path('proxmox/modules/azuracast.sh').read_text()
+          dashboard=Path('proxmox/modules/dashboard.sh').read_text()
+          required={
+            'extras menu': '"AZURA" "EXTRAS · AzuraCast installieren',
+            'management menu': '"AZURAMENU" "EXTRAS · AzuraCast verwalten',
+            'standalone selection': 'AZURA)\n            INSTALL_AZURACAST=1',
+            'optimal selection': 'OPTIMAL_RESET_PENDING=1',
+            'guest storage preflight': 'INSTALL_AZURACAST',
+            'capacity': 'OPTIMAL_STACK_DISK_GB_V107',
+            'service install': 'install_azuracast_v145',
+            'link': 'dashboard_link_upsert "AzuraCast"',
+            'module loader': 'load_azuracast_module_v145',
+          }
+          for label, marker in required.items():
+              assert marker in p, label
+          assert '(( INSTALL_AZURACAST )) && total=$((total + 1))' in dashboard
+          assert 'RequiresMountsFor=$AZURA_MEDIA_MOUNT' in guest
+          assert 'nfs|smb|disk' in guest
+          assert 'azuracast-smb.credentials' in guest
+          assert 'azuracast-media.conf' in guest
+          assert 'azuracast-default-sync.timer' in guest
+          assert 'azuracast-media-check.timer' in guest
+          config=Path('proxmox/modules/azuracast-config.sh').read_text()
+          for mode in ('nfs','smb','local','disk'):
+              assert mode in config
+          assert 'get_cpu_cores' in config
+          assert 'get_ram_mb' in config
+          assert 'get_disk_gb' in config
+          assert 'azura_configure_v145' in p
+          assert 'AZURA_MEDIA_DISK_STORAGE' in p
+          assert "azura_check_id_v145" in host
+          assert "qm destroy 110" not in host
+          assert "pct destroy 110" not in host
+          PY
+
+      - name: AzuraCast menu and storage mode smoke tests
+        run: |
+          bash <<'BASH'
+          set -Eeuo pipefail
+          . proxmox/modules/azuracast-config.sh
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          azura_config_file() { echo "$tmp/config"; }
+          azura_note_v145() { :; }
+          header() { :; }
+          setup_profile_capture_value_v64() { :; }
+          qm() { return 1; }
+          pct() { return 1; }
+          pvesm() {
+            printf 'Name Type Status Total Used Available\nlocal-lvm lvmthin active 1000000 0 1000000\n'
+          }
+          get_cpu_cores() { echo 8; }
+          get_ram_mb() { echo 8192; }
+          get_disk_gb() { printf '%s\n' "$2"; }
+          get_value() {
+            if [[ "$1" == "AzuraCast IP/CIDR" ]]; then
+              echo 192.168.178.150/24
+            else
+              printf '%s\n' "$2"
+            fi
+          }
+          setup_profile_capture_value_v64() { :; }
+          whiptail() { echo "$MODE" >&2; }
+          INSTALL_AZURACAST=1
+          TUI_AVAILABLE=1
+          TUI_BACKTITLE="Proxmox test"
+          OPTIMAL_INSTALL=0
+          DISK_STORAGE=local-lvm
+          GATEWAY=192.168.178.1
+          for MODE in nfs local disk; do
+            azura_configure_v145
+            [[ "$AZURA_MEDIA_TYPE" == "$MODE" ]]
+            [[ "$AZURA_CORES" -eq 8 ]]
+            [[ "$AZURA_MEMORY" -eq 8192 ]]
+            [[ "$AZURA_DISK" -eq 64 ]]
+            [[ "$AZURA_CIDR" == 192.168.178.150/24 ]]
+            [[ -s "$tmp/config" ]]
+            case "$MODE" in
+              nfs)
+                [[ "$AZURA_MEDIA_SERVER" == 192.168.178.20 ]]
+                [[ "$AZURA_MEDIA_SHARE" == /volume1/music ]]
+                ;;
+              local)
+                [[ "$AZURA_MEDIA_MOUNT" == /var/azuracast/stations/home/media ]]
+                ;;
+              disk)
+                [[ "$AZURA_MEDIA_DISK_GB" -eq 500 ]]
+                [[ "$AZURA_MEDIA_DISK_STORAGE" == local-lvm ]]
+                ;;
+            esac
+          done
+          OPTIMAL_INSTALL=1
+          azura_configure_v145
+          [[ "$AZURA_MEDIA_TYPE" == nfs ]]
+          echo "AzuraCast media/resource selections: PASS"
+          BASH
 
       - name: V144 home layout checks
         run: |
@@ -102,7 +208,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="2e1d32da222f9207e9da124e982eb8b31e59a5ce"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh

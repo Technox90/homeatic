@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V144
+# PROXMOX MODULARER KOMPLETT-INSTALLER V145
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -59,6 +59,7 @@ set -Eeuo pipefail
 #   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
 #   V143: Paperless-NAS wird bei externer Ablage direkt im Paperless-CT per NFS4 gemountet; kein PVE-Host-Mount/mp4 mehr
 #   V144: Installer-Artefakte konsistent unter /home: downloads, backups, diagnose; aktive Secrets bleiben unter /root/passwort
+#   V145: AzuraCast-EXTRAS als Ubuntu-VM, NFS-Guard und Musik-Sync
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -840,8 +841,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V144"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V144"
+TUI_TITLE="PROXMOX INSTALLER V145"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V145"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1024,10 +1025,12 @@ tui_apps_menu_v106() {
                 --ok-button "Auswählen" \
                 --cancel-button "Zurück" \
                 --menu "Wie möchtest du Apps auswählen?" \
-                17 86 5 \
+                21 92 7 \
                 "APPS_REC" "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" \
                 "APPS"     "Apps einzeln auswählen · Checkliste" \
                 "APPS_ALL" "Alle Apps & Dienste auswählen" \
+                "AZURA" "EXTRAS · AzuraCast installieren · VM 110" \
+                "AZURAMENU" "EXTRAS · AzuraCast verwalten" \
                 "9"        "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
                 3>&1 1>&2 2>&3
         )" || return 1
@@ -1035,13 +1038,15 @@ tui_apps_menu_v106() {
         return 0
     fi
 
-    printf >&2 '\nAPPS & DIENSTE\n  1 Empfohlene Apps\n  2 Apps auswählen\n  3 Alle Apps\n  4 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [1]: '
+    printf >&2 '\nAPPS & DIENSTE\n  1 Empfohlene Apps\n  2 Apps auswählen\n  3 Alle Apps\n  4 Freie Gesamtauswahl\n  5 AzuraCast installieren\n  6 AzuraCast verwalten\n  Z Zurück\nAuswahl [1]: '
     read -r result
     case "${result:-1}" in
         1) printf 'APPS_REC' ;;
         2) printf 'APPS' ;;
         3) printf 'APPS_ALL' ;;
         4) printf '9' ;;
+        5) printf 'AZURA' ;;
+        6) printf 'AZURAMENU' ;;
         [Zz]) return 1 ;;
         *) return 1 ;;
     esac
@@ -1214,7 +1219,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 138" \
+                    --title "HAUPTMENÜ · Version 145" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -1317,6 +1322,7 @@ tui_selected_extended_text() {
     out+="  [$([[ "$INSTALL_SCRUTINY" -eq 1 ]] && echo X || echo ' ')] Scrutiny   "
     out+="[$([[ "$INSTALL_MEALIE" -eq 1 ]] && echo X || echo ' ')] Mealie\n\n"
 
+    out+="  [$([[ "$INSTALL_AZURACAST" -eq 1 ]] && echo X || echo ' ')] AzuraCast Webradio · VM 110\n\n"
     out+="BETRIEBSSYSTEM\n"
     if (( INSTALL_OS )); then
         if [[ -n "${OS_LABEL:-}" ]]; then
@@ -1380,6 +1386,7 @@ tui_extended_checklist() {
                 "14" "EXTRAS · Scrutiny" OFF \
                 "15" "EXTRAS · Mealie" OFF \
                 "16" "OPTIONAL · Betriebssystem-VM · Windows / Linux" OFF \
+                "17" "EXTRAS · AzuraCast · VM 110" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
 
@@ -1404,6 +1411,7 @@ tui_extended_checklist() {
                 14) INSTALL_SCRUTINY=1 ;;
                 15) INSTALL_MEALIE=1 ;;
                 16) INSTALL_OS=1 ;;
+                17) INSTALL_AZURACAST=1 ;;
             esac
         done <<<"$selected"
 
@@ -7218,6 +7226,7 @@ reset_addon_flags_v94() {
     INSTALL_SPEEDTEST=0
     INSTALL_SCRUTINY=0
     INSTALL_MEALIE=0
+    INSTALL_AZURACAST=0
 }
 
 reset_community_flags_v94() {
@@ -7263,6 +7272,7 @@ select_addon_components_v94() {
                 "8"  "Speedtest Tracker" OFF \
                 "9"  "Scrutiny" OFF \
                 "10" "Mealie" OFF \
+                "11" "AzuraCast · VM 110" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
@@ -7277,6 +7287,7 @@ select_addon_components_v94() {
         echo " 8) Speedtest Tracker"
         echo " 9) Scrutiny"
         echo "10) Mealie"
+        echo "11) AzuraCast Musikserver (VM 110)"
         echo
         read -rp "Zusatzanwendungen auswählen (z.B. 1,4,10; ENTER = keine): " selected
         [[ -n "$selected" ]] || return 1
@@ -7297,6 +7308,7 @@ select_addon_components_v94() {
             8)  INSTALL_SPEEDTEST=1 ;;
             9)  INSTALL_SCRUTINY=1 ;;
             10) INSTALL_MEALIE=1 ;;
+            11) INSTALL_AZURACAST=1 ;;
             *)
                 warn "Ungültige Zusatzanwendungs-Auswahl: $choice"
                 ;;
@@ -7387,6 +7399,7 @@ reset_install_flags() {
     INSTALL_SPEEDTEST=0
     INSTALL_SCRUTINY=0
     INSTALL_MEALIE=0
+    INSTALL_AZURACAST=0
 
     # Community-Scripts Erweiterungen
     INSTALL_PBS=0
@@ -7434,12 +7447,13 @@ select_apps_compact_v106() {
                 "8"  "Speedtest Tracker" ON \
                 "9"  "Scrutiny" ON \
                 "10" "Mealie" OFF \
+                "11" "AzuraCast · VM 110" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
         header "APPS & DIENSTE AUSWÄHLEN"
         echo "1 Uptime · 2 Vaultwarden · 3 Caddy · 4 Stirling · 5 ntfy"
-        echo "6 Forgejo · 7 Syncthing · 8 Speedtest · 9 Scrutiny · 10 Mealie"
+        echo "6 Forgejo · 7 Syncthing · 8 Speedtest · 9 Scrutiny · 10 Mealie · 11 AzuraCast"
         read -rp "Auswahl kommasepariert [1,3,4,8,9]: " selected
         selected="${selected:-1,3,4,8,9}"
         selected="$(printf '%s' "$selected" | tr ',' '\n')"
@@ -7459,13 +7473,14 @@ select_apps_compact_v106() {
             8)  INSTALL_SPEEDTEST=1 ;;
             9)  INSTALL_SCRUTINY=1 ;;
             10) INSTALL_MEALIE=1 ;;
+            11) INSTALL_AZURACAST=1 ;;
             *) warn "Unbekannte App-Auswahl ignoriert: $choice" ;;
         esac
     done <<<"$selected"
 
     (( INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
        INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-       INSTALL_SCRUTINY || INSTALL_MEALIE )) || return 1
+       INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_AZURACAST )) || return 1
 
     return 0
 }
@@ -7682,6 +7697,7 @@ labels = [
     ("INSTALL_PAPERLESS", "Paperless"),
     ("INSTALL_PIHOLE", "Pi-hole"),
     ("INSTALL_NETALERTX", "NetAlertX"),
+    ("INSTALL_AZURACAST", "AzuraCast"),
     ("INSTALL_OS", "OS"),
     ("INSTALL_PBS", "PBS"),
     ("INSTALL_PULSE", "Pulse"),
@@ -7831,6 +7847,7 @@ setup_profile_apply_selection_v64() {
             INSTALL_SPEEDTEST) INSTALL_SPEEDTEST="$value" ;;
             INSTALL_SCRUTINY) INSTALL_SCRUTINY="$value" ;;
             INSTALL_MEALIE) INSTALL_MEALIE="$value" ;;
+            INSTALL_AZURACAST) INSTALL_AZURACAST="$value" ;;
             INSTALL_PBS) INSTALL_PBS="$value" ;;
             INSTALL_PULSE) INSTALL_PULSE="$value" ;;
             INSTALL_PVEUPS) INSTALL_PVEUPS="$value" ;;
@@ -7894,6 +7911,7 @@ allowed = {
     "INSTALL_SPEEDTEST",
     "INSTALL_SCRUTINY",
     "INSTALL_MEALIE",
+    "INSTALL_AZURACAST",
     "INSTALL_PBS",
     "INSTALL_PULSE",
     "INSTALL_PVEUPS",
@@ -8325,6 +8343,7 @@ setup_profile_save_v64() {
         INSTALL_SPEEDTEST="${INSTALL_SPEEDTEST:-0}" \
         INSTALL_SCRUTINY="${INSTALL_SCRUTINY:-0}" \
         INSTALL_MEALIE="${INSTALL_MEALIE:-0}" \
+        INSTALL_AZURACAST="${INSTALL_AZURACAST:-0}" \
         INSTALL_PBS="${INSTALL_PBS:-0}" \
         INSTALL_PULSE="${INSTALL_PULSE:-0}" \
         INSTALL_PVEUPS="${INSTALL_PVEUPS:-0}" \
@@ -8443,6 +8462,7 @@ flags = [
     "INSTALL_SPEEDTEST",
     "INSTALL_SCRUTINY",
     "INSTALL_MEALIE",
+    "INSTALL_AZURACAST",
     "INSTALL_PBS",
     "INSTALL_PULSE",
     "INSTALL_PVEUPS",
@@ -8501,7 +8521,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V144",
+    "installer_version": "V145",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8603,7 +8623,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                INSTALL_NETALERTX || INSTALL_UPTIME || INSTALL_VAULTWARDEN ||
                INSTALL_CADDY || INSTALL_STIRLING || INSTALL_NTFY || INSTALL_FORGEJO ||
                INSTALL_SYNCTHING || INSTALL_SPEEDTEST || INSTALL_SCRUTINY ||
-               INSTALL_MEALIE || INSTALL_OS )) || {
+               INSTALL_MEALIE || INSTALL_OS || INSTALL_AZURACAST )) || {
                 tui_msgbox \
                     "KEINE AUSWAHL" \
                     "Es wurde keine Komponente ausgewählt."
@@ -8647,6 +8667,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                 INSTALL_SPEEDTEST=1
                 INSTALL_SCRUTINY=1
                 INSTALL_MEALIE=1
+                INSTALL_AZURACAST=1
                 INSTALL_OS=1
                 ;;
             B)
@@ -8667,6 +8688,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                 INSTALL_SPEEDTEST=1
                 INSTALL_SCRUTINY=1
                 INSTALL_MEALIE=1
+                INSTALL_AZURACAST=1
                 ;;
             *)
                 local choices choice
@@ -8690,6 +8712,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                         14) INSTALL_SCRUTINY=1 ;;
                         15) INSTALL_MEALIE=1 ;;
                         16) INSTALL_OS=1 ;;
+                        17) INSTALL_AZURACAST=1 ;;
                         *) die "Ungültige Komponentenauswahl: $choice" ;;
                     esac
                 done
@@ -8706,6 +8729,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
         break
     done
 
+    if (( INSTALL_AZURACAST )); then RESERVED_IDS["110"]="AzuraCast"; fi
     if (( INSTALL_VAULTWARDEN )); then
         warn "Vaultwarden benötigt für Web-Vault/Clients HTTPS."
     fi
@@ -8975,7 +8999,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V144 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V145 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9068,6 +9092,31 @@ install_proxmox_auto_updater
 
 ensure_tui
 
+AZURACAST_MODULE_REF="41eac978f156406590a5b76c99be583152487461"
+load_azuracast_module_v145() {
+    declare -F install_azuracast_v145 >/dev/null && return 0
+    local ref="$AZURACAST_MODULE_REF"
+    local path="/home/downloads/nodezero/modules/$ref/azuracast.sh"
+    install -d -m 0700 "$(dirname "$path")"
+    if [[ ! -s "$path" ]]; then
+        curl -fsSL --retry 3 --connect-timeout 15 \
+            "https://raw.githubusercontent.com/Technox90/homeatic/$ref/proxmox/modules/azuracast.sh" \
+            -o "$path.tmp" || return 1
+        mv -f "$path.tmp" "$path"
+    fi
+    bash -n "$path" || { echo "AzuraCast Modul fehlerhaft" >&2; return 1; }
+    source "$path"
+    local cfg="$(dirname "$path")/azuracast-config.sh"
+    if [[ ! -s "$cfg" ]]; then
+        curl -fsSL --retry 3 --connect-timeout 15 \
+            "https://raw.githubusercontent.com/Technox90/homeatic/$ref/proxmox/modules/azuracast-config.sh" \
+            -o "$cfg.tmp" || return 1
+        mv -f "$cfg.tmp" "$cfg"
+    fi
+    bash -n "$cfg" || { echo "AzuraCast Konfigurationsmodul fehlerhaft" >&2; return 1; }
+    source "$cfg"
+}
+
 while true; do
     if ! INSTALL_SELECTION="$(tui_main_menu)"; then
         clear 2>/dev/null || true
@@ -9151,6 +9200,12 @@ while true; do
         continue
     fi
 
+    if [[ "$INSTALL_SELECTION" == "AZURAMENU" ]]; then
+        load_azuracast_module_v145 || continue
+        azuracast_menu_v145
+        continue
+    fi
+
     reset_install_flags
 
     # V106 · kompakte thematische Kategorien. Die Funktionen setzen nur die
@@ -9166,6 +9221,7 @@ while true; do
             break
             ;;
         APPS_ALL)
+            INSTALL_AZURACAST=1
             INSTALL_UPTIME=1
             INSTALL_VAULTWARDEN=1
             INSTALL_CADDY=1
@@ -9183,6 +9239,10 @@ while true; do
                 break
             fi
             continue
+            ;;
+        AZURA)
+            INSTALL_AZURACAST=1
+            break
             ;;
         MON_REC)
             INSTALL_PULSE=1
@@ -9239,6 +9299,8 @@ while true; do
         INSTALL_PAPERLESS=1
         INSTALL_PIHOLE=1
         INSTALL_NETALERTX=1
+        INSTALL_AZURACAST=1
+        RESERVED_IDS["110"]="AzuraCast"
 
         INSTALL_UPTIME=1
         INSTALL_CADDY=1
@@ -9350,6 +9412,11 @@ while true; do
     break
 done
 
+# AzuraCast reserviert VM-ID 110 vor allen automatischen Gast-ID-Zuteilungen.
+if (( INSTALL_AZURACAST )); then
+    RESERVED_IDS["110"]="AzuraCast"
+fi
+
 # -----------------------------------------------------------------------------
 # Auswahl vor der Konfiguration bestätigen
 # -----------------------------------------------------------------------------
@@ -9377,6 +9444,7 @@ if (( TUI_AVAILABLE && ! OPTIMAL_INSTALL )); then
     (( INSTALL_SPEEDTEST )) && SELECTED_OVERVIEW+="[X] Speedtest Tracker\n"
     (( INSTALL_SCRUTINY )) && SELECTED_OVERVIEW+="[X] Scrutiny\n"
     (( INSTALL_MEALIE )) && SELECTED_OVERVIEW+="[X] Mealie\n"
+    (( INSTALL_AZURACAST )) && SELECTED_OVERVIEW+="[X] AzuraCast VM 110 · NAS-Musik\n"
     (( INSTALL_PBS )) && SELECTED_OVERVIEW+="[X] Proxmox Backup Server\n"
     (( INSTALL_PULSE )) && SELECTED_OVERVIEW+="[X] Pulse\n"
     (( INSTALL_PVEUPS )) && SELECTED_OVERVIEW+="[X] PVE-UPS\n"
@@ -9924,13 +9992,13 @@ find_cached_haos_version() {
 # -----------------------------------------------------------------------------
 
 STORAGE_RESERVE_PERCENT_V107=10
-# Fester O-Stack: HA 64 + Paperless 64 + Pi-hole 8 + NetAlertX 12 +
+# Fester O-Stack inklusive AzuraCast 64: HA 64 + Paperless 64 + Pi-hole 8 + NetAlertX 12 +
 # Uptime 12 + Caddy 8 + Stirling 16 + Speedtest 8 + Scrutiny 12 +
 # Pulse 12 + PVE-UPS 8 + Semaphore 10 + Prometheus 24 + Exporter 6 +
-# Grafana 12 + EMQX 10 = 286 GB. Mit 10 % Reserve werden 315 GB verlangt.
+# Grafana 12 + EMQX 10 + AzuraCast 64 = 350 GB. Mit 10 % Reserve 385 GB.
 OPTIMAL_STACK_DISK_GB_V107=$((
     64 + 64 + 8 + 12 + 12 + 8 + 16 + 8 +
-    12 + 12 + 8 + 10 + 24 + 6 + 12 + 10
+    12 + 12 + 8 + 10 + 24 + 6 + 12 + 10 + 64
 ))
 
 best_guest_storage_v107() {
@@ -9982,7 +10050,7 @@ validate_selected_storage_v107() {
         awk -v s="$storage" 'NR>1 && $1==s && $3=="active" {found=1} END {exit !found}' ||
         die "Storage '$storage' existiert nicht oder ist nicht aktiv."
 
-    (( ${INSTALL_HA:-0} || ${INSTALL_OS:-0} )) && need_images=1
+    (( ${INSTALL_HA:-0} || ${INSTALL_OS:-0} || ${INSTALL_AZURACAST:-0} )) && need_images=1
 
     if (( ${INSTALL_PAPERLESS:-0} || ${INSTALL_PIHOLE:-0} || ${INSTALL_NETALERTX:-0} ||
           ${INSTALL_UPTIME:-0} || ${INSTALL_VAULTWARDEN:-0} || ${INSTALL_CADDY:-0} ||
@@ -10090,6 +10158,14 @@ selected_guest_disk_sum_v107() {
     local total=0
 
     (( INSTALL_OS )) && total=$((total + OS_DISK))
+    if (( INSTALL_AZURACAST )); then
+        total=$((total + AZURA_DISK))
+        # Separate Media-Disk auf demselben Ziel-Storage mitzaehlen.
+        if [[ "$AZURA_MEDIA_TYPE" == disk &&
+              "$AZURA_MEDIA_DISK_STORAGE" == "$DISK_STORAGE" ]]; then
+            total=$((total + AZURA_MEDIA_DISK_GB))
+        fi
+    fi
     (( INSTALL_HA )) && total=$((total + HA_DISK))
     (( INSTALL_PAPERLESS )) && total=$((total + PL_DISK))
     (( INSTALL_PIHOLE )) && total=$((total + PH_DISK))
@@ -10180,6 +10256,17 @@ optimal_network_preflight_v107() {
         rm -f "$tmp"
     done
 
+    # V145: vor destruktivem O-Reset alle AzuraCast-Pflichtquellen pruefen.
+    if (( INSTALL_AZURACAST )); then
+        load_azuracast_module_v145 || die "AzuraCast Modul nicht erreichbar"
+        curl -fsSL --connect-timeout 10 --max-time 25 \
+          'https://cloud-images.ubuntu.com/releases/server/jammy/release/SHA256SUMS' \
+          -o /dev/null || die "Ubuntu Cloud-Image Checksumme nicht erreichbar"
+        curl -fsSL --connect-timeout 10 --max-time 25 \
+          'https://raw.githubusercontent.com/AzuraCast/AzuraCast/main/docker.sh' \
+          -o /dev/null || die "AzuraCast Installer nicht erreichbar"
+    fi
+
     curl -fsSL --connect-timeout 10 --max-time 25 \
         https://download.docker.com/linux/debian/gpg \
         -o /dev/null || die "Docker-Repository ist nicht erreichbar. Vor dem Löschen wird abgebrochen."
@@ -10235,10 +10322,10 @@ if (( NEED_GUESTS )); then
 
     prepare_image_cache_base
 
-    if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS ||
+    if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS || INSTALL_AZURACAST ||
           INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
           INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-          INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_PBS || INSTALL_PULSE ||
+          INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_AZURACAST || INSTALL_PBS || INSTALL_PULSE ||
           INSTALL_PVEUPS || INSTALL_SEMAPHORE || INSTALL_POCKETID ||
           INSTALL_PROMETHEUS || INSTALL_PVE_EXPORTER || INSTALL_GRAFANA ||
           INSTALL_PANGOLIN || INSTALL_NEWT || INSTALL_GATUS ||
@@ -10276,12 +10363,14 @@ fi
 # geeigneter Proxmox-Storage eingerichtet ist oder Internet/Community-Scripts
 # nicht erreichbar sind.
 if (( OPTIMAL_RESET_PENDING )); then
-    [[ "$OPTIMAL_STACK_DISK_GB_V107" -eq 286 ]] || die "Interner Fehler: Optimal-Stack-Disk-Summe ist nicht 286 GB."
+    [[ "$OPTIMAL_STACK_DISK_GB_V107" -eq 350 ]] || die "Interner Fehler: Optimal-Stack-Disk-Summe ist nicht 350 GB."
 
     storage_capacity_preflight_v107         "$DISK_STORAGE"         "$OPTIMAL_STACK_DISK_GB_V107"         "Optimal-Stack vor Guest-Reset"
 
     optimal_network_preflight_v107
     optimal_install_reset_v100
+    # Gast-ID-Sperren wurden beim Reset zurueckgesetzt.
+    (( INSTALL_AZURACAST )) && RESERVED_IDS["110"]="AzuraCast"
     OPTIMAL_RESET_PENDING=0
 
     # Nach dem Reset muss der Storage tatsächlich genügend freien PHYSISCHEN
@@ -10717,6 +10806,12 @@ configure_operating_system_v61() {
 }
 
 configure_operating_system_v61
+
+# V145: Fragen erst nach Storage-/Netzwerkauswahl; "O" nutzt Standards.
+if (( INSTALL_AZURACAST )); then
+    load_azuracast_module_v145 || die "AzuraCast-Konfigurationsmodul konnte nicht geladen werden."
+    azura_configure_v145 || die "AzuraCast-Einstellungen ungueltig oder abgebrochen."
+fi
 
 # -----------------------------------------------------------------------------
 # Home Assistant Einstellungen
@@ -11325,6 +11420,7 @@ register_service_ip() {
 (( INSTALL_HOMEPAGE )) && register_service_ip "Homepage" "$HOMEPAGE_IP"
 (( INSTALL_NPM )) && register_service_ip "Nginx Proxy Manager" "$NPM_IP"
 (( INSTALL_EMQX )) && register_service_ip "EMQX MQTT Broker" "$EMQX_IP"
+(( INSTALL_AZURACAST )) && register_service_ip "AzuraCast" "$AZURA_IP"
 
 # -----------------------------------------------------------------------------
 # Zusammenfassung
@@ -11352,6 +11448,16 @@ if (( INSTALL_OS )); then
         "Netzwerk" "$([[ -n "$OS_CIDR" ]] && echo "$OS_CIDR" || echo "DHCP / im Gast")" \
         "Methode" "$([[ "$OS_DISTRO" == "debian" || "$OS_DISTRO" == "ubuntu" ]] && echo "Cloud-Image · automatisch" || echo "ISO · VM vorbereitet")"
 fi
+
+(( INSTALL_AZURACAST )) && ui_card \
+    "AzuraCast · Musikserver" \
+    "VM-ID" "110" \
+    "IP" "$AZURA_CIDR" \
+    "CPU / RAM" "$AZURA_CORES / $((AZURA_MEMORY / 1024)) GB" \
+    "Disk" "$AZURA_DISK GB" \
+    "Musik-Speicher" "$AZURA_MEDIA_TYPE" \
+    "Mount" "$AZURA_MEDIA_MOUNT" \
+    "Web" "http://$AZURA_IP/"
 
 (( INSTALL_HA )) && ui_card \
     "Home Assistant" \
@@ -11871,7 +11977,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"
+NODEZERO_MODULE_REF="2e1d32da222f9207e9da124e982eb8b31e59a5ce"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
@@ -20117,6 +20223,17 @@ if (( NEED_GUESTS )); then
     fi
 fi
 
+# V145: Wenn die optionale Musik-Disk auf einem ANDEREN Storage liegt,
+# wird dessen freier Platz separat geprueft (auch mit 10 % Reserve).
+if (( INSTALL_AZURACAST )) &&
+   [[ "$AZURA_MEDIA_TYPE" == disk &&
+      "$AZURA_MEDIA_DISK_STORAGE" != "$DISK_STORAGE" ]]; then
+    storage_available_preflight_v107 \
+        "$AZURA_MEDIA_DISK_STORAGE" \
+        "$AZURA_MEDIA_DISK_GB" \
+        "AzuraCast separate Musik-Disk"
+fi
+
 # Zugangsdaten sind bereits VOR den eigentlichen Installationsschritten
 # persistent. Ein späterer Download-/Runtime-Fehler verliert daher keine
 # zuvor erzeugten Passwörter.
@@ -20177,6 +20294,10 @@ fi
 (( INSTALL_OS )) && run_install_step "Betriebssystem · ${OS_LABEL}" install_operating_system_v61
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
+if (( INSTALL_AZURACAST )); then
+    load_azuracast_module_v145
+    run_install_step "AzuraCast VM 110 · Docker · Musik-Speicher ($AZURA_MEDIA_TYPE)" install_azuracast_v145
+fi
 
 # V138: Bei einem reinen Dashboard-Update einen bereits vorhandenen
 # Paperless-CT nachziehen. Bei Neuinstallation prüft install_paperless() selbst.
@@ -20252,6 +20373,7 @@ fi
 (( INSTALL_SPEEDTEST )) && dashboard_link_upsert "Speedtest Tracker" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && dashboard_link_upsert "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && dashboard_link_upsert "Mealie" "https://${MEALIE_IP}/"
+(( INSTALL_AZURACAST )) && dashboard_link_upsert "AzuraCast" "http://$AZURA_IP/"
 (( INSTALL_PBS )) && dashboard_link_upsert "Proxmox Backup Server" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && dashboard_link_upsert "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && dashboard_link_upsert "PVE-UPS" "https://${PVEUPS_IP}/"
@@ -20419,6 +20541,22 @@ OVERVIEW_FILE="/root/PROXMOX-MODULAR-INSTALL-CREDENTIALS.txt"
         echo
     fi
 
+    if (( INSTALL_AZURACAST )); then
+        echo "=================================================="
+        echo "AzuraCast"
+        echo "=================================================="
+        echo "VM: 110 / $AZURA_CIDR · $AZURA_CORES CPU · $AZURA_MEMORY MB RAM"
+        echo "Disk: $AZURA_DISK GB · Musik: $AZURA_MEDIA_TYPE"
+        if [[ "$AZURA_MEDIA_TYPE" == nfs || "$AZURA_MEDIA_TYPE" == smb ]]; then
+            echo "Netzwerk: $AZURA_MEDIA_SERVER:$AZURA_MEDIA_SHARE"
+        fi
+        echo "Mount: $AZURA_MEDIA_MOUNT"
+        echo "URL: http://$AZURA_IP/"
+        echo "Status/Medien/Timer: Apps & Dienste → AzuraCast verwalten"
+        echo "Erstkonfiguration (Admin, Station, default): API-/Setup-Pruefung notwendig"
+        echo
+    fi
+
     if (( INSTALL_HA )); then
         echo "=================================================="
         echo "Home Assistant"
@@ -20567,6 +20705,7 @@ ui_section "Weboberflächen"
 (( INSTALL_SPEEDTEST )) && ui_kv "Speedtest" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && ui_kv "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && ui_kv "Mealie" "https://${MEALIE_IP}/"
+(( INSTALL_AZURACAST )) && ui_kv "AzuraCast" "http://$AZURA_IP/"
 (( INSTALL_PBS )) && ui_kv "PBS" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && ui_kv "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && ui_kv "PVE-UPS" "https://${PVEUPS_IP}/ · HTTP → HTTPS"
