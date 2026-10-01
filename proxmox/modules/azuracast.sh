@@ -35,9 +35,10 @@ azura_cloud_image_v145() {
   echo "$expected  $img" | sha256sum -c - >/dev/null
 }
 azura_ssh_v145() {
+  azura_load_config
   ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
    -o ConnectTimeout=10 -i /root/passwort/azuracast-110-ed25519 \
-   azura@192.168.178.110 "$@"
+   "azura@$AZURA_IP" "$@"
 }
 azura_wait_v145() {
   local attempt
@@ -86,18 +87,21 @@ runcmd:
 EOF
   chmod 0600 /home/img/snippets/azuracast-110-user.yaml
   qm create 110 --name azuracast --ostype l26 --machine q35 --cpu host \
-    --cores 4 --memory 4096 --balloon 0 --scsihw virtio-scsi-single \
+    --cores "$AZURA_CORES" --memory "$AZURA_MEMORY" --balloon 0 --scsihw virtio-scsi-single \
     --net0 "virtio,bridge=$BRIDGE" --agent enabled=1 \
     --serial0 socket --vga serial0 --onboot 1
   qm disk import 110 /home/img/os/ubuntu-22.04-server-cloudimg-amd64.img "$DISK_STORAGE" || return 1
   unused="$(qm config 110|awk -F': ' '/^unused0:/{print $2;exit}')"
   [[ -n "$unused" ]] || return 1
   qm set 110 --scsi0 "$unused,discard=on,ssd=1,iothread=1"
-  qm resize 110 scsi0 64G
+  qm resize 110 scsi0 "$AZURA_DISK"G
   qm set 110 --ide2 "$DISK_STORAGE:cloudinit" \
-    --cicustom 'user=image-cache:snippets/azuracast-110-user.yaml' \
-    --ipconfig0 "ip=192.168.178.110/24,gw=$GATEWAY" \
-    --nameserver 192.168.178.1 --boot 'order=scsi0'
+    --cicustom "user=$IMAGE_CACHE_STORAGE:snippets/azuracast-110-user.yaml" \
+    --ipconfig0 "ip=$AZURA_CIDR,gw=$AZURA_GATEWAY" \
+    --nameserver "$AZURA_DNS" --boot 'order=scsi0'
+  if [[ "$AZURA_MEDIA_TYPE" == disk ]]; then
+    qm set 110 --scsi1 "$AZURA_MEDIA_DISK_STORAGE:$AZURA_MEDIA_DISK_GB,discard=on,ssd=1" || return 1
+  fi
   qm start 110
 }
 azura_guest_tool_v145() {
@@ -133,10 +137,11 @@ install_azuracast_v145() {
   install -d -m 0700 /home/log/azuracast
   azura_create_vm_v145 || return 1
   azura_wait_v145 || return 1
+  azura_send_media_config_v145 || return 1
   azura_guest_tool_v145 || return 1
   azura_action_v145 install > >(tee -a /home/log/azuracast/install.log) \
      2> >(tee -a /home/log/azuracast/error.log >&2) || return 1
-  azura_note_v145 "Basis-VM, Docker, NAS, Timer bereit unter http://192.168.178.110"
+  azura_note_v145 "Basis-VM, Docker, Medien, Timer bereit unter http://$AZURA_IP"
   azura_note_v145 "Admin-Initialisierung und Playlist-Mapping werden erst nach gueltigen API-Rechten/Schemacheck freigegeben."
 }
 azuracast_menu_v145() {
@@ -164,7 +169,7 @@ azuracast_menu_v145() {
       7) azura_action_v145 update || true ;;
       8) azura_action_v145 repair || true ;;
       9) azura_action_v145 logs || true ;;
-      10) azura_wait_v145 && azura_guest_tool_v145 && azura_action_v145 install || true ;;
+      10) azura_wait_v145 && azura_send_media_config_v145 && azura_guest_tool_v145 && azura_action_v145 install || true ;;
       Z|z) return 0 ;;
       *) echo 'Ungueltige Auswahl.' ;;
     esac
