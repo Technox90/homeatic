@@ -41,6 +41,12 @@ media_prepare() {
   mkdir -p /etc/nodezero /etc/systemd/system/docker.service.d
   if [[ "$AZURA_MEDIA_TYPE" == local ]]; then
     mkdir -p /var/azuracast/stations/home/media
+    cat >/usr/local/sbin/azuracast-check-media <<'CHECK'
+#!/bin/bash
+set -Eeuo pipefail
+[[ -d /var/azuracast/stations/home/media ]]
+CHECK
+    chmod 0755 /usr/local/sbin/azuracast-check-media
     return 0
   fi
   [[ "$AZURA_MEDIA_MOUNT" == /mnt/* && "$AZURA_MEDIA_MOUNT" != *..* &&
