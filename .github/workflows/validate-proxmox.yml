@@ -143,7 +143,7 @@ jobs:
             fi
           }
           setup_profile_capture_value_v64() { :; }
-          whiptail() { echo "$MODE"; }
+          whiptail() { echo "$MODE" >&2; }
           INSTALL_AZURACAST=1
           TUI_AVAILABLE=1
           TUI_BACKTITLE="Proxmox test"
