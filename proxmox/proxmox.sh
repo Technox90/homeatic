@@ -7697,7 +7697,9 @@ labels = [
     ("INSTALL_PAPERLESS", "Paperless"),
     ("INSTALL_PIHOLE", "Pi-hole"),
     ("INSTALL_NETALERTX", "NetAlertX"),
+    ("INSTALL_AZURACAST", "AzuraCast"),
     ("INSTALL_OS", "OS"),
+    ("INSTALL_AZURACAST", "AzuraCast"),
     ("INSTALL_PBS", "PBS"),
     ("INSTALL_PULSE", "Pulse"),
     ("INSTALL_PVEUPS", "PVE-UPS"),
@@ -7846,6 +7848,7 @@ setup_profile_apply_selection_v64() {
             INSTALL_SPEEDTEST) INSTALL_SPEEDTEST="$value" ;;
             INSTALL_SCRUTINY) INSTALL_SCRUTINY="$value" ;;
             INSTALL_MEALIE) INSTALL_MEALIE="$value" ;;
+            INSTALL_AZURACAST) INSTALL_AZURACAST="$value" ;;
             INSTALL_PBS) INSTALL_PBS="$value" ;;
             INSTALL_PULSE) INSTALL_PULSE="$value" ;;
             INSTALL_PVEUPS) INSTALL_PVEUPS="$value" ;;
@@ -7909,6 +7912,7 @@ allowed = {
     "INSTALL_SPEEDTEST",
     "INSTALL_SCRUTINY",
     "INSTALL_MEALIE",
+    "INSTALL_AZURACAST",
     "INSTALL_PBS",
     "INSTALL_PULSE",
     "INSTALL_PVEUPS",
@@ -8340,6 +8344,7 @@ setup_profile_save_v64() {
         INSTALL_SPEEDTEST="${INSTALL_SPEEDTEST:-0}" \
         INSTALL_SCRUTINY="${INSTALL_SCRUTINY:-0}" \
         INSTALL_MEALIE="${INSTALL_MEALIE:-0}" \
+        INSTALL_AZURACAST="${INSTALL_AZURACAST:-0}" \
         INSTALL_PBS="${INSTALL_PBS:-0}" \
         INSTALL_PULSE="${INSTALL_PULSE:-0}" \
         INSTALL_PVEUPS="${INSTALL_PVEUPS:-0}" \
@@ -8458,6 +8463,7 @@ flags = [
     "INSTALL_SPEEDTEST",
     "INSTALL_SCRUTINY",
     "INSTALL_MEALIE",
+    "INSTALL_AZURACAST",
     "INSTALL_PBS",
     "INSTALL_PULSE",
     "INSTALL_PVEUPS",
@@ -8618,7 +8624,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                INSTALL_NETALERTX || INSTALL_UPTIME || INSTALL_VAULTWARDEN ||
                INSTALL_CADDY || INSTALL_STIRLING || INSTALL_NTFY || INSTALL_FORGEJO ||
                INSTALL_SYNCTHING || INSTALL_SPEEDTEST || INSTALL_SCRUTINY ||
-               INSTALL_MEALIE || INSTALL_OS )) || {
+               INSTALL_MEALIE || INSTALL_OS || INSTALL_AZURACAST )) || {
                 tui_msgbox \
                     "KEINE AUSWAHL" \
                     "Es wurde keine Komponente ausgewählt."
@@ -8724,6 +8730,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
         break
     done
 
+    if (( INSTALL_AZURACAST )); then RESERVED_IDS["110"]="AzuraCast"; fi
     if (( INSTALL_VAULTWARDEN )); then
         warn "Vaultwarden benötigt für Web-Vault/Clients HTTPS."
     fi
@@ -9085,6 +9092,22 @@ ensure_no_subscription_after_zero_v72
 install_proxmox_auto_updater
 
 ensure_tui
+
+AZURACAST_MODULE_REF="1f411acd34c495c596fb02f37beea0befc8dc260"
+load_azuracast_module_v145() {
+    declare -F install_azuracast_v145 >/dev/null && return 0
+    local ref="$AZURACAST_MODULE_REF"
+    local path="/home/downloads/nodezero/modules/$ref/azuracast.sh"
+    install -d -m 0700 "$(dirname "$path")"
+    if [[ ! -s "$path" ]]; then
+        curl -fsSL --retry 3 --connect-timeout 15 \
+            "https://raw.githubusercontent.com/Technox90/homeatic/$ref/proxmox/modules/azuracast.sh" \
+            -o "$path.tmp" || return 1
+        mv -f "$path.tmp" "$path"
+    fi
+    bash -n "$path" || { echo "AzuraCast Modul fehlerhaft" >&2; return 1; }
+    source "$path"
+}
 
 while true; do
     if ! INSTALL_SELECTION="$(tui_main_menu)"; then
@@ -10019,7 +10042,7 @@ validate_selected_storage_v107() {
         awk -v s="$storage" 'NR>1 && $1==s && $3=="active" {found=1} END {exit !found}' ||
         die "Storage '$storage' existiert nicht oder ist nicht aktiv."
 
-    (( ${INSTALL_HA:-0} || ${INSTALL_OS:-0} )) && need_images=1
+    (( ${INSTALL_HA:-0} || ${INSTALL_OS:-0} || ${INSTALL_AZURACAST:-0} )) && need_images=1
 
     if (( ${INSTALL_PAPERLESS:-0} || ${INSTALL_PIHOLE:-0} || ${INSTALL_NETALERTX:-0} ||
           ${INSTALL_UPTIME:-0} || ${INSTALL_VAULTWARDEN:-0} || ${INSTALL_CADDY:-0} ||
@@ -10217,6 +10240,17 @@ optimal_network_preflight_v107() {
         fi
         rm -f "$tmp"
     done
+
+    # V145: vor destruktivem O-Reset alle AzuraCast-Pflichtquellen pruefen.
+    if (( INSTALL_AZURACAST )); then
+        load_azuracast_module_v145 || die "AzuraCast Modul nicht erreichbar"
+        curl -fsSL --connect-timeout 10 --max-time 25 \
+          'https://cloud-images.ubuntu.com/releases/server/jammy/release/SHA256SUMS' \
+          -o /dev/null || die "Ubuntu Cloud-Image Checksumme nicht erreichbar"
+        curl -fsSL --connect-timeout 10 --max-time 25 \
+          'https://raw.githubusercontent.com/AzuraCast/AzuraCast/main/docker.sh' \
+          -o /dev/null || die "AzuraCast Installer nicht erreichbar"
+    fi
 
     curl -fsSL --connect-timeout 10 --max-time 25 \
         https://download.docker.com/linux/debian/gpg \
@@ -11391,6 +11425,15 @@ if (( INSTALL_OS )); then
         "Netzwerk" "$([[ -n "$OS_CIDR" ]] && echo "$OS_CIDR" || echo "DHCP / im Gast")" \
         "Methode" "$([[ "$OS_DISTRO" == "debian" || "$OS_DISTRO" == "ubuntu" ]] && echo "Cloud-Image · automatisch" || echo "ISO · VM vorbereitet")"
 fi
+
+(( INSTALL_AZURACAST )) && ui_card \
+    "AzuraCast · NAS-Musikserver" \
+    "VM-ID" "110" \
+    "IP" "192.168.178.110/24" \
+    "CPU / RAM" "4 / 4 GB" \
+    "Disk" "64 GB" \
+    "Quelle" "192.168.178.20:/volume1/music" \
+    "Web" "http://192.168.178.110/"
 
 (( INSTALL_HA )) && ui_card \
     "Home Assistant" \
@@ -20463,6 +20506,18 @@ OVERVIEW_FILE="/root/PROXMOX-MODULAR-INSTALL-CREDENTIALS.txt"
         echo
     fi
 
+    if (( INSTALL_AZURACAST )); then
+        echo "=================================================="
+        echo "AzuraCast"
+        echo "=================================================="
+        echo "VM: 110 / 192.168.178.110"
+        echo "NAS: 192.168.178.20:/volume1/music"
+        echo "URL: http://192.168.178.110/"
+        echo "Status/Medien/Timer: Apps & Dienste → AzuraCast verwalten"
+        echo "Erstkonfiguration (Admin, Station, default): API-/Setup-Pruefung notwendig"
+        echo
+    fi
+
     if (( INSTALL_HA )); then
         echo "=================================================="
         echo "Home Assistant"
@@ -20611,6 +20666,7 @@ ui_section "Weboberflächen"
 (( INSTALL_SPEEDTEST )) && ui_kv "Speedtest" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && ui_kv "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && ui_kv "Mealie" "https://${MEALIE_IP}/"
+(( INSTALL_AZURACAST )) && ui_kv "AzuraCast" "http://192.168.178.110/"
 (( INSTALL_PBS )) && ui_kv "PBS" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && ui_kv "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && ui_kv "PVE-UPS" "https://${PVEUPS_IP}/ · HTTP → HTTPS"
