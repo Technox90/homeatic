@@ -57,15 +57,11 @@ install_cast() {
     mv docker.sh.tmp docker.sh
     chmod 0755 docker.sh
   fi
+  # The upstream unattended stable channel selector is supported;
+  # do not invent .env bootstrap files from a release branch.
   if [[ ! -s .env ]]; then
-    curl -fsSL https://raw.githubusercontent.com/AzuraCast/AzuraCast/stable/sample.env -o .env
+    yes 'Y' | ./docker.sh setup-release
   fi
-  if grep -q '^AZURACAST_VERSION=' .env; then
-    sed -i 's/^AZURACAST_VERSION=.*/AZURACAST_VERSION=stable/' .env
-  else
-    echo AZURACAST_VERSION=stable >>.env
-  fi
-  chmod 0600 .env
   if [[ -e docker-compose.override.yml ]] && ! grep -q '^# nodezero-v145$' docker-compose.override.yml; then
     echo "Fremdes Override vorhanden, wird nicht ueberschrieben." >&2
     return 34
