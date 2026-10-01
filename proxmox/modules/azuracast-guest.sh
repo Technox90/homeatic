@@ -107,8 +107,12 @@ fs="$(findmnt -rn -T "$AZURA_MEDIA_MOUNT" -o FSTYPE | tail -1)"
 case "$AZURA_MEDIA_TYPE" in
  nfs) [[ "$fs" == nfs4 && "$source" == "$AZURA_MEDIA_SERVER:$AZURA_MEDIA_SHARE" ]] ;;
  smb) [[ "$fs" == cifs && "$source" == "//$AZURA_MEDIA_SERVER/$AZURA_MEDIA_SHARE" ]] ;;
- disk) [[ "$fs" == ext4 && "$source" == /dev/sdb* ||
-          "$fs" == ext4 && "$source" == UUID=* ]] ;;
+ disk)
+   [[ "$fs" == ext4 && -s /etc/nodezero/azuracast-disk-uuid ]] || exit 1
+   uuid="$(cat /etc/nodezero/azuracast-disk-uuid)"
+   [[ "$(blkid -s UUID -o value /dev/sdb)" == "$uuid" ]] || exit 1
+   [[ "$(findmnt -rn -T "$AZURA_MEDIA_MOUNT" -o UUID | tail -1)" == "$uuid" ]] ;;
+
  *) exit 1 ;;
 esac
 CHECK
@@ -276,11 +280,11 @@ case "$1" in
     timer_prepare
     ;;
   status)
-    nfs_verify && findmnt -T /mnt/music
+    media_guard && findmnt -T "$AZURA_MEDIA_MOUNT"
     docker compose ps
     systemctl list-timers --all 'azuracast-*'
     ;;
-  mount) nfs_verify && findmnt -T /mnt/music ;;
+  mount) media_guard && findmnt -T "$AZURA_MEDIA_MOUNT" ;;
   import) /usr/local/sbin/azuracast-media-check.sh ;;
   playlist) /usr/local/sbin/azuracast-default-sync.sh ;;
   timer-on) systemctl enable --now azuracast-default-sync.timer ;;
