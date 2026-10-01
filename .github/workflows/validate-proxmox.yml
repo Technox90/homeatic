@@ -52,7 +52,7 @@ jobs:
 
       - name: Paperless direct NFS checks
         run: |
-          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V144' proxmox/proxmox.sh
+          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V145' proxmox/proxmox.sh
           grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
           grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
           grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
@@ -71,6 +71,39 @@ jobs:
             echo "Legacy PVE-host Paperless mountpoint is still the active default"
             exit 1
           fi
+
+      - name: AzuraCast extras module checks
+        run: |
+          bash -n proxmox/modules/azuracast.sh
+          bash -n proxmox/modules/azuracast-guest.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('proxmox/proxmox.sh').read_text()
+          guest=Path('proxmox/modules/azuracast-guest.sh').read_text()
+          host=Path('proxmox/modules/azuracast.sh').read_text()
+          dashboard=Path('proxmox/modules/dashboard.sh').read_text()
+          required={
+            'extras menu': '"AZURA" "EXTRAS · AzuraCast installieren',
+            'management menu': '"AZURAMENU" "EXTRAS · AzuraCast verwalten',
+            'standalone selection': 'AZURA)\n            INSTALL_AZURACAST=1',
+            'optimal selection': 'OPTIMAL_RESET_PENDING=1',
+            'guest storage preflight': 'INSTALL_AZURACAST',
+            'capacity': 'OPTIMAL_STACK_DISK_GB_V107',
+            'service install': 'install_azuracast_v145',
+            'link': 'dashboard_link_upsert "AzuraCast"',
+            'module loader': 'load_azuracast_module_v145',
+          }
+          for label, marker in required.items():
+              assert marker in p, label
+          assert '(( INSTALL_AZURACAST )) && total=$((total + 1))' in dashboard
+          assert 'RequiresMountsFor=/mnt/music' in guest
+          assert 'azuracast-default-sync.timer' in guest
+          assert 'azuracast-media-check.timer' in guest
+          assert '192.168.178.20:/volume1/music' in guest
+          assert "azura_check_id_v145" in host
+          assert "qm destroy 110" not in host
+          assert "pct destroy 110" not in host
+          PY
 
       - name: V144 home layout checks
         run: |
@@ -102,7 +135,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="2e1d32da222f9207e9da124e982eb8b31e59a5ce"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
