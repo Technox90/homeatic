@@ -5,28 +5,120 @@ export DEBIAN_FRONTEND=noninteractive
 cd /var/azuracast 2>/dev/null || mkdir -p /var/azuracast
 cd /var/azuracast
 
-nfs_verify() {
-  timeout 35 ls /mnt/music >/dev/null
-  [[ "$(findmnt -rn -T /mnt/music -o SOURCE|tail -1)" == "192.168.178.20:/volume1/music" ]]
-  [[ "$(findmnt -rn -T /mnt/music -o FSTYPE|tail -1)" == "nfs4" ]]
+# Host-side installer sends root-only sanitized Bash variables here.
+[[ -r /etc/nodezero/azuracast-media.conf ]] || {
+  echo "AzuraCast media config missing" >&2; exit 25;
 }
-nfs_prepare() {
+source /etc/nodezero/azuracast-media.conf
+: "$AZURA_MEDIA_TYPE" "$AZURA_MEDIA_MOUNT"
+media_guard() {
+  case "$AZURA_MEDIA_TYPE" in
+    local)
+      [[ -d /var/azuracast/stations/home/media ]] ||
+          mkdir -p /var/azuracast/stations/home/media
+      ;;
+    nfs|smb|disk)
+      timeout 35 ls "$AZURA_MEDIA_MOUNT" >/dev/null || return 1
+      local source fstype
+      source="$(findmnt -rn -T "$AZURA_MEDIA_MOUNT" -o SOURCE|tail -1)"
+      fstype="$(findmnt -rn -T "$AZURA_MEDIA_MOUNT" -o FSTYPE|tail -1)"
+      case "$AZURA_MEDIA_TYPE" in
+        nfs) [[ "$fstype" == nfs4 &&
+               "$source" == "$AZURA_MEDIA_SERVER:$AZURA_MEDIA_SHARE" ]] ;;
+        smb) [[ "$fstype" == cifs &&
+               "$source" == "//$AZURA_MEDIA_SERVER/$AZURA_MEDIA_SHARE" ]] ;;
+        disk)
+          [[ "$fstype" == ext4 && -s /etc/nodezero/azuracast-disk-uuid ]] || return 1
+          [[ "$(blkid -o value -s UUID /dev/sdb)" == "$(cat /etc/nodezero/azuracast-disk-uuid)" ]] ;;
+      esac
+      ;;
+    *) echo "Invalid media type: $AZURA_MEDIA_TYPE" >&2; return 1 ;;
+  esac
+}
+media_prepare() {
   apt-get update -qq
-  apt-get install -y -qq curl ca-certificates nfs-common gnupg jq
-  mkdir -p /mnt/music /etc/systemd/system/docker.service.d
-  if ! awk '$1 !~ /^#/ && $2=="/mnt/music"{f=1} END{exit !f}' /etc/fstab; then
-    echo "192.168.178.20:/volume1/music /mnt/music nfs4 rw,vers=4.1,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30s,hard,timeo=600,retrans=2 0 0" >>/etc/fstab
+  apt-get install -y -qq curl ca-certificates nfs-common cifs-utils gnupg jq
+  mkdir -p /etc/nodezero /etc/systemd/system/docker.service.d
+  if [[ "$AZURA_MEDIA_TYPE" == local ]]; then
+    mkdir -p /var/azuracast/stations/home/media
+    return 0
   fi
-  cat >/usr/local/sbin/azuracast-check-nfs <<'CHECK'
+  [[ "$AZURA_MEDIA_MOUNT" == /mnt/* && "$AZURA_MEDIA_MOUNT" != *..* &&
+    "$AZURA_MEDIA_MOUNT" != *' '* ]] || {
+    echo "Invalid VM media mountpoint" >&2; return 30;
+  }
+  mkdir -p "$AZURA_MEDIA_MOUNT"
+  local entry='' existing=''
+  existing="$(awk -v p="$AZURA_MEDIA_MOUNT" '$1 !~ /^#/ && $2==p{print;exit}' /etc/fstab)"
+  case "$AZURA_MEDIA_TYPE" in
+    nfs)
+      entry="$AZURA_MEDIA_SERVER:$AZURA_MEDIA_SHARE $AZURA_MEDIA_MOUNT nfs4 rw,vers=4.1,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30s,hard,timeo=600,retrans=2 0 0"
+      ;;
+    smb)
+      [[ -s /etc/nodezero/azuracast-smb.credentials ]] ||
+        { echo "SMB credentials missing" >&2; return 31; }
+      chmod 600 /etc/nodezero/azuracast-smb.credentials
+      entry="//$AZURA_MEDIA_SERVER/$AZURA_MEDIA_SHARE $AZURA_MEDIA_MOUNT cifs rw,credentials=/etc/nodezero/azuracast-smb.credentials,vers=3.0,uid=1000,gid=1000,_netdev,nofail,x-systemd.automount,x-systemd.mount-timeout=30s 0 0"
+      ;;
+    disk)
+      [[ -b /dev/sdb ]] ||
+        { echo "Dedicated SCSI1 media disk not present" >&2; return 31; }
+      [[ "$(findmnt -n -o SOURCE /)" != /dev/sdb* ]] ||
+        { echo "Refusing to use the root filesystem disk" >&2; return 31; }
+      if ! blkid -s UUID -o value /dev/sdb >/dev/null 2>&1; then
+        [[ "$AZURA_MEDIA_DISK_NEW" == 1 &&
+           ! -e /etc/nodezero/azuracast-disk-uuid ]] ||
+          { echo "Blank disk is not an authorized new media disk" >&2; return 32; }
+        [[ "$(lsblk -nr -o NAME /dev/sdb|wc -l)" -eq 1 ]] ||
+          { echo "Media disk contains partitions; no formatting" >&2; return 32; }
+        mkfs.ext4 -F -L AZURACAST_MEDIA /dev/sdb
+      fi
+      local uuid
+      uuid="$(blkid -s UUID -o value /dev/sdb)"
+      [[ -n "$uuid" ]] || return 32
+      if [[ -s /etc/nodezero/azuracast-disk-uuid ]]; then
+        [[ "$uuid" == "$(cat /etc/nodezero/azuracast-disk-uuid)" ]] ||
+          { echo "Media disk UUID mismatch" >&2; return 32; }
+      else
+        echo "$uuid" >/etc/nodezero/azuracast-disk-uuid
+      fi
+      entry="UUID=$uuid $AZURA_MEDIA_MOUNT ext4 defaults,nofail,x-systemd.device-timeout=30s 0 2"
+      ;;
+    *) return 33 ;;
+  esac
+  if [[ -n "$existing" && "$existing" != "$entry" ]]; then
+    echo "Existing non-matching /etc/fstab entry; refusing overwrite" >&2
+    return 34
+  fi
+  [[ -n "$existing" ]] || printf '%s\n' "$entry" >>/etc/fstab
+  cat >/usr/local/sbin/azuracast-check-media <<'CHECK'
 #!/bin/bash
 set -Eeuo pipefail
-timeout 35 ls /mnt/music >/dev/null
-[[ "$(findmnt -rn -T /mnt/music -o SOURCE|tail -1)" == "192.168.178.20:/volume1/music" ]]
-[[ "$(findmnt -rn -T /mnt/music -o FSTYPE|tail -1)" == "nfs4" ]]
+source /etc/nodezero/azuracast-media.conf
+timeout 35 ls "$AZURA_MEDIA_MOUNT" >/dev/null
+source="$(findmnt -rn -T "$AZURA_MEDIA_MOUNT" -o SOURCE | tail -1)"
+fs="$(findmnt -rn -T "$AZURA_MEDIA_MOUNT" -o FSTYPE | tail -1)"
+case "$AZURA_MEDIA_TYPE" in
+ nfs) [[ "$fs" == nfs4 && "$source" == "$AZURA_MEDIA_SERVER:$AZURA_MEDIA_SHARE" ]] ;;
+ smb) [[ "$fs" == cifs && "$source" == "//$AZURA_MEDIA_SERVER/$AZURA_MEDIA_SHARE" ]] ;;
+ disk) [[ "$fs" == ext4 && "$source" == /dev/sdb* ||
+          "$fs" == ext4 && "$source" == UUID=* ]] ;;
+ *) exit 1 ;;
+esac
 CHECK
-  chmod 0755 /usr/local/sbin/azuracast-check-nfs
+  chmod 0755 /usr/local/sbin/azuracast-check-media
   systemctl daemon-reload
-  nfs_verify || { echo "NFS fehlt. Synology muss 192.168.178.110 zulassen." >&2; exit 30; }
+  if [[ "$AZURA_MEDIA_TYPE" == disk ]]; then
+    mount "$AZURA_MEDIA_MOUNT" || return 34
+  fi
+  media_guard || {
+    echo "Media storage not mounted; stop before Docker writes" >&2; return 35;
+  }
+  [[ "$AZURA_MEDIA_SUBDIR" == . ]] ||
+    [[ -d "$AZURA_MEDIA_MOUNT/$AZURA_MEDIA_SUBDIR" ]] || {
+      echo "Media subdirectory missing; no remote directories created" >&2
+      return 35
+    }
 }
 docker_prepare() {
   install -d -m 0755 /etc/apt/keyrings
@@ -37,20 +129,22 @@ docker_prepare() {
     "$(dpkg --print-architecture)" "$VERSION_CODENAME" >/etc/apt/sources.list.d/docker.list
   apt-get update -qq
   apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
-  cat >/etc/systemd/system/docker.service.d/20-azuracast-nfs.conf <<'UNIT'
+  if [[ "$AZURA_MEDIA_TYPE" != local ]]; then
+    cat >/etc/systemd/system/docker.service.d/20-azuracast-media.conf <<UNIT
 [Unit]
-RequiresMountsFor=/mnt/music
+RequiresMountsFor=$AZURA_MEDIA_MOUNT
 After=network-online.target remote-fs.target
 [Service]
-ExecStartPre=/usr/local/sbin/azuracast-check-nfs
+ExecStartPre=/usr/local/sbin/azuracast-check-media
 UNIT
+  fi
   systemctl daemon-reload
   systemctl enable --now docker
   systemctl restart docker
   docker compose version
 }
 install_cast() {
-  nfs_verify
+  media_guard
   if [[ ! -s docker.sh ]]; then
     curl -fsSL --retry 4 https://raw.githubusercontent.com/AzuraCast/AzuraCast/main/docker.sh -o docker.sh.tmp
     test -s docker.sh.tmp
@@ -71,13 +165,21 @@ install_cast() {
     echo "Fremdes Override vorhanden, wird nicht ueberschrieben." >&2
     return 34
   fi
-  cat >docker-compose.override.yml <<'YAML'
+  if [[ "$AZURA_MEDIA_TYPE" != local ]]; then
+    local media_source="$AZURA_MEDIA_MOUNT"
+    if [[ "$AZURA_MEDIA_SUBDIR" != . ]]; then
+      media_source="$AZURA_MEDIA_MOUNT/$AZURA_MEDIA_SUBDIR"
+    fi
+    # Avoid writing into a missing, unmounted or empty local directory.
+    media_guard || return 34
+    cat >docker-compose.override.yml <<YAML
 # nodezero-v145
 services:
   web:
     volumes:
-      - /mnt/music:/var/azuracast/stations/home/media:rw
+      - $media_source:/var/azuracast/stations/home/media:rw
 YAML
+  fi
   local count
   for count in 1 2 3; do
     # Installer updates its docker.sh and may exit early. Check runtime state.
@@ -96,7 +198,7 @@ timer_prepare() {
 set -Eeuo pipefail
 exec 9>/run/azuracast-default-sync.lock
 flock -n 9 || exit 0
-/usr/local/sbin/azuracast-check-nfs
+/usr/local/sbin/azuracast-check-media
 cd /var/azuracast
 ./docker.sh cli sync:run medium >>/home/log/azuracast/default-sync.log 2>&1
 if [[ ! -s stations/home/playlists/playlist_default.m3u ]]; then
@@ -108,7 +210,7 @@ SYNC
 set -Eeuo pipefail
 exec 9>/run/azuracast-media-check.lock
 flock -n 9 || exit 0
-/usr/local/sbin/azuracast-check-nfs
+/usr/local/sbin/azuracast-check-media
 cd /var/azuracast
 ./docker.sh cli azuracast:sync:task check_media --force >>/home/log/azuracast/media-check.log 2>&1
 SYNC
@@ -156,13 +258,13 @@ UNIT
 }
 case "$1" in
   install)
-    nfs_prepare
+    media_prepare
     docker_prepare
     install_cast
     timer_prepare
     ;;
   repair)
-    nfs_verify
+    media_guard
     docker compose config -q
     docker compose up -d
     timer_prepare
@@ -179,7 +281,7 @@ case "$1" in
   timer-off) systemctl disable --now azuracast-default-sync.timer ;;
   logs) docker compose logs --tail=120 web ;;
   update)
-    nfs_verify
+    media_guard
     ./docker.sh update-self
     rc=0
     yes '' | ./docker.sh update || rc="${PIPESTATUS[1]}"
