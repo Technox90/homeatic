@@ -5,7 +5,9 @@ Verfolgung der Änderungen
 ----------------------------------------------------------------
 - AzuraCast als EXTRAS-Anwendung in Apps & Dienste ergänzt (Einzelinstallation, Mehrfachauswahl, APPS_ALL) sowie Wartungsmenü mit Status, NAS-Test, Medienimport, Playlist-Sync, Timer, Update, Reparatur und Logs.
 - AzuraCast optional in O - Optimale Installation vorgemerkt; reservierte VM-ID 110 und erhöhte Speicherplanung (350 GB gesamt). O erst nach vollständiger Ende-zu-Ende-Verifikation produktiv nutzen.
-- Eigenständige Ubuntu-Server-22.04-VM 110, 4 CPU / 4 GB / 64 GB, IP 192.168.178.110, SSH-Schlüssel/Cloud-Init und QEMU Guest Agent.
+- Eigenständige Ubuntu-Server-22.04-VM 110 mit per Installer konfigurierbarer CPU-, RAM-, Systemdisk- und IP-/Gateway-/DNS-Ausstattung (Vorgaben 4 CPU / 4 GB / 64 GB / 192.168.178.110), SSH-Schlüssel/Cloud-Init und QEMU Guest Agent.
+- Musikmedium im EXTRAS-Installer auswählbar: NAS/NFS (Server/Export/Unterordner), SMB-Netzfreigabe (Server/Share/Unterordner, Passwort separat in /root/passwort mit Backup unter /home/passwort), lokal auf VM-Systemdisk oder separate Media-Disk (Kapazität und Proxmox-Storage).
+- Zusätzliche Proxmox-Media-Disk wird bei der Speicherkapazitätsprüfung mitgezählt bzw. auf abweichendem Storage separat geprüft. Bestands-VM 110 wird gegen unbeabsichtigte Neukonfiguration geschützt.
 - Image-Cache unter /home/img/os; SHA256SUMS-Prüfung; keine automatische Löschung vorhandener VM 110.
 - NFSv4.1-Musikbibliothek 192.168.178.20:/volume1/music wird in der VM nach /mnt/music gemountet; Docker stoppt bei fehlendem NAS-Zugriff statt auf leeres lokales Verzeichnis auszuweichen.
 - AzuraCast-Docker-Stable-Installer und ein Compose-Override für den Medienordner; Installationslogs unter /home/log/azuracast.
