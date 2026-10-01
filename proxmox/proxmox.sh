@@ -1322,6 +1322,7 @@ tui_selected_extended_text() {
     out+="  [$([[ "$INSTALL_SCRUTINY" -eq 1 ]] && echo X || echo ' ')] Scrutiny   "
     out+="[$([[ "$INSTALL_MEALIE" -eq 1 ]] && echo X || echo ' ')] Mealie\n\n"
 
+    out+="  [$([[ "$INSTALL_AZURACAST" -eq 1 ]] && echo X || echo ' ')] AzuraCast Webradio · VM 110\n\n"
     out+="BETRIEBSSYSTEM\n"
     if (( INSTALL_OS )); then
         if [[ -n "${OS_LABEL:-}" ]]; then
@@ -1385,6 +1386,7 @@ tui_extended_checklist() {
                 "14" "EXTRAS · Scrutiny" OFF \
                 "15" "EXTRAS · Mealie" OFF \
                 "16" "OPTIONAL · Betriebssystem-VM · Windows / Linux" OFF \
+                "17" "EXTRAS · AzuraCast · VM 110" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
 
@@ -1409,6 +1411,7 @@ tui_extended_checklist() {
                 14) INSTALL_SCRUTINY=1 ;;
                 15) INSTALL_MEALIE=1 ;;
                 16) INSTALL_OS=1 ;;
+                17) INSTALL_AZURACAST=1 ;;
             esac
         done <<<"$selected"
 
@@ -7223,6 +7226,7 @@ reset_addon_flags_v94() {
     INSTALL_SPEEDTEST=0
     INSTALL_SCRUTINY=0
     INSTALL_MEALIE=0
+    INSTALL_AZURACAST=0
 }
 
 reset_community_flags_v94() {
@@ -8658,6 +8662,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                 INSTALL_SPEEDTEST=1
                 INSTALL_SCRUTINY=1
                 INSTALL_MEALIE=1
+                INSTALL_AZURACAST=1
                 INSTALL_OS=1
                 ;;
             B)
@@ -8678,6 +8683,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                 INSTALL_SPEEDTEST=1
                 INSTALL_SCRUTINY=1
                 INSTALL_MEALIE=1
+                INSTALL_AZURACAST=1
                 ;;
             *)
                 local choices choice
@@ -8701,6 +8707,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                         14) INSTALL_SCRUTINY=1 ;;
                         15) INSTALL_MEALIE=1 ;;
                         16) INSTALL_OS=1 ;;
+                        17) INSTALL_AZURACAST=1 ;;
                         *) die "Ungültige Komponentenauswahl: $choice" ;;
                     esac
                 done
@@ -9162,6 +9169,12 @@ while true; do
         continue
     fi
 
+    if [[ "$INSTALL_SELECTION" == "AZURAMENU" ]]; then
+        load_azuracast_module_v145 || continue
+        azuracast_menu_v145
+        continue
+    fi
+
     reset_install_flags
 
     # V106 · kompakte thematische Kategorien. Die Funktionen setzen nur die
@@ -9177,6 +9190,7 @@ while true; do
             break
             ;;
         APPS_ALL)
+            INSTALL_AZURACAST=1
             INSTALL_UPTIME=1
             INSTALL_VAULTWARDEN=1
             INSTALL_CADDY=1
@@ -9194,6 +9208,10 @@ while true; do
                 break
             fi
             continue
+            ;;
+        AZURA)
+            INSTALL_AZURACAST=1
+            break
             ;;
         MON_REC)
             INSTALL_PULSE=1
@@ -9250,6 +9268,8 @@ while true; do
         INSTALL_PAPERLESS=1
         INSTALL_PIHOLE=1
         INSTALL_NETALERTX=1
+        INSTALL_AZURACAST=1
+        RESERVED_IDS["110"]="AzuraCast"
 
         INSTALL_UPTIME=1
         INSTALL_CADDY=1
@@ -9361,6 +9381,11 @@ while true; do
     break
 done
 
+# AzuraCast reserviert VM-ID 110 vor allen automatischen Gast-ID-Zuteilungen.
+if (( INSTALL_AZURACAST )); then
+    RESERVED_IDS["110"]="AzuraCast"
+fi
+
 # -----------------------------------------------------------------------------
 # Auswahl vor der Konfiguration bestätigen
 # -----------------------------------------------------------------------------
@@ -9388,6 +9413,7 @@ if (( TUI_AVAILABLE && ! OPTIMAL_INSTALL )); then
     (( INSTALL_SPEEDTEST )) && SELECTED_OVERVIEW+="[X] Speedtest Tracker\n"
     (( INSTALL_SCRUTINY )) && SELECTED_OVERVIEW+="[X] Scrutiny\n"
     (( INSTALL_MEALIE )) && SELECTED_OVERVIEW+="[X] Mealie\n"
+    (( INSTALL_AZURACAST )) && SELECTED_OVERVIEW+="[X] AzuraCast VM 110 · NAS-Musik\n"
     (( INSTALL_PBS )) && SELECTED_OVERVIEW+="[X] Proxmox Backup Server\n"
     (( INSTALL_PULSE )) && SELECTED_OVERVIEW+="[X] Pulse\n"
     (( INSTALL_PVEUPS )) && SELECTED_OVERVIEW+="[X] PVE-UPS\n"
@@ -9935,13 +9961,13 @@ find_cached_haos_version() {
 # -----------------------------------------------------------------------------
 
 STORAGE_RESERVE_PERCENT_V107=10
-# Fester O-Stack: HA 64 + Paperless 64 + Pi-hole 8 + NetAlertX 12 +
+# Fester O-Stack inklusive AzuraCast 64: HA 64 + Paperless 64 + Pi-hole 8 + NetAlertX 12 +
 # Uptime 12 + Caddy 8 + Stirling 16 + Speedtest 8 + Scrutiny 12 +
 # Pulse 12 + PVE-UPS 8 + Semaphore 10 + Prometheus 24 + Exporter 6 +
-# Grafana 12 + EMQX 10 = 286 GB. Mit 10 % Reserve werden 315 GB verlangt.
+# Grafana 12 + EMQX 10 + AzuraCast 64 = 350 GB. Mit 10 % Reserve 385 GB.
 OPTIMAL_STACK_DISK_GB_V107=$((
     64 + 64 + 8 + 12 + 12 + 8 + 16 + 8 +
-    12 + 12 + 8 + 10 + 24 + 6 + 12 + 10
+    12 + 12 + 8 + 10 + 24 + 6 + 12 + 10 + 64
 ))
 
 best_guest_storage_v107() {
@@ -10101,6 +10127,7 @@ selected_guest_disk_sum_v107() {
     local total=0
 
     (( INSTALL_OS )) && total=$((total + OS_DISK))
+    (( INSTALL_AZURACAST )) && total=$((total + 64))
     (( INSTALL_HA )) && total=$((total + HA_DISK))
     (( INSTALL_PAPERLESS )) && total=$((total + PL_DISK))
     (( INSTALL_PIHOLE )) && total=$((total + PH_DISK))
@@ -10246,10 +10273,10 @@ if (( NEED_GUESTS )); then
 
     prepare_image_cache_base
 
-    if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS ||
+    if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS || INSTALL_AZURACAST || INSTALL_AZURACAST ||
           INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
           INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-          INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_PBS || INSTALL_PULSE ||
+          INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_AZURACAST || INSTALL_PBS || INSTALL_PULSE ||
           INSTALL_PVEUPS || INSTALL_SEMAPHORE || INSTALL_POCKETID ||
           INSTALL_PROMETHEUS || INSTALL_PVE_EXPORTER || INSTALL_GRAFANA ||
           INSTALL_PANGOLIN || INSTALL_NEWT || INSTALL_GATUS ||
@@ -10287,7 +10314,7 @@ fi
 # geeigneter Proxmox-Storage eingerichtet ist oder Internet/Community-Scripts
 # nicht erreichbar sind.
 if (( OPTIMAL_RESET_PENDING )); then
-    [[ "$OPTIMAL_STACK_DISK_GB_V107" -eq 286 ]] || die "Interner Fehler: Optimal-Stack-Disk-Summe ist nicht 286 GB."
+    [[ "$OPTIMAL_STACK_DISK_GB_V107" -eq 350 ]] || die "Interner Fehler: Optimal-Stack-Disk-Summe ist nicht 350 GB."
 
     storage_capacity_preflight_v107         "$DISK_STORAGE"         "$OPTIMAL_STACK_DISK_GB_V107"         "Optimal-Stack vor Guest-Reset"
 
@@ -11336,6 +11363,7 @@ register_service_ip() {
 (( INSTALL_HOMEPAGE )) && register_service_ip "Homepage" "$HOMEPAGE_IP"
 (( INSTALL_NPM )) && register_service_ip "Nginx Proxy Manager" "$NPM_IP"
 (( INSTALL_EMQX )) && register_service_ip "EMQX MQTT Broker" "$EMQX_IP"
+(( INSTALL_AZURACAST )) && register_service_ip "AzuraCast" "192.168.178.110"
 
 # -----------------------------------------------------------------------------
 # Zusammenfassung
@@ -20188,6 +20216,10 @@ fi
 (( INSTALL_OS )) && run_install_step "Betriebssystem · ${OS_LABEL}" install_operating_system_v61
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
+if (( INSTALL_AZURACAST )); then
+    load_azuracast_module_v145
+    run_install_step "AzuraCast VM 110 · Docker · Synology NFS" install_azuracast_v145
+fi
 
 # V138: Bei einem reinen Dashboard-Update einen bereits vorhandenen
 # Paperless-CT nachziehen. Bei Neuinstallation prüft install_paperless() selbst.
@@ -20263,6 +20295,7 @@ fi
 (( INSTALL_SPEEDTEST )) && dashboard_link_upsert "Speedtest Tracker" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && dashboard_link_upsert "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && dashboard_link_upsert "Mealie" "https://${MEALIE_IP}/"
+(( INSTALL_AZURACAST )) && dashboard_link_upsert "AzuraCast" "http://192.168.178.110/"
 (( INSTALL_PBS )) && dashboard_link_upsert "Proxmox Backup Server" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && dashboard_link_upsert "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && dashboard_link_upsert "PVE-UPS" "https://${PVEUPS_IP}/"
