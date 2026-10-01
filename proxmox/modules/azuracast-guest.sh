@@ -60,7 +60,12 @@ install_cast() {
   # The upstream unattended stable channel selector is supported;
   # do not invent .env bootstrap files from a release branch.
   if [[ ! -s .env ]]; then
-    yes 'Y' | ./docker.sh setup-release
+    # Supported unattended Stable-channel selection. Avoid yes/SIGPIPE
+    # masking the upstream tool's actual exit code.
+    local release_rc=0
+    yes 'Y' | ./docker.sh setup-release || release_rc="${PIPESTATUS[1]}"
+    [[ "$release_rc" -eq 0 ]] ||
+      { echo "Stable-Kanal Auswahl fehlgeschlagen (RC=$release_rc)" >&2; return 36; }
   fi
   if [[ -e docker-compose.override.yml ]] && ! grep -q '^# nodezero-v145$' docker-compose.override.yml; then
     echo "Fremdes Override vorhanden, wird nicht ueberschrieben." >&2
@@ -76,10 +81,8 @@ YAML
   local count
   for count in 1 2 3; do
     # Installer updates its docker.sh and may exit early. Check runtime state.
-    set +o pipefail
-    yes '' | ./docker.sh install
-    local rc=$?
-    set -o pipefail
+    local rc=0
+    yes '' | ./docker.sh install || rc="${PIPESTATUS[1]}"
     if docker compose ps --status running --services | grep -Fxq web; then break; fi
     [[ $count -lt 3 ]] || { echo "AzuraCast-Install fehlgeschlagen ($rc)"; return 35; }
     sleep 10
@@ -178,7 +181,9 @@ case "$1" in
   update)
     nfs_verify
     ./docker.sh update-self
-    yes '' | ./docker.sh update
+    rc=0
+    yes '' | ./docker.sh update || rc="${PIPESTATUS[1]}"
+    exit "$rc"
     ;;
   *) echo "Unbekannte AzuraCast Aktion $1" >&2; exit 2 ;;
 esac
