@@ -9092,7 +9092,7 @@ install_proxmox_auto_updater
 
 ensure_tui
 
-AZURACAST_MODULE_REF="a38b8112916c4fd5204bed3bf9301bbda1d58fe1"
+AZURACAST_MODULE_REF="7debc7a53de76e77d8d4193df2e25d7b4ee4fae7"
 load_azuracast_module_v145() {
     declare -F install_azuracast_v145 >/dev/null && return 0
     local ref="$AZURACAST_MODULE_REF"
