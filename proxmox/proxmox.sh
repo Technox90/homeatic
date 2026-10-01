@@ -9092,7 +9092,7 @@ install_proxmox_auto_updater
 
 ensure_tui
 
-AZURACAST_MODULE_REF="7debc7a53de76e77d8d4193df2e25d7b4ee4fae7"
+AZURACAST_MODULE_REF="3a40be9232f79d2317556eac359f25d5b1c3f2cf"
 load_azuracast_module_v145() {
     declare -F install_azuracast_v145 >/dev/null && return 0
     local ref="$AZURACAST_MODULE_REF"
@@ -9106,6 +9106,15 @@ load_azuracast_module_v145() {
     fi
     bash -n "$path" || { echo "AzuraCast Modul fehlerhaft" >&2; return 1; }
     source "$path"
+    local cfg="$(dirname "$path")/azuracast-config.sh"
+    if [[ ! -s "$cfg" ]]; then
+        curl -fsSL --retry 3 --connect-timeout 15 \
+            "https://raw.githubusercontent.com/Technox90/homeatic/$ref/proxmox/modules/azuracast-config.sh" \
+            -o "$cfg.tmp" || return 1
+        mv -f "$cfg.tmp" "$cfg"
+    fi
+    bash -n "$cfg" || { echo "AzuraCast Konfigurationsmodul fehlerhaft" >&2; return 1; }
+    source "$cfg"
 }
 
 while true; do
@@ -10149,7 +10158,14 @@ selected_guest_disk_sum_v107() {
     local total=0
 
     (( INSTALL_OS )) && total=$((total + OS_DISK))
-    (( INSTALL_AZURACAST )) && total=$((total + 64))
+    if (( INSTALL_AZURACAST )); then
+        total=$((total + AZURA_DISK))
+        # Separate Media-Disk auf demselben Ziel-Storage mitzaehlen.
+        if [[ "$AZURA_MEDIA_TYPE" == disk &&
+              "$AZURA_MEDIA_DISK_STORAGE" == "$DISK_STORAGE" ]]; then
+            total=$((total + AZURA_MEDIA_DISK_GB))
+        fi
+    fi
     (( INSTALL_HA )) && total=$((total + HA_DISK))
     (( INSTALL_PAPERLESS )) && total=$((total + PL_DISK))
     (( INSTALL_PIHOLE )) && total=$((total + PH_DISK))
@@ -10791,6 +10807,12 @@ configure_operating_system_v61() {
 
 configure_operating_system_v61
 
+# V145: Fragen erst nach Storage-/Netzwerkauswahl; "O" nutzt Standards.
+if (( INSTALL_AZURACAST )); then
+    load_azuracast_module_v145 || die "AzuraCast-Konfigurationsmodul konnte nicht geladen werden."
+    azura_configure_v145 || die "AzuraCast-Einstellungen ungueltig oder abgebrochen."
+fi
+
 # -----------------------------------------------------------------------------
 # Home Assistant Einstellungen
 # -----------------------------------------------------------------------------
@@ -11398,7 +11420,7 @@ register_service_ip() {
 (( INSTALL_HOMEPAGE )) && register_service_ip "Homepage" "$HOMEPAGE_IP"
 (( INSTALL_NPM )) && register_service_ip "Nginx Proxy Manager" "$NPM_IP"
 (( INSTALL_EMQX )) && register_service_ip "EMQX MQTT Broker" "$EMQX_IP"
-(( INSTALL_AZURACAST )) && register_service_ip "AzuraCast" "192.168.178.110"
+(( INSTALL_AZURACAST )) && register_service_ip "AzuraCast" "$AZURA_IP"
 
 # -----------------------------------------------------------------------------
 # Zusammenfassung
@@ -11428,13 +11450,14 @@ if (( INSTALL_OS )); then
 fi
 
 (( INSTALL_AZURACAST )) && ui_card \
-    "AzuraCast · NAS-Musikserver" \
+    "AzuraCast · Musikserver" \
     "VM-ID" "110" \
-    "IP" "192.168.178.110/24" \
-    "CPU / RAM" "4 / 4 GB" \
-    "Disk" "64 GB" \
-    "Quelle" "192.168.178.20:/volume1/music" \
-    "Web" "http://192.168.178.110/"
+    "IP" "$AZURA_CIDR" \
+    "CPU / RAM" "$AZURA_CORES / $((AZURA_MEMORY / 1024)) GB" \
+    "Disk" "$AZURA_DISK GB" \
+    "Musik-Speicher" "$AZURA_MEDIA_TYPE" \
+    "Mount" "$AZURA_MEDIA_MOUNT" \
+    "Web" "http://$AZURA_IP/"
 
 (( INSTALL_HA )) && ui_card \
     "Home Assistant" \
@@ -20200,6 +20223,17 @@ if (( NEED_GUESTS )); then
     fi
 fi
 
+# V145: Wenn die optionale Musik-Disk auf einem ANDEREN Storage liegt,
+# wird dessen freier Platz separat geprueft (auch mit 10 % Reserve).
+if (( INSTALL_AZURACAST )) &&
+   [[ "$AZURA_MEDIA_TYPE" == disk &&
+      "$AZURA_MEDIA_DISK_STORAGE" != "$DISK_STORAGE" ]]; then
+    storage_available_preflight_v107 \
+        "$AZURA_MEDIA_DISK_STORAGE" \
+        "$AZURA_MEDIA_DISK_GB" \
+        "AzuraCast separate Musik-Disk"
+fi
+
 # Zugangsdaten sind bereits VOR den eigentlichen Installationsschritten
 # persistent. Ein späterer Download-/Runtime-Fehler verliert daher keine
 # zuvor erzeugten Passwörter.
@@ -20262,7 +20296,7 @@ fi
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
 if (( INSTALL_AZURACAST )); then
     load_azuracast_module_v145
-    run_install_step "AzuraCast VM 110 · Docker · Synology NFS" install_azuracast_v145
+    run_install_step "AzuraCast VM 110 · Docker · Musik-Speicher ($AZURA_MEDIA_TYPE)" install_azuracast_v145
 fi
 
 # V138: Bei einem reinen Dashboard-Update einen bereits vorhandenen
@@ -20339,7 +20373,7 @@ fi
 (( INSTALL_SPEEDTEST )) && dashboard_link_upsert "Speedtest Tracker" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && dashboard_link_upsert "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && dashboard_link_upsert "Mealie" "https://${MEALIE_IP}/"
-(( INSTALL_AZURACAST )) && dashboard_link_upsert "AzuraCast" "http://192.168.178.110/"
+(( INSTALL_AZURACAST )) && dashboard_link_upsert "AzuraCast" "http://$AZURA_IP/"
 (( INSTALL_PBS )) && dashboard_link_upsert "Proxmox Backup Server" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && dashboard_link_upsert "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && dashboard_link_upsert "PVE-UPS" "https://${PVEUPS_IP}/"
@@ -20511,9 +20545,13 @@ OVERVIEW_FILE="/root/PROXMOX-MODULAR-INSTALL-CREDENTIALS.txt"
         echo "=================================================="
         echo "AzuraCast"
         echo "=================================================="
-        echo "VM: 110 / 192.168.178.110"
-        echo "NAS: 192.168.178.20:/volume1/music"
-        echo "URL: http://192.168.178.110/"
+        echo "VM: 110 / $AZURA_CIDR · $AZURA_CORES CPU · $AZURA_MEMORY MB RAM"
+        echo "Disk: $AZURA_DISK GB · Musik: $AZURA_MEDIA_TYPE"
+        if [[ "$AZURA_MEDIA_TYPE" == nfs || "$AZURA_MEDIA_TYPE" == smb ]]; then
+            echo "Netzwerk: $AZURA_MEDIA_SERVER:$AZURA_MEDIA_SHARE"
+        fi
+        echo "Mount: $AZURA_MEDIA_MOUNT"
+        echo "URL: http://$AZURA_IP/"
         echo "Status/Medien/Timer: Apps & Dienste → AzuraCast verwalten"
         echo "Erstkonfiguration (Admin, Station, default): API-/Setup-Pruefung notwendig"
         echo
@@ -20667,7 +20705,7 @@ ui_section "Weboberflächen"
 (( INSTALL_SPEEDTEST )) && ui_kv "Speedtest" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && ui_kv "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && ui_kv "Mealie" "https://${MEALIE_IP}/"
-(( INSTALL_AZURACAST )) && ui_kv "AzuraCast" "http://192.168.178.110/"
+(( INSTALL_AZURACAST )) && ui_kv "AzuraCast" "http://$AZURA_IP/"
 (( INSTALL_PBS )) && ui_kv "PBS" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && ui_kv "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && ui_kv "PVE-UPS" "https://${PVEUPS_IP}/ · HTTP → HTTPS"
