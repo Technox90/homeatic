@@ -7699,7 +7699,6 @@ labels = [
     ("INSTALL_NETALERTX", "NetAlertX"),
     ("INSTALL_AZURACAST", "AzuraCast"),
     ("INSTALL_OS", "OS"),
-    ("INSTALL_AZURACAST", "AzuraCast"),
     ("INSTALL_PBS", "PBS"),
     ("INSTALL_PULSE", "Pulse"),
     ("INSTALL_PVEUPS", "PVE-UPS"),
@@ -9093,7 +9092,7 @@ install_proxmox_auto_updater
 
 ensure_tui
 
-AZURACAST_MODULE_REF="1f411acd34c495c596fb02f37beea0befc8dc260"
+AZURACAST_MODULE_REF="a38b8112916c4fd5204bed3bf9301bbda1d58fe1"
 load_azuracast_module_v145() {
     declare -F install_azuracast_v145 >/dev/null && return 0
     local ref="$AZURACAST_MODULE_REF"
@@ -10307,7 +10306,7 @@ if (( NEED_GUESTS )); then
 
     prepare_image_cache_base
 
-    if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS || INSTALL_AZURACAST || INSTALL_AZURACAST ||
+    if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS || INSTALL_AZURACAST ||
           INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
           INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
           INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_AZURACAST || INSTALL_PBS || INSTALL_PULSE ||
@@ -10354,6 +10353,8 @@ if (( OPTIMAL_RESET_PENDING )); then
 
     optimal_network_preflight_v107
     optimal_install_reset_v100
+    # Gast-ID-Sperren wurden beim Reset zurueckgesetzt.
+    (( INSTALL_AZURACAST )) && RESERVED_IDS["110"]="AzuraCast"
     OPTIMAL_RESET_PENDING=0
 
     # Nach dem Reset muss der Storage tatsächlich genügend freien PHYSISCHEN
@@ -11953,7 +11954,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"
+NODEZERO_MODULE_REF="2e1d32da222f9207e9da124e982eb8b31e59a5ce"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
