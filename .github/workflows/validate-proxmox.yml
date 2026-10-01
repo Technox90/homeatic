@@ -146,6 +146,7 @@ jobs:
           whiptail() { echo "$MODE"; }
           INSTALL_AZURACAST=1
           TUI_AVAILABLE=1
+          TUI_BACKTITLE="Proxmox test"
           OPTIMAL_INSTALL=0
           DISK_STORAGE=local-lvm
           GATEWAY=192.168.178.1
