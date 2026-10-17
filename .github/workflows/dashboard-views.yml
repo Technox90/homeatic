@@ -1,0 +1,46 @@
+name: NodeZero dashboard views checks
+on:
+  push:
+    paths:
+      - "dashboard/views/**"
+      - "proxmox/tools/nodezero-dashboard-views"
+      - "proxmox/proxmox.sh"
+      - ".github/workflows/dashboard-views.yml"
+  pull_request:
+    paths:
+      - "dashboard/views/**"
+      - "proxmox/tools/nodezero-dashboard-views"
+      - "proxmox/proxmox.sh"
+      - ".github/workflows/dashboard-views.yml"
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          bash -n proxmox/proxmox.sh
+          bash -n proxmox/tools/nodezero-dashboard-views
+      - name: JavaScript syntax
+        run: node --check dashboard/views/runtime.js
+      - name: Check five local styles and installer hook
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("dashboard/views")
+          expected = ["boot", "live", "telemetry", "glass", "status"]
+          for name in expected:
+              css = (root / f"{name}.css").read_text(encoding="utf-8")
+              assert "nz-highlight" in css, name
+              assert "prefers-reduced-motion" in css, name
+          main = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
+          assert '"DV" "Dashboard-Ansicht wählen' in main
+          assert "nodezero-dashboard-views --install" in main
+          manager = Path("proxmox/tools/nodezero-dashboard-views").read_text(encoding="utf-8")
+          assert "NODEZERO-VIEWS-START" in manager
+          assert "NODEZERO-VIEWS-END" in manager
+          assert "dashboard-view" in manager
+          assert "docker " not in manager
+          assert "systemctl restart" not in manager
+          print("OK: 5 Styles, Menu, Local Cache, Idempotent HTML markers")
+          PY
