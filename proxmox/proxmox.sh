@@ -5791,11 +5791,19 @@ pushover_send() {
     [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] || return 0
     [[ -n "${PUSHOVER_APP_TOKEN:-}" ]] || return 0
 
-    # Pushover message body begrenzen.
-    message="$(printf '%s' "$message" | head -c 900)"
+    # Pushover erlaubt maximal 1024 Zeichen je Nachricht. In mehrere
+    # kleinere Nachrichten aufteilen, statt Fehler am Ende abzuschneiden.
+    local chunk_size=850 remaining="$message"
+    local chunks=()
+    while (( ${#remaining} > chunk_size )); do
+        chunks+=("${remaining:0:chunk_size}")
+        remaining="${remaining:chunk_size}"
+    done
+    chunks+=("$remaining")
 
     local idx user_var device_var name_var
     local user device name
+    local part_index part_title
     local sent=0
 
     for idx in 1 2; do
@@ -5807,7 +5815,6 @@ pushover_send() {
         device="${!device_var:-}"
         name="${!name_var:-Empfänger ${idx}}"
 
-        # Abwärtskompatibilität mit älteren V22-V26-Konfigurationen:
         if [[ "$idx" == "1" && -z "$user" ]]; then
             user="${PUSHOVER_USER_KEY:-}"
             device="${PUSHOVER_DEVICE:-}"
@@ -5816,34 +5823,41 @@ pushover_send() {
 
         [[ -n "$user" ]] || continue
 
-        local args=(
-            -fsS
-            --connect-timeout 10
-            --max-time 20
-            -X POST
-            --data-urlencode "token=${PUSHOVER_APP_TOKEN}"
-            --data-urlencode "user=${user}"
-            --data-urlencode "title=${title}"
-            --data-urlencode "message=${message}"
-            --data-urlencode "priority=${priority}"
-        )
+        for (( part_index=0; part_index<${#chunks[@]}; part_index++ )); do
+            part_title="$title"
+            if (( ${#chunks[@]} > 1 )); then
+                part_title+=" ($((part_index + 1))/${#chunks[@]})"
+            fi
 
-        if [[ -n "$device" ]]; then
-            args+=(--data-urlencode "device=${device}")
-        fi
+            local args=(
+                -fsS
+                --connect-timeout 10
+                --max-time 20
+                -X POST
+                --data-urlencode "token=${PUSHOVER_APP_TOKEN}"
+                --data-urlencode "user=${user}"
+                --data-urlencode "title=${part_title}"
+                --data-urlencode "message=${chunks[part_index]}"
+                --data-urlencode "priority=${priority}"
+            )
 
-        if curl "${args[@]}" \
-            https://api.pushover.net/1/messages.json \
-            >/dev/null; then
-            echo "Pushover gesendet an: $name"
-            sent=$((sent + 1))
-        else
-            echo "WARNUNG: Pushover an '$name' konnte nicht gesendet werden."
-        fi
+            if [[ -n "$device" ]]; then
+                args+=(--data-urlencode "device=${device}")
+            fi
+
+            if curl "${args[@]}" \
+                https://api.pushover.net/1/messages.json \
+                >/dev/null; then
+                echo "Pushover gesendet an: $name ($((part_index + 1))/${#chunks[@]})"
+                sent=$((sent + 1))
+            else
+                echo "WARNUNG: Pushover an '$name' (Teil $((part_index + 1))) konnte nicht gesendet werden."
+            fi
+        done
     done
 
     if (( sent == 0 )); then
-        echo "WARNUNG: Pushover ist aktiviert, aber kein gültiger Empfänger ist konfiguriert."
+        echo "WARNUNG: Pushover ist aktiviert, aber keine Nachricht konnte versendet werden."
     fi
 }
 
@@ -6136,6 +6150,22 @@ compose_state() {
     " 2>/dev/null | tr -d '\r'
 }
 
+cleanup_ct_docker_images() {
+    local ctid="$1"
+    local label="$2"
+
+    echo "--- ${label}: alte unbenutzte Docker-Images bereinigen (7 Tage) ---"
+    if pct exec "$ctid" -- bash -lc '
+        set -Eeuo pipefail
+        docker image prune -a -f --filter "until=168h"
+        df -h /
+    '; then
+        echo "[OK] ${label}: Docker-Image-Bereinigung abgeschlossen."
+    else
+        add_manual "${label}: automatische Docker-Image-Bereinigung fehlgeschlagen"
+    fi
+}
+
 update_ct_compose() {
     local ctid="$1"
     local label="$2"
@@ -6176,6 +6206,7 @@ update_ct_compose() {
                 docker compose up -d --remove-orphans
             "; then
                 add_update "${label}: Docker-Images/Container aktualisiert"
+                cleanup_ct_docker_images "$ctid" "$label"
 
                 if [[ "$hostname" == "pihole" ]]; then
                     PIHOLE_DOCKER_CHANGED=1
@@ -6185,6 +6216,7 @@ update_ct_compose() {
             fi
         else
             echo "${label}: Docker-Images bereits aktuell."
+            cleanup_ct_docker_images "$ctid" "$label"
         fi
     else
         add_failure "${label}: Docker-Updateprüfung fehlgeschlagen"
@@ -6501,20 +6533,21 @@ update_proxmox_host() {
 
 build_summary() {
     local out=""
+    local item
 
-    if (( ${#UPDATED_ITEMS[@]} > 0 )); then
-        out+="Installiert/aktualisiert:\n"
-        local item
-        for item in "${UPDATED_ITEMS[@]}"; do
+    # Kritische Hinweise immer zuerst, damit sie in der Push-Nachricht
+    # sichtbar sind, auch wenn viele Pakete aktualisiert wurden.
+    if (( ${#MANUAL_ITEMS[@]} > 0 )); then
+        out+="Persönliches Eingreifen:\n"
+        for item in "${MANUAL_ITEMS[@]}"; do
             out+="- ${item}\n"
         done
     fi
 
-    if (( ${#MANUAL_ITEMS[@]} > 0 )); then
+    if (( ${#UPDATED_ITEMS[@]} > 0 )); then
         [[ -n "$out" ]] && out+="\n"
-        out+="Persönliches Eingreifen:\n"
-        local item
-        for item in "${MANUAL_ITEMS[@]}"; do
+        out+="Installiert/aktualisiert:\n"
+        for item in "${UPDATED_ITEMS[@]}"; do
             out+="- ${item}\n"
         done
     fi
@@ -6524,6 +6557,8 @@ build_summary() {
 
 send_summary() {
     local summary
+    local priority=0
+    (( ${#FAILED_ITEMS[@]} > 0 )) && priority=1
     summary="$(build_summary)"
 
     if [[ -z "$summary" ]]; then
@@ -6543,12 +6578,12 @@ send_summary() {
             pushover_send \
                 "Proxmox Updates + Eingreifen nötig" \
                 "$summary" \
-                1
+                "$priority"
         elif manual_notification_due "$summary"; then
             pushover_send \
                 "Proxmox: Eingreifen nötig" \
                 "$summary" \
-                1
+                "$priority"
         else
             echo "Identische manuelle Pushover-Warnung wurde in den letzten 7 Tagen bereits gesendet."
         fi
@@ -11663,8 +11698,19 @@ cd "$COMPOSE_DIR"
 docker compose config -q
 
 ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
+[[ "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || {
+    echo "FEHLER: Verfügbaren Root-Speicher nicht messbar." >&2
+    exit 1
+}
+
+if (( ROOT_FREE_MB < 3072 )); then
+    echo "[WARN] Nur ${ROOT_FREE_MB} MB auf / frei. Räume unbenutzte Docker-Images auf ..."
+    docker image prune -a -f
+    ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
+fi
+
 if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 3072 )); then
-    echo "FEHLER: Docker-Image-Pull abgebrochen: weniger als 3 GB auf der LXC-Root-Disk frei." >&2
+    echo "FEHLER: Docker-Image-Pull abgebrochen: trotz Image-Bereinigung weniger als 3 GB auf / frei." >&2
     df -hT / >&2 || true
     exit 1
 fi
@@ -11697,8 +11743,22 @@ echo "Docker-Image-Cache:"
 echo "  $TAR"
 
 if [[ -s "$TAR" ]]; then
-    echo "Lade vorhandene Images aus /home/img ..."
-    docker load -i "$TAR" >/dev/null
+    # Nur Images nachladen, die lokal noch fehlen. Anderenfalls würden
+    # ältere Stände aus dem persistenten Cache wieder importiert.
+    CACHE_RESTORE_NEEDED=0
+    for image in "${IMAGES[@]}"; do
+        if ! docker image inspect "$image" >/dev/null 2>&1; then
+            CACHE_RESTORE_NEEDED=1
+            break
+        fi
+    done
+
+    if (( CACHE_RESTORE_NEEDED == 1 )); then
+        echo "Fehlende Images aus /home/img laden ..."
+        docker load -i "$TAR" >/dev/null
+    else
+        echo "[OK] Benötigte Images bereits lokal vorhanden; Cache-Import übersprungen."
+    fi
 fi
 
 echo "Prüfe Registry auf neuere Images ..."
