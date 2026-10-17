@@ -981,6 +981,34 @@ tui_host_status_v106() {
         "$host" "$ip" "$pve_version" "$vm_count" "$ct_count" "$root_use"
 }
 
+# V145 · Eigenständige Dashboard-Ansichten, ohne Neuinstallation des Stacks.
+# Designpakete liegen unter /home/downloads/nodezero/dashboard-views/v1.
+install_nodezero_dashboard_view_manager_v1() {
+    local target="/usr/local/sbin/nodezero-dashboard-views"
+    local cache="/home/downloads/nodezero/tools/nodezero-dashboard-views-v1"
+    local tmp="${cache}.tmp"
+
+    mkdir -p "$(dirname "$cache")"
+    if [[ ! -s "$cache" ]]; then
+        rm -f "$tmp"
+        if ! curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 2 --connect-timeout 15 \
+            "https://raw.githubusercontent.com/Technox90/homeatic/main/proxmox/tools/nodezero-dashboard-views" \
+            -o "$tmp"; then
+            rm -f "$tmp"
+            warn "NodeZero-Ansichtsauswahl konnte nicht von GitHub geladen werden."
+            return 1
+        fi
+        [[ -s "$tmp" ]] || { rm -f "$tmp"; return 1; }
+        bash -n "$tmp" || { rm -f "$tmp"; return 1; }
+        mv -f "$tmp" "$cache"
+    fi
+
+    bash -n "$cache" || return 1
+    install -m 0755 -o root -g root "$cache" "$target"
+    return 0
+}
+
 tui_basis_menu_v106() {
     local result=""
 
@@ -995,6 +1023,7 @@ tui_basis_menu_v106() {
                 21 88 9 \
                 "6" "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" \
                 "1" "Server-Dashboard installieren / aktualisieren" \
+                "DV" "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" \
                 "2" "Home Assistant OS" \
                 "3" "Paperless-ngx + Ollama" \
                 "4" "Pi-hole + Unbound" \
@@ -1006,7 +1035,7 @@ tui_basis_menu_v106() {
         return 0
     fi
 
-    printf >&2 '\nBASIS-SYSTEME\n  6 Basis-Paket (empfohlen)\n  1 Dashboard\n  2 Home Assistant\n  3 Paperless\n  4 Pi-hole\n  5 NetAlertX\n  9 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [6]: '
+    printf >&2 '\nBASIS-SYSTEME\n  6 Basis-Paket (empfohlen)\n  1 Dashboard\n  DV Dashboard-Ansichten auswählen\n  2 Home Assistant\n  3 Paperless\n  4 Pi-hole\n  5 NetAlertX\n  9 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [6]: '
     read -r result
     result="${result:-6}"
     [[ "${result^^}" == "Z" ]] && return 1
@@ -9114,6 +9143,18 @@ while true; do
 
     if [[ "${INSTALL_SELECTION^^}" == "I" ]]; then
         show_installer_info
+        continue
+    fi
+
+    if [[ "${INSTALL_SELECTION^^}" == "DV" ]]; then
+        if [[ ! -s /opt/nodezero/dashboard/static/index.html ]]; then
+            warn "Dashboard noch nicht installiert. Bitte zuerst Server-Dashboard installieren."
+        elif install_nodezero_dashboard_view_manager_v1; then
+            /usr/local/sbin/nodezero-dashboard-views --menu ||
+                warn "Dashboard-Ansicht konnte nicht gewechselt werden."
+        else
+            warn "Dashboard-Ansichtsauswahl konnte nicht installiert werden."
+        fi
         continue
     fi
 
@@ -20395,6 +20436,17 @@ if (( INSTALL_DASHBOARD )); then
 
     # TLS darf die fertige UI nicht verändern oder zurücksetzen.
     validate_dashboard_final_state_v69 ||         die "Dashboard-UI wurde nach TLS unerwartet verändert."
+fi
+
+# V145: Designpakete ganz am Ende nach allen UI-Patches anwenden.
+# Eine vorher gewählte Ansicht bleibt auch nach Dashboard-Updates aktiv.
+if (( INSTALL_DASHBOARD )); then
+    if install_nodezero_dashboard_view_manager_v1; then
+        /usr/local/sbin/nodezero-dashboard-views --install ||
+            die "Dashboard-Ansichten konnten nicht installiert werden."
+    else
+        die "Dashboard-Ansichtsauswahl konnte nicht geladen werden."
+    fi
 fi
 
 # =============================================================================
