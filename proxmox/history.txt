@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+17.10.2026 – V145 · NodeZero Dashboard-Ansichten
+------------------------------------------------
+- Fünf GitHub-Darstellungsprofile: Boot Sequence, Live Pulse, Telemetry Flow, Glass Motion und Status Control.
+- Neue Auswahl: Basis-Systeme -> DV Dashboard-Ansicht wählen; kein Gast-Reset oder Dashboard-Neuaufbau erforderlich.
+- Alle fünf CSS-Pakete und ein gemeinsames Animationsskript werden lokal zwischengespeichert.
+- Offline-Wechsel über /usr/local/sbin/nodezero-dashboard-views; aktiver Stil bleibt bei Dashboard-Updates erhalten.
+- Basis-HTML wird vor erstmaliger Integration gesichert; markerbasierte Integration ist wiederholbar.
+- Dashboard-Daten, Kategorien, Links, API, Power-Code und TLS bleiben unverändert.
+- Workflow prüft Bash-/JavaScript-Syntax und die fünf Pakete.
+
 29.09.2026 – V144
 -----------------
 - Installer-Verzeichnisstruktur vereinheitlicht: verwaltete Artefakte liegen künftig unter /home.

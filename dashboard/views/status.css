@@ -1,0 +1,46 @@
+/* NodeZero Dashboard Views v1 — shared styles and motion */
+:root { --nz-highlight:#64a7ff; --nz-surface:#102036; --nz-edge:#37516e; --nz-glow:#64a7ff35; }
+.card,.chart,.live,.navItem,.navManage,.serviceCard,.linkCard,.statCard,button {
+  transition: background-color .25s ease, border-color .25s ease,box-shadow .25s ease,transform .25s ease,opacity .25s ease;
+}
+.card,.chart,.serviceCard,.linkCard,.statCard { border-color:var(--nz-edge); }
+.card:hover,.chart:hover,.serviceCard:hover,.linkCard:hover,.statCard:hover { transform:translateY(-3px);border-color:var(--nz-highlight);box-shadow:0 12px 30px var(--nz-glow); }
+button:hover:not(:disabled),.navItem:hover,.navManage:hover {transform:translateY(-1px);}
+.nz-view-badge {display:inline-flex;align-items:center;gap:7px;border-radius:999px;font-size:11px;font-weight:700;padding:5px 9px;color:var(--nz-highlight);border:1px solid var(--nz-edge);background:var(--nz-surface);white-space:nowrap;}
+.nz-view-dot {width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor;}
+.nz-view-dot.nz-offline {color:#ff5f6d;}
+.nz-value-updated {animation:nz-value-refresh .45s ease-out both;}
+.nz-enter {animation:nz-enter .55s cubic-bezier(.2,.8,.2,1) both;}
+.nz-alert {border-color:#ffbd4a !important;box-shadow:inset 3px 0 #ffbd4a,0 0 16px #ffbd4a26 !important;}
+.nz-critical {border-color:#ff5f6d !important;box-shadow:inset 3px 0 #ff5f6d,0 0 18px #ff5f6d44 !important;}
+.nz-refresh-ticker {width:42px;height:3px;display:inline-block;overflow:hidden;border-radius:5px;background:#ffffff22;vertical-align:middle;}
+.nz-refresh-ticker>i {width:100%;height:100%;display:block;background:var(--nz-highlight);transform-origin:left;animation:nz-progress 15s linear infinite;}
+.nz-boot-overlay {position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at center,#152b43,#08101b 70%);color:#edf7ff;display:grid;place-items:center;transition:opacity .5s ease,visibility .5s;}
+.nz-boot-overlay.nz-finished {opacity:0;visibility:hidden;pointer-events:none;}
+.nz-boot-inner {display:grid;justify-items:center;text-align:center;gap:12px;padding:20px;}
+.nz-boot-ring {width:86px;height:86px;border-radius:50%;border:3px solid #ffffff1a;border-top-color:var(--nz-highlight);box-shadow:0 0 36px var(--nz-glow);animation:nz-spin 1.1s linear infinite;}
+.nz-boot-title {font-weight:800;font-size:26px;letter-spacing:.14em;}
+.nz-boot-sub {font-size:12px;letter-spacing:.06em;color:#a4b9d3;}
+.nz-placeholder {position:relative;overflow:hidden;}
+.nz-placeholder::after {content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 20%,#ffffff10 48%,transparent 76%);transform:translateX(-120%);animation:nz-shimmer 1.7s ease-in-out infinite;}
+@keyframes nz-spin {to {transform:rotate(360deg);}}
+@keyframes nz-shimmer {to {transform:translateX(120%);}}
+@keyframes nz-value-refresh {0% {opacity:.5;filter:brightness(1.7);transform:translateY(4px);}100% {opacity:1;filter:brightness(1);transform:translateY(0);}}
+@keyframes nz-enter {from {opacity:.3;transform:translateY(13px);}to {opacity:1;transform:translateY(0);}}
+@keyframes nz-progress {0% {transform:scaleX(0);}100% {transform:scaleX(1);}}
+@keyframes nz-pulse {0%,100% {box-shadow:0 0 0 0 var(--nz-glow);}50% {box-shadow:0 0 0 7px transparent;}}
+@media(max-width:760px){.nz-view-badge{font-size:10px}.card:hover,.chart:hover,.serviceCard:hover,.linkCard:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important;}}
+
+/* 5 STATUS CONTROL — clean operations, explicit warning colors */
+:root{--nz-highlight:#80dda2;--nz-surface:#1b272a;--nz-edge:#344c47;--nz-glow:#74dba027}
+body{background:radial-gradient(circle at 80% -15%,#244a4550,transparent 36rem),#0d1719 !important}
+.card,.chart{background:linear-gradient(155deg,#162526,#101c1e) !important;border-left:3px solid #506a68}
+.card .value{color:#dcfce9}
+.card.nz-alert{border-left:4px solid #ffbd4a !important;animation:nz-warning-flash 2.7s ease-in-out infinite}
+.card.nz-critical{border-left:4px solid #ff5f6d !important;animation:nz-danger-flash 1.8s ease-in-out infinite}
+.live{background:#122c25 !important;border-color:#437866 !important}
+.nz-view-dot.nz-offline{animation:nz-danger-flash 1.5s infinite}
+@keyframes nz-warning-flash{50%{box-shadow:inset 3px 0 #ffbd4a,0 0 24px #ffbd4a2b}}
+@keyframes nz-danger-flash{50%{box-shadow:inset 3px 0 #ff5f6d,0 0 30px #ff5f6d60}}
+.ranges button.active{background:#265346 !important;border-color:#80dda2 !important}

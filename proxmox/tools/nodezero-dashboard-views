@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# NodeZero Dashboard-Ansichten v1: GitHub-Download, Cache und Offline-Wechsel
+set -Eeuo pipefail
+umask 022
+
+REMOTE="https://raw.githubusercontent.com/Technox90/homeatic/main/dashboard/views"
+CACHE="/home/downloads/nodezero/dashboard-views/v1"
+STATIC="/opt/nodezero/dashboard/static"
+TARGET="$STATIC/nodezero-views"
+INDEX="$STATIC/index.html"
+STATE="/etc/pve-sensor-dashboard/dashboard-view"
+BACKUPS="/home/backups/nodezero-dashboard-views"
+VIEWS=(boot live telemetry glass status)
+FILES=(boot.css live.css telemetry.css glass.css status.css runtime.js)
+
+view_title() {
+  case "$1" in
+    boot) echo "Boot Sequence - Start und Ladeanimation" ;;
+    live) echo "Live Pulse - Signal und Refresh" ;;
+    telemetry) echo "Telemetry Flow - Graphen und Werte" ;;
+    glass) echo "Glass Motion - Glaskarten und Hover" ;;
+    status) echo "Status Control - Zustände und Warnungen" ;;
+    *) return 1 ;;
+  esac
+}
+is_view() {
+  case "$1" in boot|live|telemetry|glass|status) return 0;; *) return 1;; esac
+}
+current_view() {
+  local id="boot"
+  if [[ -s "$STATE" ]]; then
+    IFS= read -r id < "$STATE" || true
+  fi
+  is_view "$id" || id="boot"
+  printf '%s\n' "$id"
+}
+need_dashboard() {
+  [[ -s "$INDEX" ]] || {
+    echo "FEHLER: Dashboard fehlt: $INDEX" >&2
+    echo "Bitte zuerst 'Server-Dashboard installieren / aktualisieren' wählen." >&2
+    exit 1
+  }
+}
+fetch_all() {
+  local refresh="$1" f tmp failed=0
+  mkdir -p "$CACHE"
+  for f in "${FILES[@]}"; do
+    if [[ "$refresh" != 1 && -s "$CACHE/$f" ]]; then
+      echo "[CACHE] $f"
+      continue
+    fi
+    tmp="$(mktemp "$CACHE/.$f.XXXXXX")"
+    if curl --fail --silent --show-error --location \
+      --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 70 \
+      "$REMOTE/$f" -o "$tmp" && [[ -s "$tmp" ]]; then
+      chmod 0644 "$tmp"
+      mv -f "$tmp" "$CACHE/$f"
+      echo "[GITHUB] $f"
+    else
+      rm -f "$tmp"
+      if [[ -s "$CACHE/$f" ]]; then
+        echo "[WARN] GitHub nicht erreichbar, lokaler Cache bleibt: $f" >&2
+      else
+        echo "FEHLER: Keine Quelle für $f (GitHub/Cache)." >&2
+        failed=1
+      fi
+    fi
+  done
+  (( failed == 0 ))
+}
+atomic_copy() {
+  local source="$1" dest="$2" tmp
+  tmp="$(mktemp "$TARGET/.asset.XXXXXX")"
+  cat "$source" > "$tmp"
+  chmod 0644 "$tmp"
+  mv -f "$tmp" "$dest"
+}
+activate() {
+  local id="$1" stamp tmp rev
+  is_view "$id" || { echo "FEHLER: Unbekannte Ansicht: $id" >&2; return 1; }
+  need_dashboard
+  fetch_all 0
+  mkdir -p "$TARGET" "$(dirname "$STATE")" "$BACKUPS"
+  chmod 0755 "$TARGET"
+
+  if ! grep -Fq '<!-- NODEZERO-VIEWS-START -->' "$INDEX"; then
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    cp -a "$INDEX" "$BACKUPS/index-before-views-$stamp.html"
+    echo "[BACKUP] Dashboard-HTML gesichert."
+  fi
+
+  atomic_copy "$CACHE/$id.css" "$TARGET/active.css"
+  atomic_copy "$CACHE/runtime.js" "$TARGET/runtime.js"
+  tmp="$(mktemp "$TARGET/.active.XXXXXX")"
+  printf 'window.NODEZERO_DASHBOARD_VIEW="%s";\n' "$id" > "$tmp"
+  chmod 0644 "$tmp"
+  mv -f "$tmp" "$TARGET/active.js"
+
+  rev="$(date +%s%N)"
+  NZ_VIEW_REV="$rev" python3 - "$INDEX" <<'PYVIEW'
+import os, re, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+html = p.read_text(encoding="utf-8")
+start = "<!-- NODEZERO-VIEWS-START -->"
+end = "<!-- NODEZERO-VIEWS-END -->"
+v = os.environ["NZ_VIEW_REV"]
+block = (f'{start}\n'
+         f'<link rel="stylesheet" href="/nodezero-views/active.css?v={v}">\n'
+         f'<script defer src="/nodezero-views/active.js?v={v}"></script>\n'
+         f'<script defer src="/nodezero-views/runtime.js?v={v}"></script>\n'
+         f'{end}')
+if start in html or end in html:
+    pattern = re.compile(re.escape(start)+r".*?"+re.escape(end), re.S)
+    if not pattern.search(html):
+        raise SystemExit("FEHLER: NodeZero-Ansichtsmarker beschädigt.")
+    html = pattern.sub(lambda _: block, html, count=1)
+elif "</head>" in html:
+    html = html.replace("</head>", block+"\n</head>", 1)
+else:
+    raise SystemExit("FEHLER: Dashboard <head> fehlt.")
+new = p.with_name(p.name+".nodezero-new")
+new.write_text(html, encoding="utf-8")
+new.chmod(0o644)
+new.replace(p)
+PYVIEW
+
+  tmp="$(mktemp "$(dirname "$STATE")/.dashboard-view.XXXXXX")"
+  printf '%s\n' "$id" > "$tmp"
+  chmod 0644 "$tmp"
+  mv -f "$tmp" "$STATE"
+  echo "[OK] Dashboard-Ansicht: $(view_title "$id")"
+  echo "[OK] Auswahl gespeichert: $STATE"
+  echo "[OK] Offline-Cache: $CACHE"
+  echo "Browser mit Strg+F5 neu laden. Kein Dienstneustart erforderlich."
+}
+status() {
+  local id f n=0
+  id="$(current_view)"
+  echo "Aktiv: $(view_title "$id")"
+  echo "Cache: $CACHE"
+  for f in "${FILES[@]}"; do
+    [[ -s "$CACHE/$f" ]] && n=$((n+1))
+  done
+  echo "Gespeicherte Dateien: $n/${#FILES[@]}"
+  echo "Dashboard HTML: $INDEX"
+}
+menu() {
+  local choice=""
+  need_dashboard
+  if command -v whiptail >/dev/null 2>&1 && [[ -t 2 ]]; then
+    choice="$(whiptail \
+      --backtitle "NodeZero · GitHub-Pakete lokal gespeichert" \
+      --title "DASHBOARD ANSICHT AUSWÄHLEN" \
+      --ok-button "Anwenden" --cancel-button "Zurück" \
+      --menu "Aktiv: $(current_view)\nEin Wechsel funktioniert auch offline." \
+      21 96 8 \
+      "boot" "1 · Boot Sequence - animierter Start" \
+      "live" "2 · Live Pulse - Live-Indikator" \
+      "telemetry" "3 · Telemetry Flow - Messwerte und Diagramme" \
+      "glass" "4 · Glass Motion - transparente Karten" \
+      "status" "5 · Status Control - Warnungen und Zustände" \
+      "REFRESH" "Alle fünf Ansichten von GitHub erneut laden" \
+      "STATUS" "Installationsstatus / Cache anzeigen" \
+      3>&1 1>&2 2>&3)" || return 0
+  else
+    echo "=== DASHBOARD ANSICHT AUSWÄHLEN ==="
+    status
+    echo "1) Boot Sequence"
+    echo "2) Live Pulse"
+    echo "3) Telemetry Flow"
+    echo "4) Glass Motion"
+    echo "5) Status Control"
+    echo "6) Alle Ansichten aktualisieren"
+    echo "0) Zurück"
+    read -rp "Auswahl: " choice
+    case "$choice" in
+      1) choice=boot;; 2) choice=live;; 3) choice=telemetry;;
+      4) choice=glass;; 5) choice=status;; 6) choice=REFRESH;;
+      0|"") return 0;; *) echo "Ungültige Auswahl" >&2; return 1;;
+    esac
+  fi
+  case "$choice" in
+    REFRESH) fetch_all 1; activate "$(current_view)" ;;
+    STATUS) status ;;
+    *) activate "$choice" ;;
+  esac
+}
+(( EUID == 0 )) || { echo "FEHLER: Root-Rechte erforderlich" >&2; exit 1; }
+action="${1:---menu}"
+case "$action" in
+  --menu) menu ;;
+  --install) activate "$(current_view)" ;;
+  --select)
+    (( $# == 2 )) || { echo "Benutzung: $0 --select VIEW" >&2; exit 2; }
+    activate "$2" ;;
+  --refresh) need_dashboard; fetch_all 1; activate "$(current_view)" ;;
+  --status) status ;;
+  --list) for id in "${VIEWS[@]}"; do printf '%s: %s\n' "$id" "$(view_title "$id")"; done ;;
+  *) echo "Benutzung: $0 [--menu|--install|--select VIEW|--refresh|--status|--list]" >&2; exit 2 ;;
+esac
