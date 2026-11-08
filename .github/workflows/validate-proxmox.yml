@@ -30,10 +30,15 @@ jobs:
       - name: Dashboard Python syntax
         run: python3 -m py_compile dashboard/collector.py dashboard/app.py
 
-      - name: Updater tool Bash syntax
+      - name: Updater tools Bash syntax
         run: |
+          bash -n proxmox/tools/proxmox-auto-updater
           bash -n proxmox/tools/proxmox-auto-updater-config
           bash -n proxmox/tools/proxmox-pushover-config
+          bash -n proxmox/tests/test-auto-updater.sh
+
+      - name: Updater isolated regression tests
+        run: bash proxmox/tests/test-auto-updater.sh
 
       - name: V142 maintenance navigation
         run: |
