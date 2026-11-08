@@ -997,7 +997,8 @@ send_summary() {
             echo "Identische manuelle Pushover-Warnung wurde in den letzten 7 Tagen bereits gesendet."
         fi
     else
-        rm -f "${STATE_DIR}/manual-warning.sha256"    fi
+        rm -f "${STATE_DIR}/manual-warning.sha256"
+    fi
 }
 
 # =============================================================================
@@ -1029,3 +1030,4 @@ send_summary
 echo
 echo "Fertig: $(date)"
 echo "Log: $LOGFILE"
+
