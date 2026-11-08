@@ -55,7 +55,6 @@ add_manual() {
 
 add_failure() {
     FAILED_ITEMS+=("$1")
-    MANUAL_ITEMS+=("$1")
     echo "[FEHLER] $1"
 }
 
@@ -211,13 +210,13 @@ pushover_send() {
     local priority="${3:-0}"
     local report_path="${4:-$SUMMARYFILE}"
 
-    [[ -f "$PUSH_CONF" ]] || return 0
+    [[ -f "$PUSH_CONF" ]] || return 1
 
     # shellcheck disable=SC1090
     source "$PUSH_CONF"
 
-    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] || return 0
-    [[ -n "${PUSHOVER_APP_TOKEN:-}" ]] || return 0
+    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] || return 1
+    [[ -n "${PUSHOVER_APP_TOKEN:-}" ]] || return 1
 
     # Bei langen Nachrichten den Berichtspfad als letzten Text bewahren.
     message="$(pushover_prepare_message "$message" "$report_path")"
@@ -271,8 +270,10 @@ pushover_send() {
     done
 
     if (( sent == 0 )); then
-        echo "WARNUNG: Pushover ist aktiviert, aber kein gültiger Empfänger ist konfiguriert."
+        echo "WARNUNG: Keine Pushover-Nachricht zugestellt."
+        return 1
     fi
+    return 0
 }
 
 manual_notification_due() {
@@ -281,28 +282,22 @@ manual_notification_due() {
     local hash age now mtime
 
     hash="$(printf '%s' "$body" | sha256sum | awk '{print $1}')"
-
-    if [[ ! -f "$hash_file" ]]; then
-        printf '%s\n' "$hash" > "$hash_file"
-        return 0
-    fi
-
-    if [[ "$(cat "$hash_file" 2>/dev/null)" != "$hash" ]]; then
-        printf '%s\n' "$hash" > "$hash_file"
-        return 0
-    fi
+    [[ -f "$hash_file" ]] || return 0
+    [[ "$(cat "$hash_file" 2>/dev/null)" == "$hash" ]] || return 0
 
     now="$(date +%s)"
     mtime="$(stat -c %Y "$hash_file" 2>/dev/null || echo 0)"
     age=$(( now - mtime ))
 
     # Gleiche manuelle Warnung höchstens einmal pro 7 Tage.
-    if (( age >= 604800 )); then
-        touch "$hash_file"
-        return 0
-    fi
+    (( age >= 604800 ))
+}
 
-    return 1
+mark_manual_notification_sent() {
+    local body="$1"
+    local hash_file="${STATE_DIR}/manual-warning.sha256"
+    printf '%s' "$body" | sha256sum | awk '{print $1}' > "$hash_file"
+    chmod 600 "$hash_file"
 }
 
 # -----------------------------------------------------------------------------
@@ -522,13 +517,19 @@ update_ct_apt() {
         return
     fi
 
-    packages="$(
-        pct exec "$ctid" -- bash -lc '
-            apt-get -s dist-upgrade 2>/dev/null |
-            awk "/^Inst / {print \$2}"
-        ' 2>/dev/null |
-        tr -d '\r'
-    )"
+    local plan=""
+    if ! plan="$(pct exec "$ctid" -- apt-get -s dist-upgrade 2>&1)"; then
+        add_failure "${label}: APT-Simulation fehlgeschlagen"
+        return
+    fi
+
+    if grep -q '^Remv ' <<< "$plan"; then
+        add_manual "${label}: APT plant Paketentfernungen; Upgrade erst manuell pruefen"
+        echo "$plan" | grep '^Remv ' || true
+        return
+    fi
+
+    packages="$(awk '/^Inst / {print $2}' <<< "$plan")"
 
     if [[ -n "$packages" ]]; then
         if pct exec "$ctid" -- bash -lc '
@@ -601,7 +602,7 @@ update_ct_compose() {
             if pct exec "$ctid" -- bash -lc "
                 set -Eeuo pipefail
                 cd '$dir'
-                docker compose up -d --remove-orphans
+                docker compose up -d
             "; then
                 add_update "${label}: Docker-Images/Container aktualisiert"
 
@@ -881,17 +882,27 @@ update_proxmox_host() {
     echo " PROXMOX HOST"
     echo "============================================================"
 
-    local packages=""
+    local packages="" plan=""
 
     if ! apt-get update; then
         add_failure "Proxmox Host: apt update fehlgeschlagen"
         return
     fi
 
-    packages="$(
-        apt-get -s dist-upgrade 2>/dev/null |
-        awk '/^Inst / {print $2}'
-    )"
+    if ! plan="$(apt-get -s dist-upgrade 2>&1)"; then
+        add_failure "Proxmox Host: APT-Simulation fehlgeschlagen"
+        return
+    fi
+
+    # Automatisch keine Paketentfernungen durch dist-upgrade akzeptieren.
+    # Insbesondere Schutz vor unbeabsichtigter Entfernung von Proxmox-Metapaketen.
+    if grep -q '^Remv ' <<< "$plan"; then
+        add_manual "Proxmox Host: APT plant Paketentfernungen; Upgrade erst manuell pruefen"
+        echo "$plan" | grep '^Remv ' || true
+        return
+    fi
+
+    packages="$(awk '/^Inst / {print $2}' <<< "$plan")"
 
     if [[ -n "$packages" ]]; then
         if DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
@@ -923,6 +934,19 @@ update_proxmox_host() {
     fi
 }
 
+check_host_services() {
+    local failed=""
+    if ! failed="$(systemctl --failed --type=service --no-legend --plain 2>/dev/null | awk '$1 ~ /\.service$/ {print $1}')"; then
+        add_failure "Proxmox Host: systemd-Dienste konnten nicht kontrolliert werden"
+        return
+    fi
+    if [[ -n "$failed" ]]; then
+        add_failure "Proxmox Host: fehlgeschlagene Dienste: $(printf '%s' "$failed" | paste -sd ', ' -)"
+    else
+        echo "Proxmox Host: keine fehlgeschlagenen systemd-Dienste."
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Summary / Notifications
 # -----------------------------------------------------------------------------
@@ -934,6 +958,15 @@ build_summary() {
         out+="Installiert/aktualisiert:\n"
         local item
         for item in "${UPDATED_ITEMS[@]}"; do
+            out+="- ${item}\n"
+        done
+    fi
+
+    if (( ${#FAILED_ITEMS[@]} > 0 )); then
+        [[ -n "$out" ]] && out+="\n"
+        out+="Fehler (prüfen):\n"
+        local item
+        for item in "${FAILED_ITEMS[@]}"; do
             out+="- ${item}\n"
         done
     fi
@@ -980,10 +1013,19 @@ send_summary() {
         for item in "${UPDATED_ITEMS[@]}"; do
             updates+="- ${item}\n"
         done
-        pushover_send "Proxmox Updates installiert" "$(printf '%b' "$updates")" 0
+        pushover_send "Proxmox Updates installiert" "$(printf '%b' "$updates")" 0 || true
     fi
 
-    # Nur die WARNUNGEN fingerprinten (nicht die taeglich wechselnden Update-Listen).
+    # Fehler bei jedem Lauf melden, nicht sieben Tage lang stummschalten.
+    if (( ${#FAILED_ITEMS[@]} > 0 )); then
+        local failures="Fehler (bitte pruefen):\n"
+        for item in "${FAILED_ITEMS[@]}"; do
+            failures+="- ${item}\n"
+        done
+        pushover_send "Proxmox Update-Fehler" "$(printf '%b' "$failures")" 1 || true
+    fi
+
+    # Nur manuelle WARNUNGEN fingerprinten (nicht taegliche Update-Listen).
     if (( ${#MANUAL_ITEMS[@]} > 0 )); then
         manual="Persoenliches Eingreifen:\n"
         for item in "${MANUAL_ITEMS[@]}"; do
@@ -992,7 +1034,11 @@ send_summary() {
         manual_body="$(printf '%b' "$manual")"
 
         if manual_notification_due "$manual_body"; then
-            pushover_send "Proxmox: Eingreifen noetig" "$manual_body" 1
+            if pushover_send "Proxmox: Eingreifen noetig" "$manual_body" 1; then
+                mark_manual_notification_sent "$manual_body"
+            else
+                echo "WARNUNG: Pushover nicht zugestellt; erneuter Versuch beim naechsten Lauf."
+            fi
         else
             echo "Identische manuelle Pushover-Warnung wurde in den letzten 7 Tagen bereits gesendet."
         fi
@@ -1024,6 +1070,7 @@ update_home_assistant
 
 # Host zuletzt, damit PVE-Paketupdates die laufende CT-Aktualisierung nicht stören.
 update_proxmox_host
+check_host_services
 
 send_summary
 
