@@ -1,0 +1,1031 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+LOCKFILE="/run/proxmox-auto-updater.lock"
+LOG_DIR="/home/diagnose/proxmox-auto-updater"
+STATE_DIR="/var/lib/proxmox-auto-updater"
+PUSH_CONF="/root/.config/proxmox-auto-updater/pushover.env"
+
+IMAGE_DIR="/home/img"
+HAOS_CACHE="${IMAGE_DIR}/haos"
+LXC_CACHE="${IMAGE_DIR}/template/cache"
+DOCKER_CACHE="${IMAGE_DIR}/docker"
+OLLAMA_CACHE="${IMAGE_DIR}/ollama"
+DOWNLOAD_CACHE="/home/downloads"
+PIHOLE_LANG_CACHE="/home/downloads/pihole-language"
+
+mkdir -p "$LOG_DIR" "$STATE_DIR"
+chmod 700 "$LOG_DIR" "$STATE_DIR"
+
+STAMP="$(date +%Y-%m-%d-%H-%M)"
+LOGFILE="${LOG_DIR}/update-${STAMP}.txt"
+SUMMARYFILE="${LOG_DIR}/summary-${STAMP}.txt"
+touch "$LOGFILE"
+chmod 600 "$LOGFILE"
+
+exec > >(tee -a "$LOGFILE") 2>&1
+
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    echo "Updater läuft bereits. Abbruch."
+    exit 0
+fi
+
+# Alte Update-Logs nach 60 Tagen entfernen.
+find "$LOG_DIR" -maxdepth 1 -type f \
+    \( -name 'update-*.txt' -o -name 'summary-*.txt' \) \
+    -mtime +60 -delete 2>/dev/null || true
+
+UPDATED_ITEMS=()
+MANUAL_ITEMS=()
+FAILED_ITEMS=()
+
+PIHOLE_DOCKER_CHANGED=0
+PIHOLE_TRANSLATION_CHANGED=0
+
+add_update() {
+    UPDATED_ITEMS+=("$1")
+    echo "[UPDATE] $1"
+}
+
+add_manual() {
+    MANUAL_ITEMS+=("$1")
+    echo "[MANUELL] $1"
+}
+
+add_failure() {
+    FAILED_ITEMS+=("$1")
+    MANUAL_ITEMS+=("$1")
+    echo "[FEHLER] $1"
+}
+
+short_list() {
+    local data="$1"
+    local count names
+
+    # Keine frueh abgebrochene head-Pipeline: unter pipefail kann sonst SIGPIPE (141) auftreten.
+    count="$(printf '%s\n' "$data" | awk 'NF {n++} END {print n+0}')"
+
+    if (( count == 0 )); then
+        printf '0'
+        return
+    fi
+
+    names="$(printf '%s\n' "$data" | awk 'NF {n++; if (n <= 12) printf "%s%s", (n == 1 ? "" : ", "), $0} END {print ""}')"
+
+    if (( count > 12 )); then
+        printf '%s Pakete (%s, ...)' "$count" "$names"
+    else
+        printf '%s Pakete (%s)' "$count" "$names"
+    fi
+}
+
+find_ct_by_hostname() {
+    local wanted="$1"
+    local id host
+
+    while read -r id; do
+        [[ "$id" =~ ^[0-9]+$ ]] || continue
+
+        host="$(
+            pct config "$id" 2>/dev/null |
+            awk -F': ' '/^hostname:/ {print $2; exit}'
+        )"
+
+        if [[ "$host" == "$wanted" ]]; then
+            echo "$id"
+            return 0
+        fi
+    done < <(pct list 2>/dev/null | awk 'NR>1 {print $1}')
+
+    return 1
+}
+
+find_ha_vm() {
+    local id name
+
+    while read -r id; do
+        [[ "$id" =~ ^[0-9]+$ ]] || continue
+
+        name="$(
+            qm config "$id" 2>/dev/null |
+            awk -F': ' '/^name:/ {print $2; exit}'
+        )"
+
+        if [[ "$name" == "homeassistant" ]]; then
+            echo "$id"
+            return 0
+        fi
+    done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
+
+    return 1
+}
+
+download_if_changed() {
+    local url="$1"
+    local dest="$2"
+    local tmp="${dest}.part"
+
+    mkdir -p "$(dirname "$dest")"
+    rm -f "$tmp"
+
+    if [[ -s "$dest" ]]; then
+        if curl -fL --retry 2 --connect-timeout 15 \
+            -R -z "$dest" \
+            "$url" \
+            -o "$tmp"; then
+
+            if [[ -s "$tmp" ]]; then
+                mv -f "$tmp" "$dest"
+                return 0
+            fi
+
+            rm -f "$tmp"
+            return 1
+        fi
+
+        rm -f "$tmp"
+        return 2
+    fi
+
+    if curl -fL --retry 3 --connect-timeout 15 \
+        -R \
+        "$url" \
+        -o "$tmp"; then
+        mv -f "$tmp" "$dest"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    return 2
+}
+
+# -----------------------------------------------------------------------------
+# Pushover
+# -----------------------------------------------------------------------------
+
+# Pushover begrenzt Nachrichten auf 1024 UTF-8-Zeichen.
+# Wir bleiben darunter (max. 1000 Bytes) und schneiden nicht mitten in
+# einer UTF-8-Sequenz oder einem Update-Eintrag ab.
+# Bei Platzmangel steht die komplette lokale Berichtdatei ganz am Schluss.
+pushover_prepare_message() {
+    # Erzwingt Byte-Zaehlung, unabhaengig von der System-Locale.
+    local LC_ALL=C
+    local body="$1"
+    local report_path="$2"
+    local max_bytes=1000
+    local footer line out=""
+
+    if (( ${#body} <= max_bytes )); then
+        printf '%s' "$body"
+        return 0
+    fi
+
+    footer=$'\n\n… weitere Einträge im Bericht\nVollständiger Bericht auf Proxmox:\n'"${report_path}"
+    local available=$((max_bytes - ${#footer}))
+    if (( available < 80 )); then
+        printf 'Bericht zu lang. Siehe: %s' "$report_path"
+        return 0
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Byte-Zaehlung ist absichtlich konservativ und UTF-8-sicher,
+        # weil ausschliesslich komplette Textzeilen uebernommen werden.
+        if (( ${#out} + ${#line} + 1 > available )); then
+            break
+        fi
+        out+="${line}"$'\n'
+    done <<< "$body"
+
+    if [[ -z "$out" ]]; then
+        out="(Keine Einzelzeile passt in die Benachrichtigung)"
+    else
+        out="${out%$'\n'}"
+    fi
+    printf '%s%s' "$out" "$footer"
+}
+
+pushover_send() {
+    local title="$1"
+    local message="$2"
+    local priority="${3:-0}"
+    local report_path="${4:-$SUMMARYFILE}"
+
+    [[ -f "$PUSH_CONF" ]] || return 0
+
+    # shellcheck disable=SC1090
+    source "$PUSH_CONF"
+
+    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] || return 0
+    [[ -n "${PUSHOVER_APP_TOKEN:-}" ]] || return 0
+
+    # Bei langen Nachrichten den Berichtspfad als letzten Text bewahren.
+    message="$(pushover_prepare_message "$message" "$report_path")"
+
+    local idx user_var device_var name_var
+    local user device name
+    local sent=0
+
+    for idx in 1 2; do
+        user_var="PUSHOVER_USER_KEY_${idx}"
+        device_var="PUSHOVER_DEVICE_${idx}"
+        name_var="PUSHOVER_NAME_${idx}"
+
+        user="${!user_var:-}"
+        device="${!device_var:-}"
+        name="${!name_var:-Empfänger ${idx}}"
+
+        # Abwärtskompatibilität mit älteren V22-V26-Konfigurationen:
+        if [[ "$idx" == "1" && -z "$user" ]]; then
+            user="${PUSHOVER_USER_KEY:-}"
+            device="${PUSHOVER_DEVICE:-}"
+            name="${PUSHOVER_NAME:-Empfänger 1}"
+        fi
+
+        [[ -n "$user" ]] || continue
+
+        local args=(
+            -fsS
+            --connect-timeout 10
+            --max-time 20
+            -X POST
+            --data-urlencode "token=${PUSHOVER_APP_TOKEN}"
+            --data-urlencode "user=${user}"
+            --data-urlencode "title=${title}"
+            --data-urlencode "message=${message}"
+            --data-urlencode "priority=${priority}"
+        )
+
+        if [[ -n "$device" ]]; then
+            args+=(--data-urlencode "device=${device}")
+        fi
+
+        if curl "${args[@]}" \
+            https://api.pushover.net/1/messages.json \
+            >/dev/null; then
+            echo "Pushover gesendet an: $name"
+            sent=$((sent + 1))
+        else
+            echo "WARNUNG: Pushover an '$name' konnte nicht gesendet werden."
+        fi
+    done
+
+    if (( sent == 0 )); then
+        echo "WARNUNG: Pushover ist aktiviert, aber kein gültiger Empfänger ist konfiguriert."
+    fi
+}
+
+manual_notification_due() {
+    local body="$1"
+    local hash_file="${STATE_DIR}/manual-warning.sha256"
+    local hash age now mtime
+
+    hash="$(printf '%s' "$body" | sha256sum | awk '{print $1}')"
+
+    if [[ ! -f "$hash_file" ]]; then
+        printf '%s\n' "$hash" > "$hash_file"
+        return 0
+    fi
+
+    if [[ "$(cat "$hash_file" 2>/dev/null)" != "$hash" ]]; then
+        printf '%s\n' "$hash" > "$hash_file"
+        return 0
+    fi
+
+    now="$(date +%s)"
+    mtime="$(stat -c %Y "$hash_file" 2>/dev/null || echo 0)"
+    age=$(( now - mtime ))
+
+    # Gleiche manuelle Warnung höchstens einmal pro 7 Tage.
+    if (( age >= 604800 )); then
+        touch "$hash_file"
+        return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# Cache aktuell halten
+# -----------------------------------------------------------------------------
+
+update_lxc_template_cache() {
+    command -v pveam >/dev/null 2>&1 || return 0
+    pvesm status 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq image-cache || return 0
+
+    echo
+    echo "=== LXC TEMPLATE CACHE ==="
+
+    if ! pveam update; then
+        add_failure "LXC-Template-Liste konnte nicht aktualisiert werden"
+        return
+    fi
+
+    local template dest
+
+    template="$(
+        pveam available --section system 2>/dev/null |
+        awk '$2~/^debian-13-standard_.*amd64\.tar\.(zst|xz|gz)$/{print $2}' |
+        sort -V |
+        tail -1
+    )"
+
+    [[ -n "$template" ]] || return 0
+
+    dest="${LXC_CACHE}/${template}"
+
+    if [[ ! -s "$dest" ]]; then
+        if pveam download image-cache "$template"; then
+            add_update "LXC-Template-Cache: $template"
+        else
+            add_failure "LXC-Template $template konnte nicht geladen werden"
+        fi
+    fi
+}
+
+update_haos_cache() {
+    command -v jq >/dev/null 2>&1 || return 0
+
+    echo
+    echo "=== HAOS INSTALLATIONS-IMAGE CACHE ==="
+
+    mkdir -p "$HAOS_CACHE"
+
+    local json="${HAOS_CACHE}/stable.json"
+    local tmp="${json}.part"
+    local version xz qcow2
+
+    if ! curl -fsSL --connect-timeout 15 \
+        https://version.home-assistant.io/stable.json \
+        -o "$tmp"; then
+        rm -f "$tmp"
+        echo "HAOS Versionsprüfung nicht erreichbar; vorhandener Cache bleibt."
+        return
+    fi
+
+    mv -f "$tmp" "$json"
+
+    version="$(jq -r '.hassos.ova // empty' "$json")"
+    [[ -n "$version" ]] || return 0
+
+    xz="${HAOS_CACHE}/haos_ova-${version}.qcow2.xz"
+    qcow2="${HAOS_CACHE}/haos_ova-${version}.qcow2"
+
+    if [[ ! -s "$qcow2" ]]; then
+        if [[ ! -s "$xz" ]]; then
+            if curl -fL --retry 3 \
+                "https://github.com/home-assistant/operating-system/releases/download/${version}/haos_ova-${version}.qcow2.xz" \
+                -o "${xz}.part"; then
+                mv -f "${xz}.part" "$xz"
+            else
+                rm -f "${xz}.part"
+                add_failure "HAOS Cache-Version $version konnte nicht geladen werden"
+                return
+            fi
+        fi
+
+        if xz -dkf "$xz"; then
+            add_update "HAOS Installations-Cache: Version $version"
+        else
+            add_failure "HAOS Cache-Version $version konnte nicht entpackt werden"
+        fi
+    fi
+}
+
+update_misc_downloads() {
+    echo
+    echo "=== KLEINE DOWNLOAD-CACHES ==="
+
+    mkdir -p \
+        "${DOWNLOAD_CACHE}/pihole" \
+        "${DOWNLOAD_CACHE}/scrutiny" \
+        "$PIHOLE_LANG_CACHE" \
+        "$DOCKER_CACHE"
+
+    local rc
+
+    set +e
+    download_if_changed \
+        "https://download.docker.com/linux/debian/gpg" \
+        "${DOCKER_CACHE}/docker.asc"
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        chmod 644 "${DOCKER_CACHE}/docker.asc"
+        chown 100000:100000 "${DOCKER_CACHE}/docker.asc" 2>/dev/null || true
+        add_update "Docker Repository-Key Cache"
+    elif (( rc == 2 )); then
+        add_failure "Docker Repository-Key konnte nicht geprüft werden"
+    fi
+
+    set +e
+    download_if_changed \
+        "https://www.internic.net/domain/named.root" \
+        "${DOWNLOAD_CACHE}/pihole/named.root"
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        add_update "Unbound Root-Hints Cache"
+        update_running_pihole_root_hints || true
+    elif (( rc == 2 )); then
+        echo "Root-Hints Online-Prüfung fehlgeschlagen; Cache bleibt."
+    fi
+
+    set +e
+    download_if_changed \
+        "https://raw.githubusercontent.com/pimanDE/translate2german/master/translate2german.sh" \
+        "${PIHOLE_LANG_CACHE}/translate2german.sh"
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        PIHOLE_TRANSLATION_CHANGED=1
+        add_update "Pi-hole deutsche Übersetzungsquelle"
+    elif (( rc == 2 )); then
+        echo "Pi-hole Übersetzungsquelle konnte nicht geprüft werden; Cache bleibt."
+    fi
+
+    update_scrutiny_collector_cache || true
+}
+
+update_running_pihole_root_hints() {
+    local ctid
+    ctid="$(find_ct_by_hostname pihole || true)"
+    [[ -n "$ctid" ]] || return 0
+
+    pct status "$ctid" 2>/dev/null | grep -q 'status: running' || return 0
+
+    pct push \
+        "$ctid" \
+        "${DOWNLOAD_CACHE}/pihole/named.root" \
+        /var/lib/unbound/root.hints >/dev/null
+
+    pct exec "$ctid" -- bash -lc '
+        chown unbound:unbound /var/lib/unbound/root.hints
+        chmod 644 /var/lib/unbound/root.hints
+        systemctl restart unbound
+    ' >/dev/null
+}
+
+update_scrutiny_collector_cache() {
+    local arch dest rc
+
+    case "$(uname -m)" in
+        x86_64|amd64) arch="amd64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        *) return 0 ;;
+    esac
+
+    dest="${DOWNLOAD_CACHE}/scrutiny/scrutiny-collector-metrics-linux-${arch}"
+
+    set +e
+    download_if_changed \
+        "https://github.com/AnalogJ/scrutiny/releases/latest/download/scrutiny-collector-metrics-linux-${arch}" \
+        "$dest"
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        chmod 755 "$dest"
+        add_update "Scrutiny Collector Cache"
+
+        if [[ -f /opt/scrutiny-collector/scrutiny-collector-metrics ]]; then
+            install -m 0755 \
+                "$dest" \
+                /opt/scrutiny-collector/scrutiny-collector-metrics
+        fi
+    elif (( rc == 2 )); then
+        echo "Scrutiny Collector konnte nicht online geprüft werden."
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# LXC / Docker Updates
+# -----------------------------------------------------------------------------
+
+update_ct_apt() {
+    local ctid="$1"
+    local label="$2"
+    local packages=""
+
+    echo
+    echo "--- ${label}: APT ---"
+
+    if ! pct exec "$ctid" -- bash -lc '
+        set -Eeuo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+    '; then
+        add_failure "${label}: apt update fehlgeschlagen"
+        return
+    fi
+
+    packages="$(
+        pct exec "$ctid" -- bash -lc '
+            apt-get -s dist-upgrade 2>/dev/null |
+            awk "/^Inst / {print \$2}"
+        ' 2>/dev/null |
+        tr -d '\r'
+    )"
+
+    if [[ -n "$packages" ]]; then
+        if pct exec "$ctid" -- bash -lc '
+            set -Eeuo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            export NEEDRESTART_MODE=a
+            apt-get -y dist-upgrade
+        '; then
+            add_update "${label} APT: $(short_list "$packages")"
+        else
+            add_failure "${label}: APT-Upgrade fehlgeschlagen"
+        fi
+    else
+        echo "${label}: keine APT-Updates."
+    fi
+}
+
+compose_state() {
+    local ctid="$1"
+    local dir="$2"
+
+    pct exec "$ctid" -- bash -lc "
+        set -e
+        cd '$dir'
+
+        docker compose config --images |
+        awk 'NF' |
+        sort -u |
+        while read -r image; do
+            id=\$(docker image inspect --format '{{.Id}}' \"\$image\" 2>/dev/null || true)
+            printf '%s|%s\\n' \"\$image\" \"\$id\"
+        done
+    " 2>/dev/null | tr -d '\r'
+}
+
+update_ct_compose() {
+    local ctid="$1"
+    local label="$2"
+    local dir="$3"
+    local hostname="$4"
+
+    [[ -n "$dir" ]] || return 0
+
+    if ! pct exec "$ctid" -- test -f "${dir}/docker-compose.yml" >/dev/null 2>&1 \
+       && ! pct exec "$ctid" -- test -f "${dir}/compose.yml" >/dev/null 2>&1 \
+       && ! pct exec "$ctid" -- test -f "${dir}/compose.yaml" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo
+    echo "--- ${label}: Docker ---"
+
+    local before after
+
+    before="$(compose_state "$ctid" "$dir" || true)"
+
+    if pct exec "$ctid" -- bash -lc "
+        set -Eeuo pipefail
+        cd '$dir'
+
+        if command -v docker-cache-pull >/dev/null 2>&1; then
+            docker-cache-pull .
+        else
+            docker compose pull
+        fi
+    "; then
+        after="$(compose_state "$ctid" "$dir" || true)"
+
+        if [[ "$before" != "$after" ]]; then
+            if pct exec "$ctid" -- bash -lc "
+                set -Eeuo pipefail
+                cd '$dir'
+                docker compose up -d --remove-orphans
+            "; then
+                add_update "${label}: Docker-Images/Container aktualisiert"
+
+                if [[ "$hostname" == "pihole" ]]; then
+                    PIHOLE_DOCKER_CHANGED=1
+                fi
+            else
+                add_failure "${label}: neue Docker-Images geladen, Container-Neustart fehlgeschlagen"
+            fi
+        else
+            echo "${label}: Docker-Images bereits aktuell."
+        fi
+    else
+        add_failure "${label}: Docker-Updateprüfung fehlgeschlagen"
+    fi
+}
+
+update_one_ct() {
+    local hostname="$1"
+    local label="$2"
+    local dir="$3"
+
+    local ctid was_running=0
+
+    ctid="$(find_ct_by_hostname "$hostname" || true)"
+    [[ -n "$ctid" ]] || return 0
+
+    echo
+    echo "============================================================"
+    echo " ${label} (CT ${ctid})"
+    echo "============================================================"
+
+    if pct status "$ctid" 2>/dev/null | grep -q 'status: running'; then
+        was_running=1
+    else
+        echo "Container war gestoppt; starte nur für Update ..."
+        if ! pct start "$ctid"; then
+            add_failure "${label}: LXC konnte für Update nicht gestartet werden"
+            return
+        fi
+        sleep 5
+    fi
+
+    update_ct_apt "$ctid" "$label"
+    update_ct_compose "$ctid" "$label" "$dir" "$hostname"
+
+    # Automatischer LXC-Reboot, falls Debian diesen verlangt.
+    if pct exec "$ctid" -- test -f /var/run/reboot-required >/dev/null 2>&1; then
+        if pct reboot "$ctid"; then
+            add_update "${label}: LXC-Neustart nach Paketupdate"
+            sleep 4
+        else
+            add_manual "${label}: Neustart nach Paketupdate erforderlich"
+        fi
+    fi
+
+    if (( was_running == 0 )); then
+        echo "Container war vor dem Update gestoppt; stoppe wieder ..."
+        pct shutdown "$ctid" --timeout 60 || pct stop "$ctid" || true
+    fi
+}
+
+update_managed_lxcs() {
+    update_one_ct "paperless"         "Paperless/Ollama"    "/opt/paperless"
+    update_one_ct "pihole"            "Pi-hole/Unbound"     "/opt/pihole"
+    update_one_ct "netalertx"         "NetAlertX"           "/opt/netalertx"
+    update_one_ct "uptime-kuma"       "Uptime Kuma"         "/opt/uptime-kuma"
+    update_one_ct "vaultwarden"       "Vaultwarden"         "/opt/vaultwarden"
+    update_one_ct "caddy"             "Caddy"               "/opt/caddy"
+    update_one_ct "stirling-pdf"      "Stirling PDF"        "/opt/stirling-pdf"
+    update_one_ct "ntfy"              "ntfy"                "/opt/ntfy"
+    update_one_ct "forgejo"           "Forgejo"             "/opt/forgejo"
+    update_one_ct "syncthing"         "Syncthing"           "/opt/syncthing"
+    update_one_ct "speedtest-tracker" "Speedtest Tracker"   "/opt/speedtest-tracker"
+    update_one_ct "scrutiny"          "Scrutiny"            "/opt/scrutiny"
+    update_one_ct "mealie"            "Mealie"              "/opt/mealie"
+}
+
+# -----------------------------------------------------------------------------
+# Ollama Models
+# -----------------------------------------------------------------------------
+
+ollama_model_id() {
+    local ctid="$1"
+    local model="$2"
+
+    pct exec "$ctid" -- \
+        docker exec paperless-ollama ollama list 2>/dev/null |
+    awk -v model="$model" '$1==model {print $2; exit}' |
+    tr -d '\r'
+}
+
+update_ollama_models() {
+    local ctid
+
+    ctid="$(find_ct_by_hostname paperless || true)"
+    [[ -n "$ctid" ]] || return 0
+    pct status "$ctid" 2>/dev/null | grep -q 'status: running' || return 0
+
+    if ! pct exec "$ctid" -- docker inspect paperless-ollama >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo
+    echo "============================================================"
+    echo " OLLAMA MODELLE"
+    echo "============================================================"
+
+    local model before after
+
+    for model in "qwen2.5:7b" "embeddinggemma"; do
+        before="$(ollama_model_id "$ctid" "$model" || true)"
+
+        if pct exec "$ctid" -- \
+            docker exec paperless-ollama ollama pull "$model"; then
+
+            after="$(ollama_model_id "$ctid" "$model" || true)"
+
+            if [[ "$before" != "$after" ]]; then
+                add_update "Ollama-Modell: ${model}"
+            else
+                echo "Ollama ${model}: bereits aktuell."
+            fi
+        else
+            add_failure "Ollama-Modell ${model}: Updateprüfung fehlgeschlagen"
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Pi-hole deutsche Übersetzung nach Container-Update wieder anwenden
+# -----------------------------------------------------------------------------
+
+restore_pihole_language() {
+    local ctid lang
+
+    ctid="$(find_ct_by_hostname pihole || true)"
+    [[ -n "$ctid" ]] || return 0
+
+    lang="$(
+        pct exec "$ctid" -- \
+            sh -c 'cat /opt/pihole/.web-language 2>/dev/null || true' |
+        tr -d '\r\n'
+    )"
+
+    [[ "$lang" == "DE" ]] || return 0
+
+    if (( PIHOLE_DOCKER_CHANGED == 1 || PIHOLE_TRANSLATION_CHANGED == 1 )); then
+        if command -v pihole-language >/dev/null 2>&1; then
+            if pihole-language DE; then
+                add_update "Pi-hole: deutsche Webübersetzung erneut angewendet"
+            else
+                add_manual "Pi-hole: deutsche Übersetzung muss geprüft werden"
+            fi
+        else
+            add_manual "Pi-hole DE: Sprachtool fehlt"
+        fi
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Home Assistant OS
+# -----------------------------------------------------------------------------
+
+qga_output() {
+    local vmid="$1"
+    shift
+
+    timeout 120 qm guest exec "$vmid" \
+        --output-format json \
+        -- "$@" 2>/dev/null |
+    jq -r '."out-data" // empty' 2>/dev/null
+}
+
+ha_update_available() {
+    local vmid="$1"
+    local component="$2"
+    local info
+
+    info="$(qga_output "$vmid" sh -lc "ha ${component} info --raw-json" || true)"
+    [[ -n "$info" ]] || return 2
+
+    if printf '%s' "$info" |
+       jq -e '.. | objects | select(.update_available == true)' >/dev/null 2>&1; then
+        return 0
+    fi
+
+    return 1
+}
+
+update_home_assistant() {
+    local vmid
+
+    vmid="$(find_ha_vm || true)"
+    [[ -n "$vmid" ]] || return 0
+
+    echo
+    echo "============================================================"
+    echo " HOME ASSISTANT (VM ${vmid})"
+    echo "============================================================"
+
+    qm status "$vmid" 2>/dev/null | grep -q 'status: running' || {
+        echo "Home Assistant VM ist gestoppt; automatische Aktualisierung übersprungen."
+        return 0
+    }
+
+    if ! timeout 20 qm guest cmd "$vmid" ping >/dev/null 2>&1; then
+        add_manual "Home Assistant: QEMU Guest Agent nicht erreichbar; Updates im HA-Menü prüfen"
+        return 0
+    fi
+
+    local rc
+
+    set +e
+    ha_update_available "$vmid" core
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        if timeout 3600 qm guest exec "$vmid" \
+            -- sh -lc 'ha core update --backup'; then
+            add_update "Home Assistant Core (mit Backup)"
+        else
+            add_failure "Home Assistant Core Update fehlgeschlagen"
+        fi
+    elif (( rc == 2 )); then
+        echo "HA Core Update-Status konnte nicht gelesen werden."
+    else
+        echo "Home Assistant Core: aktuell."
+    fi
+
+    set +e
+    ha_update_available "$vmid" supervisor
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        if timeout 1800 qm guest exec "$vmid" \
+            -- sh -lc 'ha supervisor update'; then
+            add_update "Home Assistant Supervisor"
+        else
+            add_failure "Home Assistant Supervisor Update fehlgeschlagen"
+        fi
+    elif (( rc == 2 )); then
+        echo "HA Supervisor Update-Status konnte nicht gelesen werden."
+    else
+        echo "Home Assistant Supervisor: aktuell."
+    fi
+
+    set +e
+    ha_update_available "$vmid" os
+    rc=$?
+    set -e
+
+    if (( rc == 0 )); then
+        echo "HAOS Update gefunden; OS-Update wird zuletzt ausgeführt."
+        if timeout 3600 qm guest exec "$vmid" \
+            -- sh -lc 'ha os update'; then
+            add_update "Home Assistant OS (VM führt Neustart selbst durch)"
+        else
+            add_failure "Home Assistant OS Update fehlgeschlagen"
+        fi
+    elif (( rc == 2 )); then
+        echo "HAOS Update-Status konnte nicht gelesen werden."
+    else
+        echo "Home Assistant OS: aktuell."
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Proxmox Host Updates
+# -----------------------------------------------------------------------------
+
+update_proxmox_host() {
+    echo
+    echo "============================================================"
+    echo " PROXMOX HOST"
+    echo "============================================================"
+
+    local packages=""
+
+    if ! apt-get update; then
+        add_failure "Proxmox Host: apt update fehlgeschlagen"
+        return
+    fi
+
+    packages="$(
+        apt-get -s dist-upgrade 2>/dev/null |
+        awk '/^Inst / {print $2}'
+    )"
+
+    if [[ -n "$packages" ]]; then
+        if DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+           apt-get -y dist-upgrade; then
+            add_update "Proxmox Host APT: $(short_list "$packages")"
+        else
+            add_failure "Proxmox Host: dist-upgrade fehlgeschlagen"
+        fi
+    else
+        echo "Proxmox Host: keine APT-Updates."
+    fi
+
+    local running newest
+
+    running="$(uname -r)"
+
+    newest="$(
+        find /boot -maxdepth 1 -type f -name 'vmlinuz-*-pve' \
+            -printf '%f\n' 2>/dev/null |
+        sed 's/^vmlinuz-//' |
+        sort -V |
+        tail -1
+    )"
+
+    if [[ -f /var/run/reboot-required ]]; then
+        add_manual "Proxmox Host: Neustart erforderlich"
+    elif [[ -n "$newest" && "$newest" != "$running" ]]; then
+        add_manual "Proxmox Host: neuer Kernel ${newest}; aktuell läuft ${running} – Neustart erforderlich"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Summary / Notifications
+# -----------------------------------------------------------------------------
+
+build_summary() {
+    local out=""
+
+    if (( ${#UPDATED_ITEMS[@]} > 0 )); then
+        out+="Installiert/aktualisiert:\n"
+        local item
+        for item in "${UPDATED_ITEMS[@]}"; do
+            out+="- ${item}\n"
+        done
+    fi
+
+    if (( ${#MANUAL_ITEMS[@]} > 0 )); then
+        [[ -n "$out" ]] && out+="\n"
+        out+="Persönliches Eingreifen:\n"
+        local item
+        for item in "${MANUAL_ITEMS[@]}"; do
+            out+="- ${item}\n"
+        done
+    fi
+
+    printf '%b' "$out"
+}
+
+send_summary() {
+    local summary updates="" manual="" item manual_body
+    summary="$(build_summary)"
+
+    if [[ -z "$summary" ]]; then
+        # Eine spaeter erneut auftretende identische Warnung soll wieder gemeldet werden.
+        rm -f "${STATE_DIR}/manual-warning.sha256"
+        echo
+        echo "Keine Updates und kein Eingreifen erforderlich."
+        return
+    fi
+
+    echo
+    echo "============================================================"
+    echo " ZUSAMMENFASSUNG"
+    echo "============================================================"
+    printf '%s\n' "$summary"
+
+    # Vollstaendige Zusammenfassung fuer spaeteren Abruf speichern.
+    # Der separate Detail-Log enthaelt zusaetzlich saemtliche Befehlsausgaben.
+    printf '%s\n' "$summary" > "$SUMMARYFILE"
+    chmod 600 "$SUMMARYFILE"
+    echo "Vollstaendige Zusammenfassung: $SUMMARYFILE"
+
+    # Update-Meldungen bleiben unabhaengig von der Warnungs-Drosselung erhalten.
+    if (( ${#UPDATED_ITEMS[@]} > 0 )); then
+        updates="Installiert/aktualisiert:\n"
+        for item in "${UPDATED_ITEMS[@]}"; do
+            updates+="- ${item}\n"
+        done
+        pushover_send "Proxmox Updates installiert" "$(printf '%b' "$updates")" 0
+    fi
+
+    # Nur die WARNUNGEN fingerprinten (nicht die taeglich wechselnden Update-Listen).
+    if (( ${#MANUAL_ITEMS[@]} > 0 )); then
+        manual="Persoenliches Eingreifen:\n"
+        for item in "${MANUAL_ITEMS[@]}"; do
+            manual+="- ${item}\n"
+        done
+        manual_body="$(printf '%b' "$manual")"
+
+        if manual_notification_due "$manual_body"; then
+            pushover_send "Proxmox: Eingreifen noetig" "$manual_body" 1
+        else
+            echo "Identische manuelle Pushover-Warnung wurde in den letzten 7 Tagen bereits gesendet."
+        fi
+    else
+        rm -f "${STATE_DIR}/manual-warning.sha256"    fi
+}
+
+# =============================================================================
+# START
+# =============================================================================
+
+echo "============================================================"
+echo " PROXMOX AUTO-UPDATER"
+echo " $(date)"
+echo "============================================================"
+echo
+echo "Log:"
+echo "  $LOGFILE"
+
+update_lxc_template_cache
+update_haos_cache
+update_misc_downloads
+
+update_managed_lxcs
+update_ollama_models
+restore_pihole_language
+update_home_assistant
+
+# Host zuletzt, damit PVE-Paketupdates die laufende CT-Aktualisierung nicht stören.
+update_proxmox_host
+
+send_summary
+
+echo
+echo "Fertig: $(date)"
+echo "Log: $LOGFILE"
