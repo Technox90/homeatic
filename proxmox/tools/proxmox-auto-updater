@@ -536,7 +536,7 @@ update_ct_apt() {
             set -Eeuo pipefail
             export DEBIAN_FRONTEND=noninteractive
             export NEEDRESTART_MODE=a
-            apt-get -y dist-upgrade
+            apt-get --no-remove -y dist-upgrade
         '; then
             add_update "${label} APT: $(short_list "$packages")"
         else
@@ -906,7 +906,7 @@ update_proxmox_host() {
 
     if [[ -n "$packages" ]]; then
         if DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
-           apt-get -y dist-upgrade; then
+           apt-get --no-remove -y dist-upgrade; then
             add_update "Proxmox Host APT: $(short_list "$packages")"
         else
             add_failure "Proxmox Host: dist-upgrade fehlgeschlagen"
