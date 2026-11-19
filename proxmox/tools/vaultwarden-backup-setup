@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Proxmox/NodeZero Vaultwarden offsite-backup configuration in the LXC.
+set -Eeuo pipefail
+umask 077
+action="${1:-}"
+key=/etc/vaultwarden-backup-ssh
+pass=/etc/vaultwarden-backup-restic-password
+config=/etc/vaultwarden-backup.conf
+case "$action" in
+  prepare)
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq restic sqlite3 openssh-client ca-certificates
+    [[ -f "$key" ]] || ssh-keygen -q -t ed25519 -N '' -f "$key"
+    chmod 600 "$key"
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+    touch /root/.ssh/known_hosts
+    chmod 600 /root/.ssh/known_hosts
+    if [[ ! -f "$pass" ]]; then openssl rand -hex 48 > "$pass"; fi
+    chmod 600 "$pass"
+    echo "OEFFENTLICHER SSH-SCHLUESSEL:"
+    cat "$key.pub"
+    ;;
+  trust)
+    host="${2:?Host fehlt}"
+    [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || exit 2
+    ssh-keyscan -T 10 -t ed25519 "$host" 2>/dev/null >> /root/.ssh/known_hosts
+    ssh-keygen -F "$host" -f /root/.ssh/known_hosts >/dev/null
+    ;;
+  activate)
+    targets="${2:?Ziele fehlen}"
+    [[ "$targets" =~ ^[a-z_][a-z0-9_-]*@[A-Za-z0-9.-]+:/[A-Za-z0-9_./-]+(,[a-z_][a-z0-9_-]*@[A-Za-z0-9.-]+:/[A-Za-z0-9_./-]+)*$ ]] || {
+      echo "Ungueltige Zielliste" >&2; exit 2;
+    }
+    IFS=',' read -r -a list <<< "$targets"
+    for target in "${list[@]}"; do
+      remote="${target%%:*}"
+      ssh -i "$key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$remote" true
+      export RESTIC_PASSWORD_FILE="$pass"
+      export RESTIC_REPOSITORY="sftp:$target"
+      if ! restic snapshots >/dev/null 2>&1; then
+        restic init
+      fi
+    done
+    printf 'BACKUP_TARGETS=%q\nRESTIC_PASSWORD_FILE=%q\nSSH_KEY_FILE=%q\n' \
+      "$targets" "$pass" "$key" > "$config"
+    chmod 600 "$config"
+    cat > /etc/systemd/system/vaultwarden-backup.service <<'EOF'
+[Unit]
+Description=Encrypted Vaultwarden offsite backup
+Wants=docker.service
+After=docker.service network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vaultwarden-offsite-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+EOF
+    cat > /etc/systemd/system/vaultwarden-backup.timer <<'EOF'
+[Unit]
+Description=Run Vaultwarden offsite backup every 15 minutes
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+Persistent=true
+Unit=vaultwarden-backup.service
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now vaultwarden-backup.timer
+    systemctl start vaultwarden-backup.service
+    echo "Backup aktiviert. RESTIC-PASSWORT UNBEDINGT SEPARAT OFFLINE SICHERN: $pass"
+    ;;
+  *)
+    echo "Aufruf: $0 prepare | trust HOST | activate USER@HOST:/ABSOLUTER/PFAD[,..]" >&2
+    exit 2
+    ;;
+esac
