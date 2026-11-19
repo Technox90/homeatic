@@ -14,7 +14,7 @@ source "$CONFIG"
 export RESTIC_PASSWORD_FILE
 export RESTIC_PASSWORD_COMMAND=
 export RESTIC_CACHE_DIR=/var/cache/vaultwarden-restic
-export RESTIC_SFTP_COMMAND="ssh -i $SSH_KEY_FILE -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15"
+sftp_command="ssh -i $SSH_KEY_FILE -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15"
 mkdir -p "$RESTIC_CACHE_DIR"
 volume_path="$(docker volume inspect vaultwarden_vaultwarden-data --format '{{.Mountpoint}}' 2>/dev/null || true)"
 if [[ -z "$volume_path" ]]; then
@@ -43,14 +43,13 @@ IFS=',' read -r -a targets <<< "$BACKUP_TARGETS"
 for target in "${targets[@]}"; do
   export RESTIC_REPOSITORY="sftp:$target"
   echo "Sichere nach $target ..."
-  if ! restic backup --tag vaultwarden "$stage" &&
-     restic snapshots >/dev/null 2>&1; then
+  if ! restic -o "sftp.command=$sftp_command" backup --tag vaultwarden "$stage"; then
     echo "FEHLER beim Backup nach $target" >&2
     status=1
     continue
   fi
   # Vorhaltung: 24 stuendliche, 14 taegliche, 8 woechentliche, 12 monatliche Snapshots.
-  if ! restic forget --keep-hourly 24 --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune; then
+  if ! restic -o "sftp.command=$sftp_command" forget --keep-hourly 24 --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune; then
     echo "WARNUNG: Aufbewahrung/Prune bei $target fehlgeschlagen" >&2
     status=1
   fi
