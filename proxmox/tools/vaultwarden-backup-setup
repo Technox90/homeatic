@@ -24,7 +24,9 @@ case "$action" in
   trust)
     host="${2:?Host fehlt}"
     [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || exit 2
-    ssh-keyscan -T 10 -t ed25519 "$host" 2>/dev/null >> /root/.ssh/known_hosts
+    hostkey="${3:?Verifizierter SSH-Hostschluessel fehlt}"
+    [[ "$hostkey" == "$host ssh-ed25519 "* ]] || { echo "Ungueltiger Hostschluessel" >&2; exit 2; }
+    printf '%s\\n' "$hostkey" >> /root/.ssh/known_hosts
     ssh-keygen -F "$host" -f /root/.ssh/known_hosts >/dev/null
     ;;
   activate)
