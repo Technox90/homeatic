@@ -14928,7 +14928,7 @@ configure_vaultwarden_offsite_backup() {
     local source_base="https://raw.githubusercontent.com/Technox90/homeatic/main/proxmox/tools"
     local tmp_script="/tmp/nodezero-vw-backup-setup"
     local tmp_runner="/tmp/nodezero-vw-backup-runner"
-    local target remote host response
+    local target remote host response ssh_hostkey
     echo
     header "VAULTWARDEN OFFSITE-BACKUP"
     echo "Anleitung: $VAULTWARDEN_BACKUP_GUIDE"
@@ -14956,16 +14956,18 @@ configure_vaultwarden_offsite_backup() {
         host="${remote#*@}"
         echo
         echo "SSH-Host-Fingerprint fuer $host (unabhaengig am Zielserver abgleichen):"
-        ssh-keyscan -T 10 -t ed25519 "$host" 2>/dev/null | ssh-keygen -lf - || {
+        ssh_hostkey="$(ssh-keyscan -T 10 -t ed25519 "$host" 2>/dev/null | grep -m1 -E "^$host ssh-ed25519 " || true)"
+        if [[ -z "$ssh_hostkey" ]]; then
             warn "Host-Schluessel fuer $host nicht lesbar. Backup nicht aktiviert."
             return 0
-        }
+        fi
+        printf '%s\\n' "$ssh_hostkey" | ssh-keygen -lf - || return 0
         read -r -p "Fingerprint unabhaengig verifiziert? 'JA' zum Fortfahren: " response || true
         if [[ "$response" != "JA" ]]; then
             warn "Backup nicht aktiviert: Host-Fingerprint nicht bestaetigt."
             return 0
         fi
-        if ! pct exec "$VAULTWARDEN_ID" -- /usr/local/sbin/vaultwarden-backup-setup trust "$host"; then
+        if ! pct exec "$VAULTWARDEN_ID" -- /usr/local/sbin/vaultwarden-backup-setup trust "$host" "$ssh_hostkey"; then
             warn "Host-Schluessel konnte nicht gespeichert werden: $host"
             return 0
         fi
