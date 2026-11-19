@@ -9,6 +9,12 @@ Dieses Repository bündelt meine Home-Assistant-, Proxmox- und Pi-hole-Konfigura
 - **dashboard/** – ausgelagerte Basisquellen des Proxmox-Dashboards
 - weitere Home-Assistant-/Homelab-Dateien können hier ergänzt werden
 
+## 🔐 Passwortmanager – Vaultwarden / Bitwarden
+
+📱 **[Grafische Anleitung für Android, iPhone, iPad und PC mit Store-QR-Codes](proxmox/passwortmanager/README.md)**
+
+🗄️ [Optionale verschlüsselte Vaultwarden-Backups auf Root-Servern](proxmox/VAULTWARDEN-BACKUP.md)
+
 ## Proxmox
 
 Der Proxmox-Bereich enthält meinen modularen Komplett-Installer für Proxmox VE. Er kann unter anderem Home Assistant, Paperless-ngx + Ollama, Pi-hole + Unbound, NetAlertX, Uptime Kuma, Caddy, Prometheus, Grafana, PVE-UPS, EMQX und weitere Dienste installieren und konfigurieren.
