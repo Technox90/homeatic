@@ -11110,6 +11110,9 @@ NEWT_ENDPOINT=""
 CROWDSEC_TARGETS=""
 
 VAULTWARDEN_ADMIN_TOKEN=""
+VAULTWARDEN_BACKUP_ENABLED=0
+VAULTWARDEN_BACKUP_TARGETS=""
+VAULTWARDEN_BACKUP_GUIDE="https://github.com/Technox90/homeatic/blob/main/proxmox/VAULTWARDEN-BACKUP.md"
 STIRLING_ADMIN_USER="admin"
 STIRLING_ADMIN_PASS=""
 SPEEDTEST_ADMIN_EMAIL="admin@local.invalid"
@@ -11125,6 +11128,36 @@ fi
 
 if (( INSTALL_VAULTWARDEN )); then
     header "VAULTWARDEN EINSTELLUNGEN"
+    # Backup-Auswahl vor den normalen LXC-Einstellungen; im unattended Optimalmodus aus.
+    if (( ! ${OPTIMAL_INSTALL:-0} )); then
+        local_vw_backup_choice=""
+        if (( TUI_AVAILABLE )); then
+            if whiptail --backtitle "$TUI_BACKTITLE" --title "VAULTWARDEN BACKUP" \
+                --yesno "Verschluesselte Offsite-Backups auf Root-Server einrichten?\n\nAnleitung: $VAULTWARDEN_BACKUP_GUIDE\n\nDanach folgen wie gewohnt die Installations-Einstellungen." \
+                16 90; then
+                VAULTWARDEN_BACKUP_ENABLED=1
+            fi
+        else
+            echo "Optionale Vaultwarden-Backups auf Root-Server?"
+            echo "Anleitung: $VAULTWARDEN_BACKUP_GUIDE"
+            read -r -p "Backup einrichten? [j/N]: " local_vw_backup_choice || true
+            [[ "$local_vw_backup_choice" =~ ^[jJyY]$ ]] && VAULTWARDEN_BACKUP_ENABLED=1
+        fi
+    fi
+    if (( VAULTWARDEN_BACKUP_ENABLED )); then
+        echo
+        echo "Backup-Anleitung (Root-Server vorbereiten):"
+        echo "  $VAULTWARDEN_BACKUP_GUIDE"
+        echo "Nach dem Vorbereiten folgen die Vaultwarden-Installationsparameter."
+        read -r -p "ENTER = Einstellungen fortsetzen (Vorbereitung kann spaeter beendet werden) ..." _vw_continue || true
+        while :; do
+            read -r -p "Backup-Ziele (user@host:/absoluter/pfad; mehrere mit Komma): " VAULTWARDEN_BACKUP_TARGETS || true
+            if [[ "$VAULTWARDEN_BACKUP_TARGETS" =~ ^[a-z_][a-z0-9_-]*@[A-Za-z0-9.-]+:/[A-Za-z0-9_./-]+(,[a-z_][a-z0-9_-]*@[A-Za-z0-9.-]+:/[A-Za-z0-9_./-]+)*$ ]]; then
+                break
+            fi
+            warn "Ungueltiges Ziel. Beispiel: vwbackup@backup.example.net:/srv/vaultwarden-backups"
+        done
+    fi
     configure_optional_lxc_app VAULTWARDEN "Vaultwarden" 2 1 8 8
     VAULTWARDEN_ADMIN_TOKEN="$(openssl rand -hex 32)"
 fi
@@ -14890,6 +14923,61 @@ EOF
     echo "  $UPTIME_DATA_DIR"
 }
 
+configure_vaultwarden_offsite_backup() {
+    (( VAULTWARDEN_BACKUP_ENABLED )) || return 0
+    local source_base="https://raw.githubusercontent.com/Technox90/homeatic/main/proxmox/tools"
+    local tmp_script="/tmp/nodezero-vw-backup-setup"
+    local tmp_runner="/tmp/nodezero-vw-backup-runner"
+    local target remote host response
+    echo
+    header "VAULTWARDEN OFFSITE-BACKUP"
+    echo "Anleitung: $VAULTWARDEN_BACKUP_GUIDE"
+    if ! curl -fsSL "$source_base/vaultwarden-backup-setup" -o "$tmp_script" ||
+       ! curl -fsSL "$source_base/vaultwarden-offsite-backup" -o "$tmp_runner"; then
+        warn "Backup-Tools konnten nicht geladen werden. Vaultwarden bleibt installiert."
+        return 0
+    fi
+    pct push "$VAULTWARDEN_ID" "$tmp_script" /usr/local/sbin/vaultwarden-backup-setup
+    pct push "$VAULTWARDEN_ID" "$tmp_runner" /usr/local/sbin/vaultwarden-offsite-backup
+    rm -f "$tmp_script" "$tmp_runner"
+    pct exec "$VAULTWARDEN_ID" -- chmod 700 /usr/local/sbin/vaultwarden-backup-setup /usr/local/sbin/vaultwarden-offsite-backup
+    if ! pct exec "$VAULTWARDEN_ID" -- /usr/local/sbin/vaultwarden-backup-setup prepare; then
+        warn "Backup-Vorbereitung fehlgeschlagen. Vaultwarden bleibt installiert."
+        return 0
+    fi
+    echo
+    echo "Bitte obigen OEFFENTLICHEN SSH-Schluessel auf ALLEN Backup-Servern"
+    echo "in ~/.ssh/authorized_keys des Backup-Benutzers eintragen."
+    echo "Anleitung: $VAULTWARDEN_BACKUP_GUIDE"
+    read -r -p "ENTER druecken, wenn die SSH-Schluessel eingerichtet sind ..." _vw_key_ready || true
+    IFS=',' read -r -a _vw_targets <<< "$VAULTWARDEN_BACKUP_TARGETS"
+    for target in "${_vw_targets[@]}"; do
+        remote="${target%%:*}"
+        host="${remote#*@}"
+        echo
+        echo "SSH-Host-Fingerprint fuer $host (unabhaengig am Zielserver abgleichen):"
+        ssh-keyscan -T 10 -t ed25519 "$host" 2>/dev/null | ssh-keygen -lf - || {
+            warn "Host-Schluessel fuer $host nicht lesbar. Backup nicht aktiviert."
+            return 0
+        }
+        read -r -p "Fingerprint unabhaengig verifiziert? 'JA' zum Fortfahren: " response || true
+        if [[ "$response" != "JA" ]]; then
+            warn "Backup nicht aktiviert: Host-Fingerprint nicht bestaetigt."
+            return 0
+        fi
+        if ! pct exec "$VAULTWARDEN_ID" -- /usr/local/sbin/vaultwarden-backup-setup trust "$host"; then
+            warn "Host-Schluessel konnte nicht gespeichert werden: $host"
+            return 0
+        fi
+    done
+    if pct exec "$VAULTWARDEN_ID" -- /usr/local/sbin/vaultwarden-backup-setup activate "$VAULTWARDEN_BACKUP_TARGETS"; then
+        ok "Vaultwarden-Backups laufen alle 15 Minuten. Passwort und SSH-Key extern sichern!"
+    else
+        warn "Backup-Aktivierung fehlgeschlagen. Vaultwarden laeuft ohne aktivierten Backup-Timer."
+        echo "Anleitung: $VAULTWARDEN_BACKUP_GUIDE"
+    fi
+}
+
 install_vaultwarden() {
     header "VAULTWARDEN INSTALLIEREN"
 
@@ -14926,6 +15014,7 @@ EOF
     configure_lxc_web_standard_ports_v65 "$VAULTWARDEN_ID" "Vaultwarden" "http" "8080"
     verify_web_v107 "Vaultwarden" "https://${VAULTWARDEN_IP}/admin/" 90
     dashboard_link_upsert "Vaultwarden" "https://${VAULTWARDEN_IP}/"
+    configure_vaultwarden_offsite_backup
 
     ok "Vaultwarden läuft ausschließlich über den verwalteten HTTPS-Einstieg; HTTP wird umgeleitet."
 }
