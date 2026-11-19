@@ -80,8 +80,9 @@ Unit=vaultwarden-backup.service
 WantedBy=timers.target
 EOF
     systemctl daemon-reload
-    systemctl enable --now vaultwarden-backup.timer
+    # Erst einen erfolgreichen Sicherungslauf verlangen, dann Timer aktivieren.
     systemctl start vaultwarden-backup.service
+    systemctl enable --now vaultwarden-backup.timer
     echo "Backup aktiviert. RESTIC-PASSWORT UNBEDINGT SEPARAT OFFLINE SICHERN: $pass"
     ;;
   *)
