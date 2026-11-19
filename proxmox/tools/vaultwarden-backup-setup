@@ -38,8 +38,8 @@ case "$action" in
       ssh -i "$key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$remote" true
       export RESTIC_PASSWORD_FILE="$pass"
       export RESTIC_REPOSITORY="sftp:$target"
-      if ! restic snapshots >/dev/null 2>&1; then
-        restic init
+      if ! restic -o "sftp.command=ssh -i $key -o BatchMode=yes -o StrictHostKeyChecking=yes" snapshots >/dev/null 2>&1; then
+        restic -o "sftp.command=ssh -i $key -o BatchMode=yes -o StrictHostKeyChecking=yes" init
       fi
     done
     printf 'BACKUP_TARGETS=%q\nRESTIC_PASSWORD_FILE=%q\nSSH_KEY_FILE=%q\n' \
