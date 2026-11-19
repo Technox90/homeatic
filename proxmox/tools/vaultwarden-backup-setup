@@ -26,7 +26,7 @@ case "$action" in
     [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || exit 2
     hostkey="${3:?Verifizierter SSH-Hostschluessel fehlt}"
     [[ "$hostkey" == "$host ssh-ed25519 "* ]] || { echo "Ungueltiger Hostschluessel" >&2; exit 2; }
-    printf '%s\\n' "$hostkey" >> /root/.ssh/known_hosts
+    printf '%s\n' "$hostkey" >> /root/.ssh/known_hosts
     ssh-keygen -F "$host" -f /root/.ssh/known_hosts >/dev/null
     ;;
   activate)
