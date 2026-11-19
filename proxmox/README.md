@@ -34,6 +34,12 @@ proxmox.sh
 - Diagnose-/Laufprotokolle unter `/home/diagnose/`
 - finale Healthchecks
 
+## 🔐 Passwortmanager – Vaultwarden
+
+| Persönliche Einrichtung | Root-Server-Backup |
+|---|---|
+| [📱 Android/iOS/PC: Schritt-für-Schritt-Anleitung mit Store-QR-Codes](passwortmanager/README.md) | [🗄️ Verschlüsseltes Offsite-Backup einrichten](VAULTWARDEN-BACKUP.md) |
+
 ## Installation
 
 Am einfachsten direkt auf dem Proxmox-Host als `root` ausführen:
