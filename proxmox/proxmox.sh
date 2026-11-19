@@ -14961,7 +14961,7 @@ configure_vaultwarden_offsite_backup() {
             warn "Host-Schluessel fuer $host nicht lesbar. Backup nicht aktiviert."
             return 0
         fi
-        printf '%s\\n' "$ssh_hostkey" | ssh-keygen -lf - || return 0
+        printf '%s\n' "$ssh_hostkey" | ssh-keygen -lf - || return 0
         read -r -p "Fingerprint unabhaengig verifiziert? 'JA' zum Fortfahren: " response || true
         if [[ "$response" != "JA" ]]; then
             warn "Backup nicht aktiviert: Host-Fingerprint nicht bestaetigt."
