@@ -16,6 +16,15 @@ case "$action" in
     chmod 700 /root/.ssh
     touch /root/.ssh/known_hosts
     chmod 600 /root/.ssh/known_hosts
+    cat > /root/.ssh/config <<'SSHCONF'
+Host *
+  IdentityFile /etc/vaultwarden-backup-ssh
+  IdentitiesOnly yes
+  BatchMode yes
+  StrictHostKeyChecking yes
+  ConnectTimeout 15
+SSHCONF
+    chmod 600 /root/.ssh/config
     if [[ ! -f "$pass" ]]; then openssl rand -hex 48 > "$pass"; fi
     chmod 600 "$pass"
     echo "OEFFENTLICHER SSH-SCHLUESSEL:"
@@ -40,8 +49,8 @@ case "$action" in
       ssh -i "$key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 "$remote" true
       export RESTIC_PASSWORD_FILE="$pass"
       export RESTIC_REPOSITORY="sftp:$target"
-      if ! restic -o "sftp.command=ssh -i $key -o BatchMode=yes -o StrictHostKeyChecking=yes" snapshots >/dev/null 2>&1; then
-        restic -o "sftp.command=ssh -i $key -o BatchMode=yes -o StrictHostKeyChecking=yes" init
+      if ! restic snapshots >/dev/null 2>&1; then
+        restic init
       fi
     done
     printf 'BACKUP_TARGETS=%q\nRESTIC_PASSWORD_FILE=%q\nSSH_KEY_FILE=%q\n' \
