@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Vaultwarden: konsistente, verschluesselte Offsite-Backups (innerhalb des LXC).
+set -Eeuo pipefail
+umask 077
+
+CONFIG=/etc/vaultwarden-backup.conf
+[[ -r "$CONFIG" ]] || { echo "FEHLER: $CONFIG fehlt" >&2; exit 1; }
+# Konfiguration wird ausschliesslich durch den Installer aus validierten Werten erstellt.
+source "$CONFIG"
+: "${BACKUP_TARGETS:?BACKUP_TARGETS fehlt}"
+: "${RESTIC_PASSWORD_FILE:?RESTIC_PASSWORD_FILE fehlt}"
+: "${SSH_KEY_FILE:?SSH_KEY_FILE fehlt}"
+
+export RESTIC_PASSWORD_FILE
+export RESTIC_PASSWORD_COMMAND=
+export RESTIC_CACHE_DIR=/var/cache/vaultwarden-restic
+export RESTIC_SFTP_COMMAND="ssh -i $SSH_KEY_FILE -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15"
+mkdir -p "$RESTIC_CACHE_DIR"
+volume_path="$(docker volume inspect vaultwarden_vaultwarden-data --format '{{.Mountpoint}}' 2>/dev/null || true)"
+if [[ -z "$volume_path" ]]; then
+  volume_path="$(docker inspect vaultwarden --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}')"
+fi
+[[ -d "$volume_path" ]] || { echo "FEHLER: Vaultwarden-Datenvolume nicht gefunden" >&2; exit 1; }
+stage="$(mktemp -d /var/tmp/vaultwarden-backup.XXXXXXXX)"
+trap 'rm -rf -- "$stage"' EXIT
+mkdir -p "$stage/data"
+
+# SQLite Online Backup: kein ungesichertes Kopieren der offenen DB/WAL.
+if [[ -f "$volume_path/db.sqlite3" ]]; then
+  sqlite3 "$volume_path/db.sqlite3" ".timeout 10000" ".backup '$stage/data/db.sqlite3'"
+  sqlite3 "$stage/data/db.sqlite3" 'PRAGMA quick_check;' | grep -qx ok
+fi
+# Dateien zusaetzlich zur SQLite-DB, exklusive transienter SQLite-Journale.
+tar -C "$volume_path" --exclude='./db.sqlite3' --exclude='./db.sqlite3-wal' \
+  --exclude='./db.sqlite3-shm' --exclude='./db.sqlite3-journal' -cf - . | tar -C "$stage/data" -xf -
+if [[ -f /opt/vaultwarden/docker-compose.yml ]]; then
+  cp /opt/vaultwarden/docker-compose.yml "$stage/docker-compose.yml"
+fi
+printf 'timestamp=%s\n' "$(date -Is)" > "$stage/backup-info.txt"
+
+status=0
+IFS=',' read -r -a targets <<< "$BACKUP_TARGETS"
+for target in "${targets[@]}"; do
+  export RESTIC_REPOSITORY="sftp:$target"
+  echo "Sichere nach $target ..."
+  if ! restic backup --tag vaultwarden "$stage" &&
+     restic snapshots >/dev/null 2>&1; then
+    echo "FEHLER beim Backup nach $target" >&2
+    status=1
+    continue
+  fi
+  # Vorhaltung: 24 stuendliche, 14 taegliche, 8 woechentliche, 12 monatliche Snapshots.
+  if ! restic forget --keep-hourly 24 --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune; then
+    echo "WARNUNG: Aufbewahrung/Prune bei $target fehlgeschlagen" >&2
+    status=1
+  fi
+done
+exit "$status"
