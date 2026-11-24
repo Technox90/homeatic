@@ -8668,7 +8668,167 @@ ensure_no_subscription_after_zero_v72
 # V116: Erst jetzt darf der Auto-Updater installiert/aktualisiert werden.
 # Zu diesem Zeitpunkt sind Enterprise/PVE-Test deaktiviert, pve-no-subscription
 # ist aktiv und ein apt-get update wurde bereits erfolgreich durchgeführt.
+install_installer_update_monitor_v155() (
+    set -Eeuo pipefail
+    local state=/var/lib/nodezero-installer-monitor
+    install -d -m 0700 "$state"
+    printf '%s\n' "$NODEZERO_SELF_PATH" > "$state/installer-path"
+    chmod 600 "$state/installer-path"
+    cat > /usr/local/sbin/nodezero-installer-monitor <<'MONITOR_V155'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+state=/var/lib/nodezero-installer-monitor
+exec 9>"$state/lock"
+flock -n 9 || exit 0
+python3 - "$state" <<'PY_MONITOR'
+import datetime, json, os, pathlib, re, subprocess, sys, tempfile, urllib.parse, urllib.request, hashlib
+state = pathlib.Path(sys.argv[1])
+url = "https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh"
+def atomic(path, content, mode=0o600):
+    fd, tmp = tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(content)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp): os.unlink(tmp)
+def version(data):
+    match = re.search(rb"(?m)^# PROXMOX MODULARER KOMPLETT-INSTALLER V([0-9]+)$", data)
+    if not match or not data.startswith(b"#!/usr/bin/env bash\n"):
+        raise ValueError("Ungültiger Installer")
+    return int(match.group(1))
+def publish(result):
+    atomic(state/"status.json", json.dumps(result))
+    for directory in (pathlib.Path("/opt/nodezero/dashboard/static"), pathlib.Path("/opt/pve-sensor-dashboard/static")):
+        if (directory/"index.html").is_file():
+            atomic(directory/"installer-update-status.json", json.dumps(result), 0o644)
+result = {"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"status":"error","local":None,"remote":None}
+try:
+    local = pathlib.Path((state/"installer-path").read_text().strip()).read_bytes()
+    result["local"] = version(local)
+    with urllib.request.urlopen(url, timeout=30) as response:
+        remote = response.read(4*1024*1024+1)
+    if len(remote)>4*1024*1024: raise ValueError("Installer zu groß")
+    result["remote"] = version(remote)
+    subprocess.run(["bash","-n"], input=remote, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=15)
+    result["status"] = "available" if result["remote"]>result["local"] else "current" if result["remote"]==result["local"] else "local_newer"
+except Exception as exc:
+    print("Installer-Prüfung fehlgeschlagen:", type(exc).__name__)
+publish(result)
+if result["status"] != "available":
+    sys.exit(0)
+# Read the existing root-owned Pushover config via bash; never publish secrets.
+conf = pathlib.Path("/root/.config/proxmox-auto-updater/pushover.env")
+if not conf.is_file(): sys.exit(0)
+if conf.stat().st_uid != 0 or conf.stat().st_mode & 0o022: sys.exit(0)
+keys = ["PUSHOVER_ENABLED","PUSHOVER_APP_TOKEN","PUSHOVER_USER_KEY","PUSHOVER_DEVICE"] + [f"PUSHOVER_{field}_{i}" for i in (1,2) for field in ("USER_KEY","DEVICE")]
+command = 'source "$1" >/dev/null; shift; for k; do printf "%s\\0" "$k"; printf "%s\\0" "${!k-}"; done'
+raw = subprocess.check_output(["bash","-c",command,"bash",str(conf),*keys], timeout=10).decode().split("\0")
+cfg = dict(zip(raw[0::2],raw[1::2]))
+if cfg.get("PUSHOVER_ENABLED")!="1" or not cfg.get("PUSHOVER_APP_TOKEN"): sys.exit(0)
+for i in (1,2):
+    user = cfg.get(f"PUSHOVER_USER_KEY_{i}") or (cfg.get("PUSHOVER_USER_KEY") if i==1 else "")
+    device = cfg.get(f"PUSHOVER_DEVICE_{i}") or (cfg.get("PUSHOVER_DEVICE") if i==1 else "")
+    if not user: continue
+    key = hashlib.sha256((user+"\0"+(device or "")).encode()).hexdigest()
+    marker = state/f"sent-{key}"
+    if marker.exists() and marker.read_text().strip()==str(result["remote"]): continue
+    data = {"token":cfg["PUSHOVER_APP_TOKEN"],"user":user,"title":f"Installer-Update V{result['remote']} verfügbar","message":f"Proxmox Master-Installer V{result['remote']} ist auf GitHub main verfügbar. Lokal: V{result['local']}. Installation beim nächsten manuellen Installerstart.","url":"https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md","url_title":"Versionshistorie"}
+    if device: data["device"]=device
+    try:
+        with urllib.request.urlopen("https://api.pushover.net/1/messages.json",data=urllib.parse.urlencode(data).encode(),timeout=20) as response:
+            if json.load(response).get("status")!=1: raise ValueError("Pushover rejected")
+        atomic(marker,str(result["remote"]))
+        print("Installer-Update-Benachrichtigung zugestellt.")
+    except Exception:
+        print("Pushover fehlgeschlagen; erneuter Versuch beim nächsten Lauf.")
+PY_MONITOR
+MONITOR_V155
+    chmod 700 /usr/local/sbin/nodezero-installer-monitor
+    cat > /etc/systemd/system/nodezero-installer-monitor.service <<'MONITOR_SERVICE'
+[Unit]
+Description=NodeZero Installer Versionsprüfung
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nodezero-installer-monitor
+TimeoutStartSec=120
+UMask=0077
+MONITOR_SERVICE
+    cat > /etc/systemd/system/nodezero-installer-monitor.timer <<'MONITOR_TIMER'
+[Unit]
+Description=NodeZero Installer Versionsprüfung alle 15 Minuten
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=30s
+[Install]
+WantedBy=timers.target
+MONITOR_TIMER
+    bash -n /usr/local/sbin/nodezero-installer-monitor
+    systemctl daemon-reload
+    systemctl enable --now nodezero-installer-monitor.timer
+)
+
+install_installer_update_dashboard_v155() (
+    local dir=/opt/nodezero/dashboard/static
+    [[ -f "$dir/index.html" ]] || return 0
+    python3 - "$dir" <<'PY_MONITOR_DASH'
+from pathlib import Path
+import sys, os, tempfile, shutil
+directory=Path(sys.argv[1])
+index=directory/"index.html"
+tag='<script defer src="/installer-update-v155.js"></script>'
+js="""(() => {
+const refresh = async () => {
+ let box = document.getElementById('nodezero-installer-update');
+ if (!box) {
+   box = document.createElement('aside'); box.id='nodezero-installer-update';
+   box.setAttribute('role','status');
+   Object.assign(box.style,{position:'fixed',bottom:'16px',right:'16px',maxWidth:'min(360px,90vw)',zIndex:'1000',padding:'12px 16px',borderRadius:'10px',background:'#182334',color:'#fff',border:'1px solid #8090aa',boxShadow:'0 4px 15px #0004',font:'14px system-ui'});
+   document.body.append(box);
+ }
+ try {
+   const response=await fetch('/installer-update-status.json',{cache:'no-store'});
+   if(!response.ok) throw Error();
+   const s=await response.json();
+   box.hidden=s.status==='current' && Date.now()-Date.parse(s.checked)<3600000;
+   box.replaceChildren();
+   const label=document.createElement('strong');
+   label.textContent=s.status==='available'?'Installer-Update verfügbar: V'+s.remote:s.status==='local_newer'?'Lokaler Installer neuer als main':'Installer-Updateprüfung nicht aktuell / fehlgeschlagen';
+   box.append(label);
+   if(s.status==='available'){
+     const detail=document.createElement('div'); detail.textContent='Lokal V'+s.local+' · GitHub V'+s.remote;box.append(detail);
+     const link=document.createElement('a');link.href='https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md';link.textContent='Versionshistorie öffnen';link.target='_blank';link.rel='noopener noreferrer';link.style.color='#8dd8ff';box.append(link);
+   }
+ } catch {box.hidden=false;box.textContent='Installer-Updateprüfung: keine Daten';}
+};
+refresh();setInterval(refresh,60000);
+})();"""
+def write(path, data, mode):
+    fd,tmp=tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd,'w') as f:f.write(data)
+        os.chmod(tmp,mode)
+        os.replace(tmp,path)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
+write(directory/"installer-update-v155.js",js,0o644)
+s=index.read_text()
+if tag not in s:
+    if "</body>" not in s:raise SystemExit("Dashboard body fehlt")
+    backup=index.with_name("index.html.pre-installer-monitor-v155")
+    if not backup.exists():shutil.copy2(index,backup)
+    write(index,s.replace("</body>",tag+"\n</body>",1),index.stat().st_mode & 0o777)
+PY_MONITOR_DASH
+)
+
 install_proxmox_auto_updater
+install_installer_update_monitor_v155 || warn "Installer-Monitor konnte nicht eingerichtet werden."
+install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige konnte nicht eingerichtet werden."
 
 ensure_tui
 
@@ -20111,6 +20271,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]
     fi
 
     (( INSTALL_DASHBOARD )) && install_dashboard_branding_v154
+    install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige fehlt."
 fi
 
 # V69:
