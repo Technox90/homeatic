@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V149**
+Installationskandidat: **V150**
 
 Geplante Hauptdatei:
 
@@ -298,3 +298,14 @@ up.<hauptdomain>
 ```
 
 Bei der Hauptdomain `ltwbh.de` wird damit `https://up.ltwbh.de` vorgeschlagen. Die URL kann weiterhin wie jede andere externe URL im Menü einzeln bearbeitet werden.
+
+
+## Dashboard LT-WBH · V150
+
+Das Server-Dashboard trägt standardmäßig den Namen **Dashboard LT-WBH**.
+
+Die obere Control-Bar mit **Menü · Live · USV · Neustart · Herunterfahren** bleibt beim Scrollen sichtbar. Auf schmalen Displays bleibt die Leiste einzeilig und kann horizontal gescrollt werden.
+
+Das Seitenmenü erhält ein LT-WBH-Techniklogo. Das Browser-Favicon wird aus demselben Motiv clientseitig als **PNG mit Alpha-Transparenz** erzeugt. Ein über die Dashboard-Einstellungen hochgeladenes eigenes Favicon hat weiterhin Vorrang.
+
+Die V150-Migration wird einmalig in `/etc/pve-sensor-dashboard/ui.json` markiert. Nach der ersten Migration können Webseiten- und Menüname weiterhin manuell geändert werden, ohne dass spätere Installer-Läufe sie wieder überschreiben.
