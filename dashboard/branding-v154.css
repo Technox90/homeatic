@@ -1,5 +1,6 @@
 /* NodeZero Dashboard Toolbar V154 */
-#dashboardFixedToolbarV154{
+/* Legacy updater signature: dashboardFixedToolbarV154 */
+#dashboardFixedToolbar{
   position:fixed;inset:0 0 auto 0;z-index:120;min-height:58px;
   background:linear-gradient(180deg,rgba(8,16,27,.98),rgba(8,16,27,.9));
   border-bottom:1px solid var(--line);
@@ -7,46 +8,46 @@
   backdrop-filter:blur(18px) saturate(145%);
   -webkit-backdrop-filter:blur(18px) saturate(145%)
 }
-#dashboardFixedToolbarV154 .toolbar{
+#dashboardFixedToolbar .toolbar{
   width:100%;max-width:none;margin:0;padding:8px 18px;min-height:58px;
   display:grid!important;
   grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr);
   align-items:center;gap:14px;flex-wrap:nowrap!important
 }
-body.dashboardToolbarFixedV154{padding-top:58px}
-body.dashboardToolbarFixedV154 .wrap{padding-top:22px}
+body.dashboardToolbarFixed{padding-top:58px}
+body.dashboardToolbarFixed .wrap{padding-top:22px}
 
-.toolbarLeftV154{justify-self:start;display:flex;align-items:center;min-width:0}
-.toolbarCenterV154{justify-self:center;display:flex;align-items:center;gap:10px}
-.toolbarRightV154{justify-self:end;display:flex;align-items:center;gap:10px}
+.toolbarLeft{justify-self:start;display:flex;align-items:center;min-width:0}
+.toolbarCenter{justify-self:center;display:flex;align-items:center;gap:10px}
+.toolbarRight{justify-self:end;display:flex;align-items:center;gap:10px}
 
-.brandMenuToggleV154{
+.brandMenuToggle{
   position:relative;z-index:130;
   display:flex!important;align-items:center;gap:9px;
   min-width:0;max-width:300px;height:48px;padding:3px 6px!important;
   border:0!important;outline:0!important;box-shadow:none!important;
   color:#a9ceff!important;background:transparent!important
 }
-.brandMenuToggleV154:hover,
-.brandMenuToggleV154:focus,
-.brandMenuToggleV154:active{
+.brandMenuToggle:hover,
+.brandMenuToggle:focus,
+.brandMenuToggle:active{
   border:0!important;outline:0!important;box-shadow:none!important;
   background:rgba(100,167,255,.06)!important
 }
-.brandMenuHamburgerV154{
+.brandMenuHamburger{
   flex:0 0 auto;font-size:20px;line-height:1;color:var(--accent);font-weight:900
 }
-.brandMenuLogoV154{
+.randMenuLogo{
   display:none;max-width:230px;height:38px;object-fit:contain;object-position:left center
 }
-.brandMenuTextV154{
+.brandMenuText{
   display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;font-size:14px;font-weight:900;letter-spacing:.08em;
   background:linear-gradient(90deg,#f7fbff,var(--accent) 55%,var(--accent2));
   -webkit-background-clip:text;background-clip:text;color:transparent
 }
-.brandMenuToggleV154.hasImageV154 .brandMenuLogoV154{display:block}
-.brandMenuToggleV154.hasImageV154 .brandMenuTextV154{display:none}
+.brandMenuToggle.hasImage .randMenuLogo{display:block}
+.brandMenuToggle.hasImage .brandMenuText{display:none}
 
 #sideNav.sideNav{
   top:58px!important;bottom:0!important;z-index:110!important;
@@ -55,49 +56,55 @@ body.dashboardToolbarFixedV154 .wrap{padding-top:22px}
 #navShade.navShade{top:58px!important;z-index:100!important}
 #sideNav .navHead{display:none!important}
 
-#dashboardFixedToolbarV154 .live,
-#dashboardFixedToolbarV154 .upsTopState,
-#dashboardFixedToolbarV154 .reboot,
-#dashboardFixedToolbarV154 .danger{margin:0!important}
+#dashboardFixedToolbar .live,
+#dashboardFixedToolbar .upsTopState,
+#dashboardFixedToolbar .reboot,
+#dashboardFixedToolbar .danger{margin:0!important}
 
 @media(max-width:900px){
-  #dashboardFixedToolbarV154 .toolbar{
+  #dashboardFixedToolbar .toolbar{
     grid-template-columns:auto 1fr auto;
     gap:8px;padding:8px 10px
   }
-  .brandMenuToggleV154{max-width:240px}
-  .brandMenuLogoV154{max-width:180px;height:34px}.brandMenuTextV154{max-width:170px}
-  .toolbarCenterV154{gap:6px}
-  .toolbarRightV154{gap:6px}
+  .brandMenuToggle{max-width:240px}
+  .randMenuLogo{max-width:180px;height:34px}.brandMenuText{max-width:170px}
+  .toolbarCenter{gap:6px}
+  .toolbarRight{gap:6px}
 }
 
 @media(max-width:760px){
-  #dashboardFixedToolbarV154 .toolbar{
+  #dashboardFixedToolbar .toolbar{
     grid-template-columns:1fr auto;
     grid-template-areas:"left right" "center center";
     min-height:96px;row-gap:7px
   }
-  .toolbarLeftV154{grid-area:left}
-  .toolbarCenterV154{grid-area:center;justify-self:center}
-  .toolbarRightV154{grid-area:right}
-  body.dashboardToolbarFixedV154{padding-top:96px}
+  .toolbarLeft{grid-area:left}
+  .toolbarCenter{grid-area:center;justify-self:center}
+  .toolbarRight{grid-area:right}
+  body.dashboardToolbarFixed{padding-top:96px}
   #sideNav.sideNav,#navShade.navShade{top:96px!important}
-  .brandMenuToggleV154{height:42px;max-width:210px;padding:2px 4px!important}
-  .brandMenuLogoV154{height:31px;max-width:155px}
-  .brandMenuTextV154{max-width:145px;font-size:13px}
-  #dashboardFixedToolbarV154 .toolbar button,
-  #dashboardFixedToolbarV154 .toolbar .live,
-  #dashboardFixedToolbarV154 .toolbar .upsTopState{padding:7px 8px;font-size:12px}
+  .brandMenuToggle{height:42px;max-width:210px;padding:2px 4px!important}
+  .randMenuLogo{height:31px;max-width:155px}
+  .brandMenuText{max-width:145px;font-size:13px}
+  #dashboardFixedToolbar .toolbar button,
+  #dashboardFixedToolbar .toolbar .live,
+  #dashboardFixedToolbar .toolbar .upsTopState{padding:7px 8px;font-size:12px}
 }
 
 /* V158 system footer */
-.nodezeroHostInfoHiddenV158{display:none!important}
-#nodezeroSystemFooterV158{
+.nodezeroHostInfoHidden{display:none!important}
+#nodezeroSystemFooter{
   margin:28px auto 0;padding:16px 20px 22px;
   border-top:1px solid var(--line,rgba(128,128,128,.25));
   text-align:center;font-size:11px;line-height:1.6;
   color:var(--muted,#8d9caf);overflow-wrap:anywhere;
 }
-#nodezeroSystemFooterV158 .nodezeroFooterCreditV158{margin-top:4px}
-#nodezeroSystemFooterV158 a{color:inherit;text-decoration:underline;text-underline-offset:2px}
-@media(max-width:760px){#nodezeroSystemFooterV158{padding:14px 12px 20px}}
+#nodezeroSystemFooter .nodezeroFooterCredit{margin-top:4px}
+#nodezeroSystemFooter a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+@media(max-width:760px){#nodezeroSystemFooter{padding:14px 12px 20px}}
+
+/* Center the configurable page title independently of the fixed toolbar. */
+body.dashboardToolbarFixed .top .brand{
+  flex:1 1 100%;width:100%;min-width:0;margin:0!important;text-align:center!important
+}
+body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-wrap:anywhere}

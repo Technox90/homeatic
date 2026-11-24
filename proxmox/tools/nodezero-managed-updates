@@ -94,7 +94,7 @@ def dashboard_payload(index, css, js):
     pattern=r"/\* PVE_DASHBOARD_BRANDING_V154_BEGIN \*/.*?/\* PVE_DASHBOARD_BRANDING_V154_END \*/"
     matches=list(re.finditer(pattern,index,re.S))
     if len(matches)!=2: raise ValueError("Dashboard-Branding nicht eindeutig; manuelles Update nötig")
-    if not all(x in css for x in ("NodeZero Dashboard Toolbar V154","dashboardFixedToolbarV154")) or "brandMenuToggleV154" not in js:
+    if not all(x in css for x in ("NodeZero Dashboard Toolbar V154","dashboardFixedToolbar")) or "brandMenuToggle" not in js:
         raise ValueError("Branding-Quellprüfung fehlgeschlagen")
     if "</style" in css.lower() or "</script" in js.lower(): raise ValueError("Ungültiger HTML-Inhalt")
     # Remove only managed branding blocks; then place them in their own proper contexts.
