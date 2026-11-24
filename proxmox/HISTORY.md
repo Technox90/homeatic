@@ -1,12 +1,19 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V159 · 24.11.2026**  
+> **Aktueller Stand: V160 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V160 · Dashboard-Zusammenführung und verpflichtende CI-Prüfungen
+----------------------------------------------------------------------------
+- Zusammenführung der parallelen V159-Änderungen: `randMenuLogo`, mittiger Titel, Logo bis 350 × 60 px sowie zugängliche mobile Power-Icons.
+- Branding-Script erhält eine stabile ID; alte Update-Marker bleiben kompatibel.
+- Beide verpflichtenden CI-Prüfungen laufen bei jedem Pull Request auf main, auch bei reinen Dokumentationsänderungen.
+- Lokale Logo- und Favicon-Dateien bleiben unverändert.
 
 24.11.2026 – V159 · Versionsneutrales Dashboard-Branding und mittiger Titel
 -------------------------------------------------------------------------
