@@ -220,6 +220,19 @@ nodezero-external-urls --reapply
 
 ## Dashboard · V150 umgesetzt
 
+### Live-Test-Reparatur 24.11.2026
+
+Auf dem produktiven Dashboard wurde geprüft, dass die feste Toolbar und `USV Online` aktiv waren, während der sichtbare Titel noch `PVE Hardware Monitor` zeigte, das Menü-Branding fehlte und ein alter `/favicon-custom.png`-Pfad HTTP 404 verursachte.
+
+Der GitHub-Stand wurde daraufhin korrigiert:
+- Titel wird robust über `document.title` plus `.top .brand h1` gesetzt.
+- Seitenmenü beginnt unterhalb der festen Toolbar.
+- `dashboard/assets/logo-lt-wbh.png` ist jetzt der schmale grafische LT-WBH-PNG-Schriftzug.
+- LT-WBH nutzt das feste PNG-Favicon unabhängig von einem alten Custom-Favicon.
+- Beim LT-WBH-Installationslauf wird ein alter `favicon_url`-Eintrag geleert.
+
+
+
 Persönlicher Standard:
 
 ```text
