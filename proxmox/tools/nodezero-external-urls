@@ -120,10 +120,17 @@ def run(args, check=False, capture=True, input_text=None):
     )
 
 def whiptail(args):
-    cp = run(["whiptail", *args])
+    # whiptail liefert Eingabewerte auf stderr. stdout zeichnet die TUI.
+    # stdout an das Terminal weiterreichen und nur stderr als Ergebnis erfassen.
+    cp = subprocess.run(
+        ["whiptail", *args],
+        text=True,
+        stdout=sys.__stderr__,
+        stderr=subprocess.PIPE,
+    )
     if cp.returncode != 0:
         raise KeyboardInterrupt
-    return (cp.stdout or "").strip()
+    return (cp.stderr or "").strip()
 
 def msg(title, text):
     if TUI:
@@ -172,7 +179,7 @@ def checklist(title, text, rows):
             raw = whiptail(args)
         except KeyboardInterrupt:
             return None
-        return set(re.findall(r'"([^"]+)"|(\S+)', raw)) if False else set(raw.replace('"', "").split())
+        return set(raw.replace('"', "").split())
     print(f"\n=== {title} ===")
     for i, (key, desc, enabled) in enumerate(rows, 1):
         print(f"{i:>2}) [{'X' if enabled else ' '}] {desc} ({key})")
@@ -203,7 +210,12 @@ def pve_host_ip():
     cp = run(["hostname", "-I"])
     return cp.stdout.split()[0] if cp.returncode == 0 and cp.stdout.split() else ""
 
-def ct_inventory():
+_CT_CACHE = None
+
+def ct_inventory(refresh=False):
+    global _CT_CACHE
+    if _CT_CACHE is not None and not refresh:
+        return _CT_CACHE
     result = {}
     cp = run(["pct", "list"])
     if cp.returncode != 0:
@@ -232,6 +244,7 @@ def ct_inventory():
             if m_ip:
                 ip = m_ip.group(1)
         result[hostname] = {"id": ctid, "ip": ip}
+    _CT_CACHE = result
     return result
 
 def ha_backend():
