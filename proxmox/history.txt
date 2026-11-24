@@ -1,6 +1,17 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V150 · Dashboard LT-WBH Branding
+------------------------------------------------
+- Dashboard-Webtitel und Standardname werden auf `Dashboard LT-WBH` migriert.
+- Die obere Control-Bar mit Menü, Live-Status, USV-Status, Neustart und Herunterfahren bleibt beim Scrollen sticky am oberen Rand.
+- Auf kleinen Displays bleibt die Control-Bar einzeilig und kann horizontal gescrollt werden.
+- Das Seitenmenü erhält ein futuristisches LT-WBH-Logo mit Cyan-/Violett-Glow und Home-Automation-Branding.
+- Das Standard-Favicon wird aus demselben Logo zur Laufzeit als PNG mit transparentem Alpha-Hintergrund erzeugt.
+- Ein später manuell hochgeladenes Favicon bleibt weiterhin möglich und überschreibt den LT-WBH-Standard.
+- Vor der Branding-Migration wird ein Dashboard-/UI-Settings-Backup unter `/home/backups/` angelegt.
+- Die Migration setzt Name und Menüname nur beim ersten V150-Lauf; spätere manuelle Änderungen in den Dashboard-Einstellungen bleiben erhalten.
+
 24.11.2026 – V149 · Uptime Kuma externe Standard-URL
 -------------------------------------------------------
 - Uptime Kuma verwendet bei der External-URL-Konfiguration standardmäßig `up.<hauptdomain>` statt `uptime.<hauptdomain>`.
