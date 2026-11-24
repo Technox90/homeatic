@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V144
+# PROXMOX MODULARER KOMPLETT-INSTALLER V146
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -59,6 +59,7 @@ set -Eeuo pipefail
 #   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
 #   V143: Paperless-NAS wird bei externer Ablage direkt im Paperless-CT per NFS4 gemountet; kein PVE-Host-Mount/mp4 mehr
 #   V144: Installer-Artefakte konsistent unter /home: downloads, backups, diagnose; aktive Secrets bleiben unter /root/passwort
+#   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -167,6 +168,30 @@ migrate_nodezero_layout_v139() {
             fi
         fi
     done
+
+    # V146: V144 dokumentierte diese Migration bereits, der Pi-hole-Sprachhelper
+    # schrieb jedoch weiterhin direkt nach /root. Alte Diagnose-Logs einmalig
+    # in die zentrale /home-Struktur übernehmen.
+    install -d -m 0700 -o root -g root \
+        "$DIAGNOSE_ROOT/pihole-language" \
+        "$DIAGNOSE_ROOT/proxmox-auto-updater"
+
+    while IFS= read -r -d '' _legacy_log; do
+        _legacy_name="$(basename -- "$_legacy_log")"
+        if [[ ! -e "$DIAGNOSE_ROOT/pihole-language/$_legacy_name" ]]; then
+            mv -- "$_legacy_log" "$DIAGNOSE_ROOT/pihole-language/$_legacy_name"
+            echo "  [V146] Migriert: $_legacy_log -> $DIAGNOSE_ROOT/pihole-language/$_legacy_name"
+        fi
+    done < <(find /root -maxdepth 1 -type f -name 'pihole-sprache-*.txt' -print0 2>/dev/null)
+
+    if [[ -d /var/log/proxmox-auto-updater && ! -L /var/log/proxmox-auto-updater ]]; then
+        if cp -au /var/log/proxmox-auto-updater/. "$DIAGNOSE_ROOT/proxmox-auto-updater/" 2>/dev/null; then
+            rm -rf /var/log/proxmox-auto-updater
+            echo "  [V146] Migriert: /var/log/proxmox-auto-updater -> $DIAGNOSE_ROOT/proxmox-auto-updater"
+        else
+            warn "V146: alte Auto-Updater-Logs konnten nicht vollständig migriert werden."
+        fi
+    fi
 
     # Alter permanenter Image-Cache -> neuer Standardpfad.
     if [[ -d /home/Images && ! -L /home/Images ]]; then
@@ -840,8 +865,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V144"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V144"
+TUI_TITLE="PROXMOX INSTALLER V146"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V146"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1185,11 +1210,12 @@ tui_maintenance_menu_v106() {
                 --ok-button "Auswählen" \
                 --cancel-button "Zurück" \
                 --menu "Werkzeug oder Einstellung auswählen" \
-                24 94 10 \
+                25 96 11 \
                 "8"  "Pi-hole Authentifizierung / Home Assistant" \
                 "10" "Pi-hole Sprache · DE / EN" \
                 "11" "Auto-Updater · Zeitplan / Status / Sofortlauf" \
                 "20" "Pushover · Empfänger / Test / Ein-Aus" \
+                "21" "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" \
                 "12" "Installations-Passwörter anzeigen" \
                 "15" "PVE Storage-Share-Helper" \
                 "17" "Setup-Profile · laden / verwalten" \
@@ -1200,7 +1226,7 @@ tui_maintenance_menu_v106() {
         return 0
     fi
 
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  Z Zurück\nAuswahl: '
+    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  Z Zurück\nAuswahl: '
     read -r result
     [[ "${result^^}" == "Z" ]] && return 1
     printf '%s' "$result"
@@ -1243,7 +1269,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 138" \
+                    --title "HAUPTMENÜ · Version 146" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -5130,16 +5156,16 @@ CACHE_DIR="/home/downloads/pihole-language"
 SOURCE_FILE="${CACHE_DIR}/translate2german.sh"
 CONVERTED_FILE="${CACHE_DIR}/translate2german.docker.sh"
 
-STAMP="$(date +%d-%m-%H-%M)"
-LOGFILE="/root/pihole-sprache-${STAMP}.txt"
+LOG_DIR="/home/diagnose/pihole-language"
+install -d -m 0700 -o root -g root "$LOG_DIR"
 
-if [[ -e "$LOGFILE" ]]; then
-    N=2
-    while [[ -e "/root/pihole-sprache-${STAMP}-${N}.txt" ]]; do
-        N=$((N + 1))
-    done
-    LOGFILE="/root/pihole-sprache-${STAMP}-${N}.txt"
-fi
+STAMP="$(date +%Y-%m-%d-%H-%M-%S)"
+LOGFILE="$(mktemp "$LOG_DIR/pihole-language-${STAMP}-XXXX.log")"
+chmod 600 "$LOGFILE"
+
+# Diagnose-Logs bleiben 60 Tage erhalten; aktive Secrets liegen weiterhin
+# ausschließlich unter /root/passwort.
+find "$LOG_DIR" -maxdepth 1 -type f -name 'pihole-language-*.log' -mtime +60 -delete 2>/dev/null || true
 
 exec > >(tee -a "$LOGFILE") 2>&1
 
@@ -5638,1025 +5664,7 @@ if ! command -v jq >/dev/null 2>&1 || \
         xz-utils
 fi
 
-cat > /usr/local/sbin/proxmox-auto-updater <<'__UPDATER__'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-
-LOCKFILE="/run/proxmox-auto-updater.lock"
-LOG_DIR="/home/diagnose/proxmox-auto-updater"
-STATE_DIR="/var/lib/proxmox-auto-updater"
-PUSH_CONF="/root/.config/proxmox-auto-updater/pushover.env"
-
-IMAGE_DIR="/home/img"
-HAOS_CACHE="${IMAGE_DIR}/haos"
-LXC_CACHE="${IMAGE_DIR}/template/cache"
-DOCKER_CACHE="${IMAGE_DIR}/docker"
-OLLAMA_CACHE="${IMAGE_DIR}/ollama"
-DOWNLOAD_CACHE="/home/downloads"
-PIHOLE_LANG_CACHE="/home/downloads/pihole-language"
-
-mkdir -p "$LOG_DIR" "$STATE_DIR"
-chmod 700 "$LOG_DIR" "$STATE_DIR"
-
-STAMP="$(date +%Y-%m-%d-%H-%M)"
-LOGFILE="${LOG_DIR}/update-${STAMP}.txt"
-touch "$LOGFILE"
-chmod 600 "$LOGFILE"
-
-exec > >(tee -a "$LOGFILE") 2>&1
-
-exec 9>"$LOCKFILE"
-if ! flock -n 9; then
-    echo "Updater läuft bereits. Abbruch."
-    exit 0
-fi
-
-# Alte Update-Logs nach 60 Tagen entfernen.
-find "$LOG_DIR" -type f -name 'update-*.txt' -mtime +60 -delete 2>/dev/null || true
-
-UPDATED_ITEMS=()
-MANUAL_ITEMS=()
-FAILED_ITEMS=()
-
-PIHOLE_DOCKER_CHANGED=0
-PIHOLE_TRANSLATION_CHANGED=0
-
-add_update() {
-    UPDATED_ITEMS+=("$1")
-    echo "[UPDATE] $1"
-}
-
-add_manual() {
-    MANUAL_ITEMS+=("$1")
-    echo "[MANUELL] $1"
-}
-
-add_failure() {
-    FAILED_ITEMS+=("$1")
-    MANUAL_ITEMS+=("$1")
-    echo "[FEHLER] $1"
-}
-
-short_list() {
-    local data="$1"
-    local count
-
-    count="$(printf '%s\n' "$data" | awk 'NF' | wc -l)"
-
-    if (( count == 0 )); then
-        printf '0'
-        return
-    fi
-
-    local names
-    names="$(
-        printf '%s\n' "$data" |
-        awk 'NF' |
-        head -n 12 |
-        paste -sd ', ' -
-    )"
-
-    if (( count > 12 )); then
-        printf '%s Pakete (%s, ...)' "$count" "$names"
-    else
-        printf '%s Pakete (%s)' "$count" "$names"
-    fi
-}
-
-find_ct_by_hostname() {
-    local wanted="$1"
-    local id host
-
-    while read -r id; do
-        [[ "$id" =~ ^[0-9]+$ ]] || continue
-
-        host="$(
-            pct config "$id" 2>/dev/null |
-            awk -F': ' '/^hostname:/ {print $2; exit}'
-        )"
-
-        if [[ "$host" == "$wanted" ]]; then
-            echo "$id"
-            return 0
-        fi
-    done < <(pct list 2>/dev/null | awk 'NR>1 {print $1}')
-
-    return 1
-}
-
-find_ha_vm() {
-    local id name
-
-    while read -r id; do
-        [[ "$id" =~ ^[0-9]+$ ]] || continue
-
-        name="$(
-            qm config "$id" 2>/dev/null |
-            awk -F': ' '/^name:/ {print $2; exit}'
-        )"
-
-        if [[ "$name" == "homeassistant" ]]; then
-            echo "$id"
-            return 0
-        fi
-    done < <(qm list 2>/dev/null | awk 'NR>1 {print $1}')
-
-    return 1
-}
-
-download_if_changed() {
-    local url="$1"
-    local dest="$2"
-    local tmp="${dest}.part"
-
-    mkdir -p "$(dirname "$dest")"
-    rm -f "$tmp"
-
-    if [[ -s "$dest" ]]; then
-        if curl -fL --retry 2 --connect-timeout 15 \
-            -R -z "$dest" \
-            "$url" \
-            -o "$tmp"; then
-
-            if [[ -s "$tmp" ]]; then
-                mv -f "$tmp" "$dest"
-                return 0
-            fi
-
-            rm -f "$tmp"
-            return 1
-        fi
-
-        rm -f "$tmp"
-        return 2
-    fi
-
-    if curl -fL --retry 3 --connect-timeout 15 \
-        -R \
-        "$url" \
-        -o "$tmp"; then
-        mv -f "$tmp" "$dest"
-        return 0
-    fi
-
-    rm -f "$tmp"
-    return 2
-}
-
-# -----------------------------------------------------------------------------
-# Pushover
-# -----------------------------------------------------------------------------
-
-pushover_send() {
-    local title="$1"
-    local message="$2"
-    local priority="${3:-0}"
-
-    [[ -f "$PUSH_CONF" ]] || return 0
-
-    # shellcheck disable=SC1090
-    source "$PUSH_CONF"
-
-    [[ "${PUSHOVER_ENABLED:-0}" == "1" ]] || return 0
-    [[ -n "${PUSHOVER_APP_TOKEN:-}" ]] || return 0
-
-    # Pushover erlaubt maximal 1024 Zeichen je Nachricht. In mehrere
-    # kleinere Nachrichten aufteilen, statt Fehler am Ende abzuschneiden.
-    local chunk_size=850 remaining="$message"
-    local chunks=()
-    while (( ${#remaining} > chunk_size )); do
-        chunks+=("${remaining:0:chunk_size}")
-        remaining="${remaining:chunk_size}"
-    done
-    chunks+=("$remaining")
-
-    local idx user_var device_var name_var
-    local user device name
-    local part_index part_title
-    local sent=0
-
-    for idx in 1 2; do
-        user_var="PUSHOVER_USER_KEY_${idx}"
-        device_var="PUSHOVER_DEVICE_${idx}"
-        name_var="PUSHOVER_NAME_${idx}"
-
-        user="${!user_var:-}"
-        device="${!device_var:-}"
-        name="${!name_var:-Empfänger ${idx}}"
-
-        if [[ "$idx" == "1" && -z "$user" ]]; then
-            user="${PUSHOVER_USER_KEY:-}"
-            device="${PUSHOVER_DEVICE:-}"
-            name="${PUSHOVER_NAME:-Empfänger 1}"
-        fi
-
-        [[ -n "$user" ]] || continue
-
-        for (( part_index=0; part_index<${#chunks[@]}; part_index++ )); do
-            part_title="$title"
-            if (( ${#chunks[@]} > 1 )); then
-                part_title+=" ($((part_index + 1))/${#chunks[@]})"
-            fi
-
-            local args=(
-                -fsS
-                --connect-timeout 10
-                --max-time 20
-                -X POST
-                --data-urlencode "token=${PUSHOVER_APP_TOKEN}"
-                --data-urlencode "user=${user}"
-                --data-urlencode "title=${part_title}"
-                --data-urlencode "message=${chunks[part_index]}"
-                --data-urlencode "priority=${priority}"
-            )
-
-            if [[ -n "$device" ]]; then
-                args+=(--data-urlencode "device=${device}")
-            fi
-
-            if curl "${args[@]}" \
-                https://api.pushover.net/1/messages.json \
-                >/dev/null; then
-                echo "Pushover gesendet an: $name ($((part_index + 1))/${#chunks[@]})"
-                sent=$((sent + 1))
-            else
-                echo "WARNUNG: Pushover an '$name' (Teil $((part_index + 1))) konnte nicht gesendet werden."
-            fi
-        done
-    done
-
-    if (( sent == 0 )); then
-        echo "WARNUNG: Pushover ist aktiviert, aber keine Nachricht konnte versendet werden."
-    fi
-}
-
-manual_notification_due() {
-    local body="$1"
-    local hash_file="${STATE_DIR}/manual-warning.sha256"
-    local hash age now mtime
-
-    hash="$(printf '%s' "$body" | sha256sum | awk '{print $1}')"
-
-    if [[ ! -f "$hash_file" ]]; then
-        printf '%s\n' "$hash" > "$hash_file"
-        return 0
-    fi
-
-    if [[ "$(cat "$hash_file" 2>/dev/null)" != "$hash" ]]; then
-        printf '%s\n' "$hash" > "$hash_file"
-        return 0
-    fi
-
-    now="$(date +%s)"
-    mtime="$(stat -c %Y "$hash_file" 2>/dev/null || echo 0)"
-    age=$(( now - mtime ))
-
-    # Gleiche manuelle Warnung höchstens einmal pro 7 Tage.
-    if (( age >= 604800 )); then
-        touch "$hash_file"
-        return 0
-    fi
-
-    return 1
-}
-
-# -----------------------------------------------------------------------------
-# Cache aktuell halten
-# -----------------------------------------------------------------------------
-
-update_lxc_template_cache() {
-    command -v pveam >/dev/null 2>&1 || return 0
-    pvesm status 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq image-cache || return 0
-
-    echo
-    echo "=== LXC TEMPLATE CACHE ==="
-
-    if ! pveam update; then
-        add_failure "LXC-Template-Liste konnte nicht aktualisiert werden"
-        return
-    fi
-
-    local template dest
-
-    template="$(
-        pveam available --section system 2>/dev/null |
-        awk '$2~/^debian-13-standard_.*amd64\.tar\.(zst|xz|gz)$/{print $2}' |
-        sort -V |
-        tail -1
-    )"
-
-    [[ -n "$template" ]] || return 0
-
-    dest="${LXC_CACHE}/${template}"
-
-    if [[ ! -s "$dest" ]]; then
-        if pveam download image-cache "$template"; then
-            add_update "LXC-Template-Cache: $template"
-        else
-            add_failure "LXC-Template $template konnte nicht geladen werden"
-        fi
-    fi
-}
-
-update_haos_cache() {
-    command -v jq >/dev/null 2>&1 || return 0
-
-    echo
-    echo "=== HAOS INSTALLATIONS-IMAGE CACHE ==="
-
-    mkdir -p "$HAOS_CACHE"
-
-    local json="${HAOS_CACHE}/stable.json"
-    local tmp="${json}.part"
-    local version xz qcow2
-
-    if ! curl -fsSL --connect-timeout 15 \
-        https://version.home-assistant.io/stable.json \
-        -o "$tmp"; then
-        rm -f "$tmp"
-        echo "HAOS Versionsprüfung nicht erreichbar; vorhandener Cache bleibt."
-        return
-    fi
-
-    mv -f "$tmp" "$json"
-
-    version="$(jq -r '.hassos.ova // empty' "$json")"
-    [[ -n "$version" ]] || return 0
-
-    xz="${HAOS_CACHE}/haos_ova-${version}.qcow2.xz"
-    qcow2="${HAOS_CACHE}/haos_ova-${version}.qcow2"
-
-    if [[ ! -s "$qcow2" ]]; then
-        if [[ ! -s "$xz" ]]; then
-            if curl -fL --retry 3 \
-                "https://github.com/home-assistant/operating-system/releases/download/${version}/haos_ova-${version}.qcow2.xz" \
-                -o "${xz}.part"; then
-                mv -f "${xz}.part" "$xz"
-            else
-                rm -f "${xz}.part"
-                add_failure "HAOS Cache-Version $version konnte nicht geladen werden"
-                return
-            fi
-        fi
-
-        if xz -dkf "$xz"; then
-            add_update "HAOS Installations-Cache: Version $version"
-        else
-            add_failure "HAOS Cache-Version $version konnte nicht entpackt werden"
-        fi
-    fi
-}
-
-update_misc_downloads() {
-    echo
-    echo "=== KLEINE DOWNLOAD-CACHES ==="
-
-    mkdir -p \
-        "${DOWNLOAD_CACHE}/pihole" \
-        "${DOWNLOAD_CACHE}/scrutiny" \
-        "$PIHOLE_LANG_CACHE" \
-        "$DOCKER_CACHE"
-
-    local rc
-
-    set +e
-    download_if_changed \
-        "https://download.docker.com/linux/debian/gpg" \
-        "${DOCKER_CACHE}/docker.asc"
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        chmod 644 "${DOCKER_CACHE}/docker.asc"
-        chown 100000:100000 "${DOCKER_CACHE}/docker.asc" 2>/dev/null || true
-        add_update "Docker Repository-Key Cache"
-    elif (( rc == 2 )); then
-        add_failure "Docker Repository-Key konnte nicht geprüft werden"
-    fi
-
-    set +e
-    download_if_changed \
-        "https://www.internic.net/domain/named.root" \
-        "${DOWNLOAD_CACHE}/pihole/named.root"
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        add_update "Unbound Root-Hints Cache"
-        update_running_pihole_root_hints || true
-    elif (( rc == 2 )); then
-        echo "Root-Hints Online-Prüfung fehlgeschlagen; Cache bleibt."
-    fi
-
-    set +e
-    download_if_changed \
-        "https://raw.githubusercontent.com/pimanDE/translate2german/master/translate2german.sh" \
-        "${PIHOLE_LANG_CACHE}/translate2german.sh"
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        PIHOLE_TRANSLATION_CHANGED=1
-        add_update "Pi-hole deutsche Übersetzungsquelle"
-    elif (( rc == 2 )); then
-        echo "Pi-hole Übersetzungsquelle konnte nicht geprüft werden; Cache bleibt."
-    fi
-
-    update_scrutiny_collector_cache || true
-}
-
-update_running_pihole_root_hints() {
-    local ctid
-    ctid="$(find_ct_by_hostname pihole || true)"
-    [[ -n "$ctid" ]] || return 0
-
-    pct status "$ctid" 2>/dev/null | grep -q 'status: running' || return 0
-
-    pct push \
-        "$ctid" \
-        "${DOWNLOAD_CACHE}/pihole/named.root" \
-        /var/lib/unbound/root.hints >/dev/null
-
-    pct exec "$ctid" -- bash -lc '
-        chown unbound:unbound /var/lib/unbound/root.hints
-        chmod 644 /var/lib/unbound/root.hints
-        systemctl restart unbound
-    ' >/dev/null
-}
-
-update_scrutiny_collector_cache() {
-    local arch dest rc
-
-    case "$(uname -m)" in
-        x86_64|amd64) arch="amd64" ;;
-        aarch64|arm64) arch="arm64" ;;
-        *) return 0 ;;
-    esac
-
-    dest="${DOWNLOAD_CACHE}/scrutiny/scrutiny-collector-metrics-linux-${arch}"
-
-    set +e
-    download_if_changed \
-        "https://github.com/AnalogJ/scrutiny/releases/latest/download/scrutiny-collector-metrics-linux-${arch}" \
-        "$dest"
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        chmod 755 "$dest"
-        add_update "Scrutiny Collector Cache"
-
-        if [[ -f /opt/scrutiny-collector/scrutiny-collector-metrics ]]; then
-            install -m 0755 \
-                "$dest" \
-                /opt/scrutiny-collector/scrutiny-collector-metrics
-        fi
-    elif (( rc == 2 )); then
-        echo "Scrutiny Collector konnte nicht online geprüft werden."
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# LXC / Docker Updates
-# -----------------------------------------------------------------------------
-
-update_ct_apt() {
-    local ctid="$1"
-    local label="$2"
-    local packages=""
-
-    echo
-    echo "--- ${label}: APT ---"
-
-    if ! pct exec "$ctid" -- bash -lc '
-        set -Eeuo pipefail
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update
-    '; then
-        add_failure "${label}: apt update fehlgeschlagen"
-        return
-    fi
-
-    packages="$(
-        pct exec "$ctid" -- bash -lc '
-            apt-get -s dist-upgrade 2>/dev/null |
-            awk "/^Inst / {print \$2}"
-        ' 2>/dev/null |
-        tr -d '\r'
-    )"
-
-    if [[ -n "$packages" ]]; then
-        if pct exec "$ctid" -- bash -lc '
-            set -Eeuo pipefail
-            export DEBIAN_FRONTEND=noninteractive
-            export NEEDRESTART_MODE=a
-            apt-get -y dist-upgrade
-        '; then
-            add_update "${label} APT: $(short_list "$packages")"
-        else
-            add_failure "${label}: APT-Upgrade fehlgeschlagen"
-        fi
-    else
-        echo "${label}: keine APT-Updates."
-    fi
-}
-
-compose_state() {
-    local ctid="$1"
-    local dir="$2"
-
-    pct exec "$ctid" -- bash -lc "
-        set -e
-        cd '$dir'
-
-        docker compose config --images |
-        awk 'NF' |
-        sort -u |
-        while read -r image; do
-            id=\$(docker image inspect --format '{{.Id}}' \"\$image\" 2>/dev/null || true)
-            printf '%s|%s\\n' \"\$image\" \"\$id\"
-        done
-    " 2>/dev/null | tr -d '\r'
-}
-
-cleanup_ct_docker_images() {
-    local ctid="$1"
-    local label="$2"
-
-    echo "--- ${label}: alte unbenutzte Docker-Images bereinigen (7 Tage) ---"
-    if pct exec "$ctid" -- bash -lc '
-        set -Eeuo pipefail
-        docker image prune -a -f --filter "until=168h"
-        df -h /
-    '; then
-        echo "[OK] ${label}: Docker-Image-Bereinigung abgeschlossen."
-    else
-        add_manual "${label}: automatische Docker-Image-Bereinigung fehlgeschlagen"
-    fi
-}
-
-update_ct_compose() {
-    local ctid="$1"
-    local label="$2"
-    local dir="$3"
-    local hostname="$4"
-
-    [[ -n "$dir" ]] || return 0
-
-    if ! pct exec "$ctid" -- test -f "${dir}/docker-compose.yml" >/dev/null 2>&1 \
-       && ! pct exec "$ctid" -- test -f "${dir}/compose.yml" >/dev/null 2>&1 \
-       && ! pct exec "$ctid" -- test -f "${dir}/compose.yaml" >/dev/null 2>&1; then
-        return 0
-    fi
-
-    echo
-    echo "--- ${label}: Docker ---"
-
-    local before after
-
-    before="$(compose_state "$ctid" "$dir" || true)"
-
-    if pct exec "$ctid" -- bash -lc "
-        set -Eeuo pipefail
-        cd '$dir'
-
-        if command -v docker-cache-pull >/dev/null 2>&1; then
-            docker-cache-pull .
-        else
-            docker compose pull
-        fi
-    "; then
-        after="$(compose_state "$ctid" "$dir" || true)"
-
-        if [[ "$before" != "$after" ]]; then
-            if pct exec "$ctid" -- bash -lc "
-                set -Eeuo pipefail
-                cd '$dir'
-                docker compose up -d --remove-orphans
-            "; then
-                add_update "${label}: Docker-Images/Container aktualisiert"
-                cleanup_ct_docker_images "$ctid" "$label"
-
-                if [[ "$hostname" == "pihole" ]]; then
-                    PIHOLE_DOCKER_CHANGED=1
-                fi
-            else
-                add_failure "${label}: neue Docker-Images geladen, Container-Neustart fehlgeschlagen"
-            fi
-        else
-            echo "${label}: Docker-Images bereits aktuell."
-            cleanup_ct_docker_images "$ctid" "$label"
-        fi
-    else
-        add_failure "${label}: Docker-Updateprüfung fehlgeschlagen"
-    fi
-}
-
-update_one_ct() {
-    local hostname="$1"
-    local label="$2"
-    local dir="$3"
-
-    local ctid was_running=0
-
-    ctid="$(find_ct_by_hostname "$hostname" || true)"
-    [[ -n "$ctid" ]] || return 0
-
-    echo
-    echo "============================================================"
-    echo " ${label} (CT ${ctid})"
-    echo "============================================================"
-
-    if pct status "$ctid" 2>/dev/null | grep -q 'status: running'; then
-        was_running=1
-    else
-        echo "Container war gestoppt; starte nur für Update ..."
-        if ! pct start "$ctid"; then
-            add_failure "${label}: LXC konnte für Update nicht gestartet werden"
-            return
-        fi
-        sleep 5
-    fi
-
-    update_ct_apt "$ctid" "$label"
-    update_ct_compose "$ctid" "$label" "$dir" "$hostname"
-
-    # Automatischer LXC-Reboot, falls Debian diesen verlangt.
-    if pct exec "$ctid" -- test -f /var/run/reboot-required >/dev/null 2>&1; then
-        if pct reboot "$ctid"; then
-            add_update "${label}: LXC-Neustart nach Paketupdate"
-            sleep 4
-        else
-            add_manual "${label}: Neustart nach Paketupdate erforderlich"
-        fi
-    fi
-
-    if (( was_running == 0 )); then
-        echo "Container war vor dem Update gestoppt; stoppe wieder ..."
-        pct shutdown "$ctid" --timeout 60 || pct stop "$ctid" || true
-    fi
-}
-
-update_managed_lxcs() {
-    update_one_ct "paperless"         "Paperless/Ollama"    "/opt/paperless"
-    update_one_ct "pihole"            "Pi-hole/Unbound"     "/opt/pihole"
-    update_one_ct "netalertx"         "NetAlertX"           "/opt/netalertx"
-    update_one_ct "uptime-kuma"       "Uptime Kuma"         "/opt/uptime-kuma"
-    update_one_ct "vaultwarden"       "Vaultwarden"         "/opt/vaultwarden"
-    update_one_ct "caddy"             "Caddy"               "/opt/caddy"
-    update_one_ct "stirling-pdf"      "Stirling PDF"        "/opt/stirling-pdf"
-    update_one_ct "ntfy"              "ntfy"                "/opt/ntfy"
-    update_one_ct "forgejo"           "Forgejo"             "/opt/forgejo"
-    update_one_ct "syncthing"         "Syncthing"           "/opt/syncthing"
-    update_one_ct "speedtest-tracker" "Speedtest Tracker"   "/opt/speedtest-tracker"
-    update_one_ct "scrutiny"          "Scrutiny"            "/opt/scrutiny"
-    update_one_ct "mealie"            "Mealie"              "/opt/mealie"
-}
-
-# -----------------------------------------------------------------------------
-# Ollama Models
-# -----------------------------------------------------------------------------
-
-ollama_model_id() {
-    local ctid="$1"
-    local model="$2"
-
-    pct exec "$ctid" -- \
-        docker exec paperless-ollama ollama list 2>/dev/null |
-    awk -v model="$model" '$1==model {print $2; exit}' |
-    tr -d '\r'
-}
-
-update_ollama_models() {
-    local ctid
-
-    ctid="$(find_ct_by_hostname paperless || true)"
-    [[ -n "$ctid" ]] || return 0
-    pct status "$ctid" 2>/dev/null | grep -q 'status: running' || return 0
-
-    if ! pct exec "$ctid" -- docker inspect paperless-ollama >/dev/null 2>&1; then
-        return 0
-    fi
-
-    echo
-    echo "============================================================"
-    echo " OLLAMA MODELLE"
-    echo "============================================================"
-
-    local model before after
-
-    for model in "qwen2.5:7b" "embeddinggemma"; do
-        before="$(ollama_model_id "$ctid" "$model" || true)"
-
-        if pct exec "$ctid" -- \
-            docker exec paperless-ollama ollama pull "$model"; then
-
-            after="$(ollama_model_id "$ctid" "$model" || true)"
-
-            if [[ "$before" != "$after" ]]; then
-                add_update "Ollama-Modell: ${model}"
-            else
-                echo "Ollama ${model}: bereits aktuell."
-            fi
-        else
-            add_failure "Ollama-Modell ${model}: Updateprüfung fehlgeschlagen"
-        fi
-    done
-}
-
-# -----------------------------------------------------------------------------
-# Pi-hole deutsche Übersetzung nach Container-Update wieder anwenden
-# -----------------------------------------------------------------------------
-
-restore_pihole_language() {
-    local ctid lang
-
-    ctid="$(find_ct_by_hostname pihole || true)"
-    [[ -n "$ctid" ]] || return 0
-
-    lang="$(
-        pct exec "$ctid" -- \
-            sh -c 'cat /opt/pihole/.web-language 2>/dev/null || true' |
-        tr -d '\r\n'
-    )"
-
-    [[ "$lang" == "DE" ]] || return 0
-
-    if (( PIHOLE_DOCKER_CHANGED == 1 || PIHOLE_TRANSLATION_CHANGED == 1 )); then
-        if command -v pihole-language >/dev/null 2>&1; then
-            if pihole-language DE; then
-                add_update "Pi-hole: deutsche Webübersetzung erneut angewendet"
-            else
-                add_manual "Pi-hole: deutsche Übersetzung muss geprüft werden"
-            fi
-        else
-            add_manual "Pi-hole DE: Sprachtool fehlt"
-        fi
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Home Assistant OS
-# -----------------------------------------------------------------------------
-
-qga_output() {
-    local vmid="$1"
-    shift
-
-    timeout 120 qm guest exec "$vmid" \
-        --output-format json \
-        -- "$@" 2>/dev/null |
-    jq -r '."out-data" // empty' 2>/dev/null
-}
-
-ha_update_available() {
-    local vmid="$1"
-    local component="$2"
-    local info
-
-    info="$(qga_output "$vmid" sh -lc "ha ${component} info --raw-json" || true)"
-    [[ -n "$info" ]] || return 2
-
-    if printf '%s' "$info" |
-       jq -e '.. | objects | select(.update_available == true)' >/dev/null 2>&1; then
-        return 0
-    fi
-
-    return 1
-}
-
-update_home_assistant() {
-    local vmid
-
-    vmid="$(find_ha_vm || true)"
-    [[ -n "$vmid" ]] || return 0
-
-    echo
-    echo "============================================================"
-    echo " HOME ASSISTANT (VM ${vmid})"
-    echo "============================================================"
-
-    qm status "$vmid" 2>/dev/null | grep -q 'status: running' || {
-        echo "Home Assistant VM ist gestoppt; automatische Aktualisierung übersprungen."
-        return 0
-    }
-
-    if ! timeout 20 qm guest cmd "$vmid" ping >/dev/null 2>&1; then
-        add_manual "Home Assistant: QEMU Guest Agent nicht erreichbar; Updates im HA-Menü prüfen"
-        return 0
-    fi
-
-    local rc
-
-    set +e
-    ha_update_available "$vmid" core
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        if timeout 3600 qm guest exec "$vmid" \
-            -- sh -lc 'ha core update --backup'; then
-            add_update "Home Assistant Core (mit Backup)"
-        else
-            add_failure "Home Assistant Core Update fehlgeschlagen"
-        fi
-    elif (( rc == 2 )); then
-        echo "HA Core Update-Status konnte nicht gelesen werden."
-    else
-        echo "Home Assistant Core: aktuell."
-    fi
-
-    set +e
-    ha_update_available "$vmid" supervisor
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        if timeout 1800 qm guest exec "$vmid" \
-            -- sh -lc 'ha supervisor update'; then
-            add_update "Home Assistant Supervisor"
-        else
-            add_failure "Home Assistant Supervisor Update fehlgeschlagen"
-        fi
-    elif (( rc == 2 )); then
-        echo "HA Supervisor Update-Status konnte nicht gelesen werden."
-    else
-        echo "Home Assistant Supervisor: aktuell."
-    fi
-
-    set +e
-    ha_update_available "$vmid" os
-    rc=$?
-    set -e
-
-    if (( rc == 0 )); then
-        echo "HAOS Update gefunden; OS-Update wird zuletzt ausgeführt."
-        if timeout 3600 qm guest exec "$vmid" \
-            -- sh -lc 'ha os update'; then
-            add_update "Home Assistant OS (VM führt Neustart selbst durch)"
-        else
-            add_failure "Home Assistant OS Update fehlgeschlagen"
-        fi
-    elif (( rc == 2 )); then
-        echo "HAOS Update-Status konnte nicht gelesen werden."
-    else
-        echo "Home Assistant OS: aktuell."
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Proxmox Host Updates
-# -----------------------------------------------------------------------------
-
-update_proxmox_host() {
-    echo
-    echo "============================================================"
-    echo " PROXMOX HOST"
-    echo "============================================================"
-
-    local packages=""
-
-    if ! apt-get update; then
-        add_failure "Proxmox Host: apt update fehlgeschlagen"
-        return
-    fi
-
-    packages="$(
-        apt-get -s dist-upgrade 2>/dev/null |
-        awk '/^Inst / {print $2}'
-    )"
-
-    if [[ -n "$packages" ]]; then
-        if DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
-           apt-get -y dist-upgrade; then
-            add_update "Proxmox Host APT: $(short_list "$packages")"
-        else
-            add_failure "Proxmox Host: dist-upgrade fehlgeschlagen"
-        fi
-    else
-        echo "Proxmox Host: keine APT-Updates."
-    fi
-
-    local running newest
-
-    running="$(uname -r)"
-
-    newest="$(
-        find /boot -maxdepth 1 -type f -name 'vmlinuz-*-pve' \
-            -printf '%f\n' 2>/dev/null |
-        sed 's/^vmlinuz-//' |
-        sort -V |
-        tail -1
-    )"
-
-    if [[ -f /var/run/reboot-required ]]; then
-        add_manual "Proxmox Host: Neustart erforderlich"
-    elif [[ -n "$newest" && "$newest" != "$running" ]]; then
-        add_manual "Proxmox Host: neuer Kernel ${newest}; aktuell läuft ${running} – Neustart erforderlich"
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Summary / Notifications
-# -----------------------------------------------------------------------------
-
-build_summary() {
-    local out=""
-    local item
-
-    # Kritische Hinweise immer zuerst, damit sie in der Push-Nachricht
-    # sichtbar sind, auch wenn viele Pakete aktualisiert wurden.
-    if (( ${#MANUAL_ITEMS[@]} > 0 )); then
-        out+="Persönliches Eingreifen:\n"
-        for item in "${MANUAL_ITEMS[@]}"; do
-            out+="- ${item}\n"
-        done
-    fi
-
-    if (( ${#UPDATED_ITEMS[@]} > 0 )); then
-        [[ -n "$out" ]] && out+="\n"
-        out+="Installiert/aktualisiert:\n"
-        for item in "${UPDATED_ITEMS[@]}"; do
-            out+="- ${item}\n"
-        done
-    fi
-
-    printf '%b' "$out"
-}
-
-send_summary() {
-    local summary
-    local priority=0
-    (( ${#FAILED_ITEMS[@]} > 0 )) && priority=1
-    summary="$(build_summary)"
-
-    if [[ -z "$summary" ]]; then
-        echo
-        echo "Keine Updates und kein Eingreifen erforderlich."
-        return
-    fi
-
-    echo
-    echo "============================================================"
-    echo " ZUSAMMENFASSUNG"
-    echo "============================================================"
-    printf '%s\n' "$summary"
-
-    if (( ${#MANUAL_ITEMS[@]} > 0 )); then
-        if (( ${#UPDATED_ITEMS[@]} > 0 )); then
-            pushover_send \
-                "Proxmox Updates + Eingreifen nötig" \
-                "$summary" \
-                "$priority"
-        elif manual_notification_due "$summary"; then
-            pushover_send \
-                "Proxmox: Eingreifen nötig" \
-                "$summary" \
-                "$priority"
-        else
-            echo "Identische manuelle Pushover-Warnung wurde in den letzten 7 Tagen bereits gesendet."
-        fi
-    elif (( ${#UPDATED_ITEMS[@]} > 0 )); then
-        pushover_send \
-            "Proxmox Updates installiert" \
-            "$summary" \
-            0
-    fi
-}
-
-# =============================================================================
-# START
-# =============================================================================
-
-echo "============================================================"
-echo " PROXMOX AUTO-UPDATER"
-echo " $(date)"
-echo "============================================================"
-echo
-echo "Log:"
-echo "  $LOGFILE"
-
-update_lxc_template_cache
-update_haos_cache
-update_misc_downloads
-
-update_managed_lxcs
-update_ollama_models
-restore_pihole_language
-update_home_assistant
-
-# Host zuletzt, damit PVE-Paketupdates die laufende CT-Aktualisierung nicht stören.
-update_proxmox_host
-
-send_summary
-
-echo
-echo "Fertig: $(date)"
-echo "Log: $LOGFILE"
-
-__UPDATER__
-
-TOOLS_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"
+# V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.\n# Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.\n\nTOOLS_REF="47b54390ce9d97c3360cec99be462abf33c292d2"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -6687,26 +5695,43 @@ install_nodezero_tool_v141() {
         chmod 0755 "$cached"
     fi
 
-    bash -n "$cached" || {
-        echo "FEHLER: Syntaxprüfung fehlgeschlagen: ${cached}" >&2
-        exit 1
-    }
+    case "$(head -n1 "$cached" 2>/dev/null || true)" in
+        *python*)
+            PYTHONPYCACHEPREFIX="/tmp/nodezero-pycache-$" \
+                python3 -m py_compile "$cached" || {
+                    rm -rf "/tmp/nodezero-pycache-$"
+                    echo "FEHLER: Python-Syntaxprüfung fehlgeschlagen: ${cached}" >&2
+                    exit 1
+                }
+            rm -rf "/tmp/nodezero-pycache-$"
+            ;;
+        *)
+            bash -n "$cached" || {
+                echo "FEHLER: Bash-Syntaxprüfung fehlgeschlagen: ${cached}" >&2
+                exit 1
+            }
+            ;;
+    esac
 
     install -m 0755 -o root -g root "$cached" "$target"
 }
 
+install_nodezero_tool_v141 "proxmox-auto-updater"
 install_nodezero_tool_v141 "proxmox-auto-updater-config"
 install_nodezero_tool_v141 "proxmox-pushover-config"
+install_nodezero_tool_v141 "nodezero-external-urls"
 
 chmod 700 \
     /usr/local/sbin/proxmox-auto-updater \
     /usr/local/sbin/proxmox-auto-updater-config \
-    /usr/local/sbin/proxmox-pushover-config
+    /usr/local/sbin/proxmox-pushover-config \
+    /usr/local/sbin/nodezero-external-urls
 
 chown root:root \
     /usr/local/sbin/proxmox-auto-updater \
     /usr/local/sbin/proxmox-auto-updater-config \
-    /usr/local/sbin/proxmox-pushover-config
+    /usr/local/sbin/proxmox-pushover-config \
+    /usr/local/sbin/nodezero-external-urls
 
 cat > /etc/systemd/system/proxmox-auto-updater.service <<'EOF'
 [Unit]
@@ -8565,7 +7590,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V144",
+    "installer_version": "V146",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -9039,7 +8064,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V144 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V146 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9183,6 +8208,13 @@ while true; do
     if [[ "$INSTALL_SELECTION" == "20" ]]; then
         if ! /usr/local/sbin/proxmox-pushover-config; then
             warn "Pushover-Konfiguration wurde mit einem Fehler beendet."
+        fi
+        continue
+    fi
+
+    if [[ "$INSTALL_SELECTION" == "21" ]]; then
+        if ! /usr/local/sbin/nodezero-external-urls; then
+            warn "Externe URL-Konfiguration wurde nicht vollständig angewendet. DNS/Portfreigabe und Diagnose-Log prüfen."
         fi
         continue
     fi
@@ -14916,7 +13948,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$UPTIME_ID" "Uptime Kuma" "http" "3001"
     verify_web_v107 "Uptime Kuma" "https://${UPTIME_IP}/" 90
-    dashboard_link_upsert "Uptime Kuma" "https://${UPTIME_IP}/"
 
     echo
     echo "Uptime-Kuma-Datenbank und Konfiguration bleiben dauerhaft unter:"
@@ -15015,7 +14046,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$VAULTWARDEN_ID" "Vaultwarden" "http" "8080"
     verify_web_v107 "Vaultwarden" "https://${VAULTWARDEN_IP}/admin/" 90
-    dashboard_link_upsert "Vaultwarden" "https://${VAULTWARDEN_IP}/"
     configure_vaultwarden_offsite_backup
 
     ok "Vaultwarden läuft ausschließlich über den verwalteten HTTPS-Einstieg; HTTP wird umgeleitet."
@@ -15063,7 +14093,6 @@ EOF
     docker_compose_deploy_in_ct_v107 "$CADDY_ID" "/opt/caddy"
 
     verify_web_v107 "Caddy" "http://${CADDY_IP}/" 60
-    dashboard_link_upsert "Caddy Reverse Proxy" "http://${CADDY_IP}/"
 }
 
 install_stirling_pdf() {
@@ -15109,7 +14138,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$STIRLING_ID" "Stirling PDF" "http" "8080"
     verify_web_v107 "Stirling PDF" "https://${STIRLING_IP}/" 120
-    dashboard_link_upsert "Stirling PDF" "https://${STIRLING_IP}/"
 }
 
 install_ntfy() {
@@ -15148,7 +14176,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$NTFY_ID" "ntfy" "http" "8080"
     verify_web_v107 "ntfy" "https://${NTFY_IP}/" 60
-    dashboard_link_upsert "ntfy" "https://${NTFY_IP}/"
 }
 
 install_forgejo() {
@@ -15190,7 +14217,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$FORGEJO_ID" "Forgejo" "http" "3000"
     verify_web_v107 "Forgejo" "https://${FORGEJO_IP}/" 90
-    dashboard_link_upsert "Forgejo" "https://${FORGEJO_IP}/"
 }
 
 install_syncthing() {
@@ -15227,7 +14253,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$SYNCTHING_ID" "Syncthing" "http" "8384"
     verify_web_v107 "Syncthing" "https://${SYNCTHING_IP}/" 90
-    dashboard_link_upsert "Syncthing" "https://${SYNCTHING_IP}/"
 }
 
 install_speedtest_tracker() {
@@ -15273,7 +14298,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$SPEEDTEST_ID" "Speedtest Tracker" "http" "8080"
     verify_web_v107 "Speedtest Tracker" "https://${SPEEDTEST_IP}/api/healthcheck" 120
-    dashboard_link_upsert "Speedtest Tracker" "https://${SPEEDTEST_IP}/"
 }
 
 install_scrutiny() {
@@ -15382,7 +14406,6 @@ EOF
         warn "Erster Scrutiny-Collector-Lauf war noch nicht erfolgreich."
     fi
 
-    dashboard_link_upsert "Scrutiny" "https://${SCRUTINY_IP}/"
 }
 
 install_mealie() {
@@ -15425,7 +14448,6 @@ EOF
 
     configure_lxc_web_standard_ports_v65 "$MEALIE_ID" "Mealie" "http" "9000"
     verify_web_v107 "Mealie" "https://${MEALIE_IP}/" 120
-    dashboard_link_upsert "Mealie" "https://${MEALIE_IP}/"
 }
 
 
@@ -20537,6 +19559,16 @@ if (( INSTALL_DASHBOARD )); then
             die "Dashboard-Ansichten konnten nicht installiert werden."
     else
         die "Dashboard-Ansichtsauswahl konnte nicht geladen werden."
+    fi
+fi
+
+# V146: Eine bereits konfigurierte externe URL-Struktur nach Installationen
+# erneut auf die aktuellen Gast-IP-Adressen und App-Basis-URLs anwenden.
+# Fehler sind hier nicht fatal, z. B. wenn DNS/Portfreigabe noch vorbereitet wird.
+if [[ -s /home/Data/proxmox-installer/external-urls/config.json &&
+      -x /usr/local/sbin/nodezero-external-urls ]]; then
+    if ! /usr/local/sbin/nodezero-external-urls --reapply; then
+        warn "Externe URLs konnten nicht vollständig erneut angewendet werden. /home/diagnose/external-urls prüfen."
     fi
 fi
 
