@@ -23078,7 +23078,7 @@ PY
 install_dashboard_branding_v150() {
     header "DASHBOARD · BRANDING / FESTE TOOLBAR"
 
-    local ref="c0c2a125d2d6bbddc29459e3b9dade15f2b04492"
+    local ref="ef4d48168e871f967f19e1617c68af768f2c27f3"
     local index="/opt/nodezero/dashboard/static/index.html"
     local static_dir="/opt/nodezero/dashboard/static"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
