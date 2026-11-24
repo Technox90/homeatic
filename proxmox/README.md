@@ -6,6 +6,14 @@ Modularer Komplett-Installer für Proxmox VE.
 
 **Installationskandidat: V153 · 24.11.2026**
 
+### Neu in V154
+
+- Logo im linken kombinierten Menü-Toggle vergrößert.
+- Kein sichtbarer Rahmen mehr.
+- Kein permanenter Button-Hintergrund mehr.
+- Klickfläche und Menü-Toggle bleiben unverändert funktionsfähig.
+- Responsive Größen ebenfalls angepasst.
+
 ### Neu in V153
 
 - Toolbar-Layout neu strukturiert.
