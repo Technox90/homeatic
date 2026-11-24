@@ -565,6 +565,44 @@ compose_state() {
     " 2>/dev/null | tr -d '\r'
 }
 
+migrate_stirling_registry_v148() {
+    local ctid="$1"
+    local dir="$2"
+    local compose_file=""
+    local backup=""
+
+    local candidate
+    for candidate in docker-compose.yml compose.yml compose.yaml; do
+        if pct exec "$ctid" -- test -f "$dir/$candidate" >/dev/null 2>&1; then
+            compose_file="$dir/$candidate"
+            break
+        fi
+    done
+
+    [[ -n "$compose_file" ]] || return 0
+
+    if ! pct exec "$ctid" -- grep -q         'docker\.stirlingpdf\.com/stirlingtools/stirling-pdf:'         "$compose_file" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    backup="$compose_file.pre-v148-stirling-registry.bak"
+
+    pct exec "$ctid" -- cp -a -- "$compose_file" "$backup"
+
+    pct exec "$ctid" -- sed -i         's#docker\.stirlingpdf\.com/stirlingtools/stirling-pdf:#ghcr.io/stirling-tools/stirling-pdf:#g'         "$compose_file"
+
+    if ! pct exec "$ctid" -- bash -lc "cd '$dir' && docker compose config -q"; then
+        pct exec "$ctid" -- cp -a -- "$backup" "$compose_file" || true
+        echo "FEHLER: Stirling Registry-Migration ergab eine ungültige Compose-Datei." >&2
+        echo "        Backup wurde wiederhergestellt: $backup" >&2
+        return 1
+    fi
+
+    echo "[OK] Stirling PDF Registry migriert:"
+    echo "     ghcr.io/stirling-tools/stirling-pdf"
+    echo "     Backup: $backup"
+}
+
 update_ct_compose() {
     local ctid="$1"
     local label="$2"
@@ -583,6 +621,13 @@ update_ct_compose() {
     echo "--- ${label}: Docker ---"
 
     local before after
+
+    if [[ "$hostname" == "stirling-pdf" ]]; then
+        if ! migrate_stirling_registry_v148 "$ctid" "$dir"; then
+            add_failure "${label}: Registry-Migration auf GHCR fehlgeschlagen"
+            return
+        fi
+    fi
 
     before="$(compose_state "$ctid" "$dir" || true)"
 

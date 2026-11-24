@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V148 · Stirling PDF Registry-Fallback
+---------------------------------------------------
+- Stirling PDF Neuinstallationen verwenden jetzt den offiziell dokumentierten GitHub Container Registry Pfad `ghcr.io/stirling-tools/stirling-pdf:latest`.
+- Hintergrund: `docker.stirlingpdf.com` kann temporär mit HTTP 503 ausfallen; Stirling dokumentiert GHCR ausdrücklich als alternative Registry.
+- Bestehende Stirling-Installationen werden beim nächsten Auto-Updater-Lauf einmalig von `docker.stirlingpdf.com/stirlingtools/stirling-pdf` auf GHCR migriert.
+- Vor der Migration wird die Compose-Datei als `.pre-v148-stirling-registry.bak` gesichert.
+- Nach der Änderung wird `docker compose config -q` geprüft; bei Fehler wird das Backup automatisch wiederhergestellt.
+- Andere Docker-Dienste und deren Registries bleiben unverändert.
+- Der NodeZero-Tool-Pin wurde auf den geprüften V148-Updater-Stand aktualisiert.
+
 24.11.2026 – V147 · Automatisches Installer-Self-Update
 --------------------------------------------------------
 - Beim Start per `bash proxmox.sh` prüft der Installer vor dem Hauptmenü automatisch den aktuellen Stand von GitHub `main`.

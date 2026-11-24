@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V147**
+Installationskandidat: **V148**
 
 Geplante Hauptdatei:
 
@@ -35,6 +35,7 @@ proxmox.sh
 - Diagnose-/Laufprotokolle unter `/home/diagnose/`
 - Pi-hole-Sprachlogs unter `/home/diagnose/pihole-language/` statt unter `/root`
 - externe URLs mit automatischen Subdomain-Vorschlägen, nginx Reverse Proxy und Let's Encrypt
+- Stirling PDF über offiziellen GHCR-Containerpfad mit Migration bestehender Compose-Installationen
 - finale Healthchecks
 
 ## 🔐 Passwortmanager – Vaultwarden
@@ -273,3 +274,16 @@ Backups der ersetzten Installer-Versionen liegen unter:
 Ist GitHub nicht erreichbar oder ist die heruntergeladene Datei ungültig, wird **kein** Update installiert. Die vorhandene lokale Version startet in diesem Fall normal weiter.
 
 Der Vergleich erfolgt über den vollständigen Dateiinhalt. Dadurch werden auch Korrekturen erkannt, wenn die sichtbare Versionsnummer ausnahmsweise unverändert geblieben ist.
+
+
+## Stirling PDF Registry · V148
+
+Stirling PDF wird neu über den offiziellen GHCR-Pfad betrieben:
+
+```text
+ghcr.io/stirling-tools/stirling-pdf:latest
+```
+
+Der bisherige Pfad `docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest` bleibt zwar offiziell, kann aber zeitweise nicht erreichbar sein. Stirling nennt Docker Hub und GitHub Container Registry ausdrücklich als alternative Registries.
+
+Bestehende NodeZero-Stirling-Container werden beim Auto-Updater einmalig migriert. Vor der Änderung wird die aktive Compose-Datei gesichert und anschließend mit `docker compose config -q` validiert. Bei einem Fehler wird automatisch das Backup wiederhergestellt.
