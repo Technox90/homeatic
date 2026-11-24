@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V161 · 24.11.2026**
+**Installationskandidat: V162 · 24.11.2026**
 
 ## Installation
 
@@ -305,6 +305,12 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V162
+
+- Freigabestand mit allen V161-Funktionen: individuell konfigurierbare aktive/inaktive Browser-Tab-Titel und priorisierte Update-Hinweise.
+- Logo wird bei unveränderten Einstellungen während der laufenden USV-Statusabfragen nicht erneut geladen; bewusste Branding-Aktualisierung bleibt möglich.
+- V162 enthält die bisherigen Änderungen kumulativ; der bestehende automatische Update-Zeitplan und die Opt-in-Einstellungen bleiben unverändert.
+
 ### V161
 
 - Browser-Tab-Anzeige in den Dashboard-Einstellungen getrennt für aktive und inaktive Tabs konfigurierbar.
@@ -329,13 +335,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 - Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
 - Die lokale Installer-Version ersetzt dort den Hostnamen; die Versionsangabe wird aus dem vorhandenen Update-Status gelesen.
 - Copyright © Technox1990 mit GitHub-Link; bestehende Logos, Themes und Einstellungen bleiben unverändert.
-
-### V157
-
-- Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
-- Doppelte Einbindung der Installer-Updateanzeige wird entfernt; bestehende Logos, Favicons und Einstellungen bleiben erhalten.
-- Sichtbare Theme-Namen entfallen in allen fünf Ansichten; Animationen und Auswahl bleiben erhalten.
-- Auto-Updater repariert auch bestehende falsch platzierte Branding-Blöcke; Theme-Cache wird erneuert.
-- Regressionstest für externe Script-Tags und wiederholbare Dashboard-Aktualisierung.
 
 **[Vollständige Versionshistorie](HISTORY.md)**

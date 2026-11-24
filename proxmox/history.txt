@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V162 · Freigabestand und stabiler Logo-Toggle
+----------------------------------------------------------
+- Freigabestand mit allen V161-Funktionen: individuell konfigurierbare aktive/inaktive Browser-Tab-Titel und priorisierte Update-Hinweise.
+- Logo wird bei unveränderten Einstellungen während der laufenden USV-Statusabfragen nicht erneut geladen; bewusste Branding-Aktualisierung bleibt möglich.
+- V162 enthält die bisherigen Änderungen kumulativ; der bestehende automatische Update-Zeitplan und die Opt-in-Einstellungen bleiben unverändert.
+
 24.11.2026 – V161 · Konfigurierbare Browser-Tab-Titel
 ----------------------------------------------------
 - Browser-Tab-Anzeige in den Dashboard-Einstellungen getrennt für aktive und inaktive Tabs konfigurierbar.
