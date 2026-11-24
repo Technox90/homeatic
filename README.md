@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V157 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V158 · Proxmox Master Installer · 24.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -135,6 +135,12 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V158
+
+- Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
+- Die lokale Installer-Version ersetzt dort den Hostnamen; die Versionsangabe wird aus dem vorhandenen Update-Status gelesen.
+- Copyright © Technox1990 mit GitHub-Link; bestehende Logos, Themes und Einstellungen bleiben unverändert.
+
 ### V157
 
 - Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
@@ -166,12 +172,5 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 - Der sichtbare Rahmen/Kasten um den Logo-Menübutton ist entfernt.
 - Der Button-Hintergrund ist transparent; nur ein sehr dezenter Hover bleibt.
 - Die Klickfläche bleibt vollständig erhalten.
-
-### V153
-- Die obere Dashboard-Leiste ist neu aufgeteilt: links Menü/Logo, mittig LIVE + USV Online, rechts Neustart + Herunterfahren.
-- Der bisherige separate „Menü“-Button entfällt.
-- Das eigene Logo wird zusammen mit dem Hamburger-Symbol als ein gemeinsamer Menü-Toggle verwendet.
-- Derselbe Logo-Button öffnet und schließt das Seitenmenü.
-- Der Seitenmenü-Kopf mit zusätzlichem Logo/X wird ausgeblendet; das Logo bleibt dauerhaft oben in der Toolbar sichtbar.
 
 **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
