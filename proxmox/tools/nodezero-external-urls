@@ -1,0 +1,723 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+if os.geteuid() != 0:
+    raise SystemExit("FEHLER: Bitte als root auf dem Proxmox-Host ausführen.")
+
+CONFIG_DIR = Path("/home/Data/proxmox-installer/external-urls")
+CONFIG_FILE = CONFIG_DIR / "config.json"
+DNS_FILE = CONFIG_DIR / "dns-records.txt"
+DIAG_DIR = Path("/home/diagnose/external-urls")
+BACKUP_DIR = Path("/home/backups/external-urls")
+ACME_ROOT = Path("/var/www/nodezero-acme")
+ACME_CONF = Path("/etc/nginx/conf.d/nodezero-external-acme.conf")
+PROXY_CONF = Path("/etc/nginx/conf.d/nodezero-external.conf")
+CERT_NAME = "nodezero-external"
+
+for path in (CONFIG_DIR, DIAG_DIR, BACKUP_DIR):
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(0o700)
+
+STAMP = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+LOGFILE = DIAG_DIR / f"external-urls-{STAMP}.log"
+
+class Tee:
+    def __init__(self, stream, file):
+        self.stream = stream
+        self.file = file
+    def write(self, data):
+        self.stream.write(data)
+        self.file.write(data)
+        self.file.flush()
+    def flush(self):
+        self.stream.flush()
+        self.file.flush()
+
+_log = LOGFILE.open("a", encoding="utf-8")
+os.chmod(LOGFILE, 0o600)
+sys.stdout = Tee(sys.__stdout__, _log)
+sys.stderr = Tee(sys.__stderr__, _log)
+
+TUI = shutil.which("whiptail") is not None
+HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")
+
+DEFAULTS = [
+    ("dash", "Dashboard", "dash", True, False),
+    ("pve", "Proxmox VE", "pve", False, True),
+    ("ha", "Home Assistant", "ha", True, False),
+    ("paper", "Paperless", "paper", True, False),
+    ("pihole", "Pi-hole", "pihole", False, True),
+    ("netalertx", "NetAlertX", "net", False, True),
+    ("uptime", "Uptime Kuma", "uptime", True, False),
+    ("vault", "Vaultwarden", "vault", True, False),
+    ("caddy", "Caddy", "caddy", False, True),
+    ("pdf", "Stirling PDF", "pdf", True, False),
+    ("ntfy", "ntfy", "ntfy", True, False),
+    ("forgejo", "Forgejo", "git", True, False),
+    ("syncthing", "Syncthing", "sync", False, True),
+    ("speedtest", "Speedtest Tracker", "speed", True, False),
+    ("scrutiny", "Scrutiny", "scrutiny", False, True),
+    ("mealie", "Mealie", "mealie", True, False),
+    ("pbs", "Proxmox Backup Server", "pbs", False, True),
+    ("pulse", "Pulse", "pulse", False, True),
+    ("pveups", "PVE-UPS", "ups", False, True),
+    ("semaphore", "Semaphore", "semaphore", False, True),
+    ("pocketid", "Pocket ID", "id", True, False),
+    ("prometheus", "Prometheus", "prometheus", False, True),
+    ("exporter", "PVE Exporter", "exporter", False, True),
+    ("grafana", "Grafana", "grafana", False, True),
+    ("gatus", "Gatus", "status", True, False),
+    ("homepage", "Homepage", "home", True, False),
+    ("npm", "Nginx Proxy Manager Admin", "npm", False, True),
+    ("emqx", "EMQX Dashboard", "mqtt", False, True),
+]
+
+CT_MAP = {
+    "paper": ("paperless", "https", None),
+    "pihole": ("pihole", "http", None),
+    "netalertx": ("netalertx", "https", None),
+    "uptime": ("uptime-kuma", "https", None),
+    "vault": ("vaultwarden", "https", None),
+    "caddy": ("caddy", "http", None),
+    "pdf": ("stirling-pdf", "https", None),
+    "ntfy": ("ntfy", "https", None),
+    "forgejo": ("forgejo", "https", None),
+    "syncthing": ("syncthing", "https", None),
+    "speedtest": ("speedtest-tracker", "https", None),
+    "scrutiny": ("scrutiny", "https", None),
+    "mealie": ("mealie", "https", None),
+    "pbs": ("pbs", "https", 8007),
+    "pulse": ("pulse", "https", None),
+    "pveups": ("pve-ups", "https", None),
+    "semaphore": ("semaphore", "https", None),
+    "pocketid": ("pocketid", "https", None),
+    "prometheus": ("prometheus", "https", None),
+    "exporter": ("pve-exporter", "https", None),
+    "grafana": ("grafana", "https", None),
+    "gatus": ("gatus", "https", None),
+    "homepage": ("homepage", "https", None),
+    "npm": ("nginx-proxy-manager", "http", 81),
+    "emqx": ("emqx", "https", None),
+}
+
+def run(args, check=False, capture=True, input_text=None):
+    return subprocess.run(
+        args,
+        check=check,
+        text=True,
+        input=input_text,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.PIPE if capture else None,
+    )
+
+def whiptail(args):
+    cp = run(["whiptail", *args])
+    if cp.returncode != 0:
+        raise KeyboardInterrupt
+    return (cp.stdout or "").strip()
+
+def msg(title, text):
+    if TUI:
+        run(["whiptail", "--title", title, "--msgbox", text, "22", "92"], capture=False)
+    else:
+        print(f"\n=== {title} ===\n{text}")
+
+def ask(title, text, default=""):
+    if TUI:
+        return whiptail(["--title", title, "--inputbox", text, "12", "92", default])
+    value = input(f"{text} [{default}]: ").strip()
+    return value or default
+
+def yesno(title, text, default=False):
+    if TUI:
+        args = ["--title", title]
+        if not default:
+            args.append("--defaultno")
+        cp = run([*["whiptail"], *args, "--yesno", text, "16", "92"], capture=False)
+        return cp.returncode == 0
+    value = input(f"{text} [{'J/n' if default else 'j/N'}]: ").strip().lower()
+    return value in ("j", "ja", "y", "yes") or (default and value == "")
+
+def menu(title, text, items):
+    if not items:
+        return ""
+    if TUI:
+        args = ["--title", title, "--menu", text, "26", "104", "17"]
+        for tag, desc in items:
+            args += [tag, desc]
+        try:
+            return whiptail(args)
+        except KeyboardInterrupt:
+            return ""
+    print(f"\n=== {title} ===\n{text}")
+    for tag, desc in items:
+        print(f"{tag:>3}) {desc}")
+    return input("Auswahl: ").strip()
+
+def checklist(title, text, rows):
+    if TUI:
+        args = ["--title", title, "--checklist", text, "28", "108", "18"]
+        for key, desc, enabled in rows:
+            args += [key, desc, "ON" if enabled else "OFF"]
+        try:
+            raw = whiptail(args)
+        except KeyboardInterrupt:
+            return None
+        return set(re.findall(r'"([^"]+)"|(\S+)', raw)) if False else set(raw.replace('"', "").split())
+    print(f"\n=== {title} ===")
+    for i, (key, desc, enabled) in enumerate(rows, 1):
+        print(f"{i:>2}) [{'X' if enabled else ' '}] {desc} ({key})")
+    value = input("Aktive Nummern kommagetrennt; ENTER = vorgeschlagene Auswahl: ").strip()
+    if not value:
+        return {key for key, _, enabled in rows if enabled}
+    selected = set()
+    for part in re.split(r"[, ]+", value):
+        if part.isdigit() and 1 <= int(part) <= len(rows):
+            selected.add(rows[int(part) - 1][0])
+    return selected
+
+def normalize_domain(value):
+    value = value.strip().lower()
+    value = re.sub(r"^https?://", "", value)
+    value = value.split("/", 1)[0].rstrip(".")
+    return value
+
+def valid_host(value):
+    return bool(HOST_RE.fullmatch(value))
+
+def pve_host_ip():
+    cp = run(["ip", "-4", "route", "get", "1.1.1.1"])
+    if cp.returncode == 0:
+        m = re.search(r"\bsrc\s+(\d+(?:\.\d+){3})", cp.stdout)
+        if m:
+            return m.group(1)
+    cp = run(["hostname", "-I"])
+    return cp.stdout.split()[0] if cp.returncode == 0 and cp.stdout.split() else ""
+
+def ct_inventory():
+    result = {}
+    cp = run(["pct", "list"])
+    if cp.returncode != 0:
+        return result
+    for line in cp.stdout.splitlines()[1:]:
+        parts = line.split()
+        if not parts or not parts[0].isdigit():
+            continue
+        ctid = parts[0]
+        cfg = run(["pct", "config", ctid])
+        m = re.search(r"^hostname:\s*(\S+)", cfg.stdout, re.M)
+        if not m:
+            continue
+        hostname = m.group(1)
+        ip = ""
+        status = run(["pct", "status", ctid])
+        if "status: running" in status.stdout:
+            cp_ip = run(["pct", "exec", ctid, "--", "hostname", "-I"])
+            if cp_ip.returncode == 0:
+                for candidate in cp_ip.stdout.split():
+                    if re.fullmatch(r"\d+(?:\.\d+){3}", candidate) and not candidate.startswith("127."):
+                        ip = candidate
+                        break
+        if not ip:
+            m_ip = re.search(r"\bip=(\d+(?:\.\d+){3})/\d+", cfg.stdout)
+            if m_ip:
+                ip = m_ip.group(1)
+        result[hostname] = {"id": ctid, "ip": ip}
+    return result
+
+def ha_backend():
+    cp = run(["qm", "list"])
+    if cp.returncode != 0:
+        return ""
+    for line in cp.stdout.splitlines()[1:]:
+        parts = line.split()
+        if not parts or not parts[0].isdigit():
+            continue
+        vmid = parts[0]
+        cfg = run(["qm", "config", vmid])
+        m = re.search(r"^name:\s*(\S+)", cfg.stdout, re.M)
+        if not m or m.group(1) not in ("homeassistant", "home-assistant"):
+            continue
+        agent = run(["qm", "agent", vmid, "network-get-interfaces"])
+        if agent.returncode != 0:
+            return ""
+        try:
+            payload = json.loads(agent.stdout)
+            interfaces = payload.get("result", payload if isinstance(payload, list) else [])
+            for nic in interfaces:
+                for addr in nic.get("ip-addresses", []):
+                    ip = addr.get("ip-address", "")
+                    if addr.get("ip-address-type") == "ipv4" and not ip.startswith("127."):
+                        return f"http://{ip}:8123"
+        except Exception:
+            return ""
+    return ""
+
+def build_catalog(saved=None):
+    saved = saved or {}
+    by_key = {row[0]: row for row in DEFAULTS}
+    hip = pve_host_ip()
+    inv = ct_inventory()
+    services = []
+
+    for key, label, prefix, default_on, sensitive in DEFAULTS:
+        backend = ""
+        if key == "dash" and hip and Path("/opt/nodezero/dashboard/static/index.html").exists():
+            backend = f"https://{hip}"
+        elif key == "pve" and hip:
+            backend = f"https://{hip}:8006"
+        elif key == "ha":
+            backend = ha_backend()
+        elif key in CT_MAP:
+            hostname, scheme, port = CT_MAP[key]
+            item = inv.get(hostname)
+            if item and item["ip"]:
+                suffix = f":{port}" if port else ""
+                backend = f"{scheme}://{item['ip']}{suffix}"
+
+        old = saved.get(key, {})
+        if old:
+            backend = backend or old.get("backend", "")
+        services.append({
+            "key": key,
+            "label": label,
+            "prefix": prefix,
+            "backend": backend,
+            "enabled": old.get("enabled", default_on),
+            "sensitive": sensitive,
+            "host": old.get("host", ""),
+            "custom": False,
+        })
+
+    for key, item in saved.items():
+        if key in by_key:
+            continue
+        custom = dict(item)
+        custom["key"] = key
+        custom["custom"] = True
+        custom.setdefault("sensitive", False)
+        custom.setdefault("enabled", True)
+        custom.setdefault("prefix", key)
+        services.append(custom)
+    return services
+
+def load_config():
+    if not CONFIG_FILE.exists():
+        return {"base_domain": "", "dns_target": "", "email": "", "services": []}
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise SystemExit(f"FEHLER: {CONFIG_FILE} ist ungültig: {exc}")
+
+def save_config(cfg):
+    CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.chmod(CONFIG_FILE, 0o600)
+
+def proposed_host(service, base_domain):
+    return service.get("host") or f"{service.get('prefix', service['key'])}.{base_domain}"
+
+def configure_selection(services, base_domain):
+    rows = []
+    for service in services:
+        if not service.get("backend"):
+            continue
+        desc = f"{service['label']} → {proposed_host(service, base_domain)}"
+        if service.get("sensitive"):
+            desc += " · Admin/sensibel"
+        rows.append((service["key"], desc, bool(service.get("enabled"))))
+    selected = checklist(
+        "EXTERNE URLS · DIENSTE",
+        "Welche erkannten Weboberflächen sollen von außen erreichbar sein?\n\n"
+        "Sensible Admin-Oberflächen sind standardmäßig AUS.",
+        rows,
+    )
+    if selected is None:
+        return False
+    for service in services:
+        service["enabled"] = service["key"] in selected
+    return True
+
+def edit_service(service, base_domain):
+    host = normalize_domain(ask(service["label"], "Öffentliche Domain (ohne https://)", proposed_host(service, base_domain)))
+    if not valid_host(host):
+        msg("UNGÜLTIGE DOMAIN", f"{host} ist kein gültiger Hostname.")
+        return
+    backend = ask(service["label"], "Interne Backend-URL", service.get("backend", ""))
+    if not re.match(r"^https?://\S+$", backend):
+        msg("UNGÜLTIGES BACKEND", "Erwartet wird z. B. https://192.168.178.102 oder http://192.168.178.101:8123.")
+        return
+    service["host"] = host
+    service["backend"] = backend
+    service["enabled"] = yesno(service["label"], "Extern aktivieren?", bool(service.get("enabled")))
+
+def add_custom(services, base_domain):
+    label = ask("EIGENE URL", "Bezeichnung", "Eigener Dienst").strip()
+    host = normalize_domain(ask("EIGENE URL", "Öffentliche Domain", f"service.{base_domain}"))
+    backend = ask("EIGENE URL", "Interne Backend-URL", "http://192.168.178.10:8080")
+    if not label or not valid_host(host) or not re.match(r"^https?://\S+$", backend):
+        msg("UNGÜLTIGE ANGABE", "Bezeichnung, Domain oder Backend ist ungültig.")
+        return
+    used = {x["key"] for x in services}
+    nr = 1
+    while f"custom{nr}" in used:
+        nr += 1
+    services.append({
+        "key": f"custom{nr}",
+        "label": label,
+        "prefix": host.split(".", 1)[0],
+        "backend": backend,
+        "enabled": True,
+        "sensitive": False,
+        "host": host,
+        "custom": True,
+    })
+
+def summary(cfg):
+    lines = [f"Hauptdomain: {cfg['base_domain']}", ""]
+    for service in cfg["services"]:
+        if service.get("enabled"):
+            lines.append(f"{service['label']}: https://{proposed_host(service, cfg['base_domain'])}")
+            lines.append(f"  → {service.get('backend', '')}")
+    return "\n".join(lines)
+
+def edit_loop(cfg):
+    while True:
+        choice = menu(
+            "EXTERNE URLS · ÜBERSICHT",
+            summary(cfg),
+            [
+                ("1", "Übernehmen und Reverse Proxy/TLS einrichten"),
+                ("2", "Einzelnen Dienst bearbeiten"),
+                ("3", "Eigenen Dienst hinzufügen"),
+                ("4", "Dienste erneut auswählen"),
+                ("5", "Hauptdomain / DNS-Ziel / E-Mail ändern"),
+                ("0", "Abbrechen"),
+            ],
+        )
+        if choice == "1":
+            return True
+        if choice == "0" or not choice:
+            return False
+        if choice == "2":
+            items = [(str(i + 1), f"{s['label']} · {proposed_host(s, cfg['base_domain'])}") for i, s in enumerate(cfg["services"])]
+            pick = menu("DIENST BEARBEITEN", "Eintrag auswählen", items)
+            if pick.isdigit() and 1 <= int(pick) <= len(cfg["services"]):
+                edit_service(cfg["services"][int(pick) - 1], cfg["base_domain"])
+        elif choice == "3":
+            add_custom(cfg["services"], cfg["base_domain"])
+        elif choice == "4":
+            configure_selection(cfg["services"], cfg["base_domain"])
+        elif choice == "5":
+            cfg["base_domain"] = normalize_domain(ask("EXTERNE URLS", "Hauptdomain", cfg["base_domain"]))
+            cfg["dns_target"] = normalize_domain(ask("DNS / DYNDNS", "Optionales CNAME-/DynDNS-Ziel; leer = A/AAAA", cfg.get("dns_target", "")))
+            cfg["email"] = ask("LET'S ENCRYPT", "E-Mail (optional)", cfg.get("email", ""))
+
+def enabled_services(cfg):
+    return [s for s in cfg["services"] if s.get("enabled") and s.get("backend") and valid_host(proposed_host(s, cfg["base_domain"]))]
+
+def write_dns(cfg):
+    rows = enabled_services(cfg)
+    target = cfg.get("dns_target", "")
+    ip = ""
+    if not target:
+        cp = run(["curl", "-4fsS", "--max-time", "8", "https://api.ipify.org"])
+        if cp.returncode == 0:
+            ip = cp.stdout.strip()
+    lines = [
+        "# NodeZero · externe URLs",
+        f"# Erstellt: {datetime.now().isoformat(timespec='seconds')}",
+        "# TCP 80 und 443 müssen aus dem Internet auf den Proxmox-Host weitergeleitet sein.",
+        "",
+    ]
+    for s in rows:
+        host = proposed_host(s, cfg["base_domain"])
+        if target:
+            lines.append(f"CNAME  {host}  ->  {target}")
+        elif ip:
+            lines.append(f"A      {host}  ->  {ip}")
+        else:
+            lines.append(f"A/AAAA {host}  ->  öffentliche WAN-IP")
+    DNS_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    os.chmod(DNS_FILE, 0o600)
+
+def ensure_packages():
+    needed = [name for name in ("nginx", "certbot", "curl", "openssl") if shutil.which(name) is None]
+    if needed:
+        run(["apt-get", "update"], check=True, capture=False)
+        run(["apt-get", "install", "-y", "nginx", "certbot", "curl", "openssl", "ca-certificates"], check=True, capture=False)
+    ACME_ROOT.mkdir(parents=True, exist_ok=True)
+
+def write_acme(cfg):
+    hosts = [proposed_host(s, cfg["base_domain"]) for s in enabled_services(cfg)]
+    if not hosts:
+        raise SystemExit("FEHLER: Keine aktive externe URL mit Backend ausgewählt.")
+    content = f"""# Automatisch verwaltet durch nodezero-external-urls.
+server {{
+    listen 80;
+    listen [::]:80;
+    server_name {' '.join(hosts)};
+
+    location ^~ /.well-known/acme-challenge/ {{
+        root {ACME_ROOT};
+        default_type text/plain;
+    }}
+
+    location / {{
+        return 308 https://$host$request_uri;
+    }}
+}}
+"""
+    ACME_CONF.write_text(content, encoding="utf-8")
+    run(["nginx", "-t"], check=True, capture=False)
+    run(["systemctl", "enable", "--now", "nginx"], check=True, capture=False)
+    run(["systemctl", "reload", "nginx"], check=True, capture=False)
+
+def cert_domains(certfile):
+    if not certfile.exists():
+        return set()
+    cp = run(["openssl", "x509", "-in", str(certfile), "-noout", "-ext", "subjectAltName"])
+    return set(re.findall(r"DNS:([^,\s]+)", cp.stdout)) if cp.returncode == 0 else set()
+
+def ensure_certificate(cfg):
+    wanted = {proposed_host(s, cfg["base_domain"]) for s in enabled_services(cfg)}
+    cert_dir = Path("/etc/letsencrypt/live") / CERT_NAME
+    certfile = cert_dir / "fullchain.pem"
+    existing = cert_domains(certfile)
+    if certfile.exists() and wanted.issubset(existing):
+        cp = run(["openssl", "x509", "-checkend", "604800", "-noout", "-in", str(certfile)])
+        if cp.returncode == 0:
+            return cert_dir
+
+    domains = sorted(wanted | {x for x in existing if valid_host(x)})
+    args = [
+        "certbot", "certonly", "--webroot", "-w", str(ACME_ROOT),
+        "--cert-name", CERT_NAME, "--non-interactive", "--agree-tos",
+    ]
+    if cfg.get("email"):
+        args += ["--email", cfg["email"]]
+    else:
+        args += ["--register-unsafely-without-email"]
+    if existing:
+        args += ["--expand"]
+    for domain in domains:
+        args += ["-d", domain]
+    cp = run(args, capture=False)
+    if cp.returncode != 0 or not certfile.exists():
+        raise SystemExit("FEHLER: Let's-Encrypt-Zertifikat konnte nicht erstellt/erweitert werden. DNS und Port 80 prüfen.")
+    return cert_dir
+
+def proxy_server(service, cfg, cert_dir):
+    host = proposed_host(service, cfg["base_domain"])
+    backend = service["backend"]
+    host_header = "$host"
+    if service["key"] == "dash":
+        host_header = pve_host_ip() or "$host"
+    ssl_extra = ""
+    if backend.startswith("https://"):
+        ssl_extra = "        proxy_ssl_verify off;\n        proxy_ssl_server_name on;\n"
+    return f"""server {{
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name {host};
+
+    ssl_certificate {cert_dir}/fullchain.pem;
+    ssl_certificate_key {cert_dir}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+
+    location / {{
+        proxy_pass {backend};
+        proxy_http_version 1.1;
+        proxy_set_header Host {host_header};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $nodezero_connection_upgrade;
+        proxy_read_timeout 3600;
+        proxy_send_timeout 3600;
+{ssl_extra}    }}
+}}
+
+"""
+
+def write_proxy(cfg, cert_dir):
+    if PROXY_CONF.exists():
+        shutil.copy2(PROXY_CONF, BACKUP_DIR / f"nodezero-external-{STAMP}.conf")
+    text = [
+        "# Automatisch verwaltet durch nodezero-external-urls.",
+        "map $http_upgrade $nodezero_connection_upgrade {",
+        "    default upgrade;",
+        "    '' close;",
+        "}",
+        "",
+    ]
+    for service in enabled_services(cfg):
+        text.append(proxy_server(service, cfg, cert_dir))
+    PROXY_CONF.write_text("\n".join(text), encoding="utf-8")
+    cp = run(["nginx", "-t"], capture=False)
+    if cp.returncode != 0:
+        raise SystemExit("FEHLER: nginx-Konfiguration ungültig. Backup liegt unter /home/backups/external-urls.")
+    run(["systemctl", "reload", "nginx"], check=True, capture=False)
+
+    hook = Path("/etc/letsencrypt/renewal-hooks/deploy/20-nodezero-nginx-reload.sh")
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text("#!/usr/bin/env bash\nset -e\nnginx -t\nsystemctl reload nginx\n", encoding="utf-8")
+    hook.chmod(0o755)
+
+def find_ctid(hostname):
+    return ct_inventory().get(hostname, {}).get("id", "")
+
+def patch_compose_key(ctid, file, key, value, workdir):
+    code = r"""import os,re
+from pathlib import Path
+p=Path(os.environ["NZ_FILE"])
+if not p.exists(): raise SystemExit(2)
+s=p.read_text(encoding="utf-8")
+key=os.environ["NZ_KEY"]; value=os.environ["NZ_VALUE"]
+pat=re.compile(r"^(\s*"+re.escape(key)+r":\s*).*$", re.M)
+if not pat.search(s): raise SystemExit(3)
+s=pat.sub(lambda m: m.group(1)+'"'+value+'"', s, count=1)
+p.write_text(s, encoding="utf-8")
+"""
+    cp = run(["pct", "exec", ctid, "--", "env", f"NZ_FILE={file}", f"NZ_KEY={key}", f"NZ_VALUE={value}", "python3", "-c", code])
+    if cp.returncode == 0:
+        run(["pct", "exec", ctid, "--", "bash", "-lc", f"cd {workdir!s} && docker compose config >/dev/null && docker compose up -d"], capture=False)
+
+def apply_app_urls(cfg):
+    for s in enabled_services(cfg):
+        host = proposed_host(s, cfg["base_domain"])
+        url = f"https://{host}"
+        mapping = {
+            "paper": ("paperless", "/opt/paperless/docker-compose.yml", "PAPERLESS_URL", url, "/opt/paperless"),
+            "ntfy": ("ntfy", "/opt/ntfy/docker-compose.yml", "NTFY_BASE_URL", url, "/opt/ntfy"),
+            "forgejo": ("forgejo", "/opt/forgejo/docker-compose.yml", "FORGEJO__server__ROOT_URL", url + "/", "/opt/forgejo"),
+            "speedtest": ("speedtest-tracker", "/opt/speedtest-tracker/docker-compose.yml", "APP_URL", url, "/opt/speedtest-tracker"),
+            "mealie": ("mealie", "/opt/mealie/docker-compose.yml", "BASE_URL", url, "/opt/mealie"),
+        }
+        if s["key"] in mapping:
+            hostname, file, key, value, workdir = mapping[s["key"]]
+            ctid = find_ctid(hostname)
+            if ctid:
+                patch_compose_key(ctid, file, key, value, workdir)
+        elif s["key"] == "pocketid":
+            ctid = find_ctid("pocketid")
+            if ctid:
+                code = r"""from pathlib import Path
+import os,re
+p=Path("/opt/pocket-id/.env")
+if p.exists():
+    s=p.read_text()
+    s=re.sub(r"^APP_URL=.*$", "APP_URL="+os.environ["NZ_URL"], s, flags=re.M)
+    s=re.sub(r"^TRUST_PROXY=.*$", "TRUST_PROXY=true", s, flags=re.M)
+    p.write_text(s)
+"""
+                run(["pct", "exec", ctid, "--", "env", f"NZ_URL={url}", "python3", "-c", code])
+                run(["pct", "exec", ctid, "--", "bash", "-lc", "systemctl restart pocket-id 2>/dev/null || systemctl restart pocketid 2>/dev/null || true"], capture=False)
+        elif s["key"] == "pulse":
+            ctid = find_ctid("pulse")
+            if ctid:
+                command = (
+                    "f=/opt/pulse/.env; [ -f $f ] || exit 0; "
+                    "sed -i -E '/^PULSE_PUBLIC_URL=/d; /^ALLOWED_ORIGINS=/d' $f; "
+                    f"printf 'PULSE_PUBLIC_URL={url}\\nALLOWED_ORIGINS={url}\\n' >> $f; "
+                    "systemctl restart pulse 2>/dev/null || true"
+                )
+                run(["pct", "exec", ctid, "--", "bash", "-lc", command], capture=False)
+
+def apply(cfg):
+    write_dns(cfg)
+    ensure_packages()
+    write_acme(cfg)
+    cert_dir = ensure_certificate(cfg)
+    write_proxy(cfg, cert_dir)
+    apply_app_urls(cfg)
+
+def refresh_backends(cfg):
+    saved = {s["key"]: s for s in cfg.get("services", [])}
+    cfg["services"] = build_catalog(saved)
+
+def show_status(cfg):
+    print("=" * 68)
+    print(" NODEZERO EXTERNE URLS")
+    print("=" * 68)
+    print(summary(cfg))
+    print()
+    print(f"Konfiguration: {CONFIG_FILE}")
+    print(f"DNS-Vorgaben: {DNS_FILE}")
+    print(f"Log: {LOGFILE}")
+    print()
+    run(["nginx", "-t"], capture=False)
+    if shutil.which("certbot"):
+        run(["certbot", "certificates"], capture=False)
+
+def interactive(cfg):
+    cfg["base_domain"] = normalize_domain(ask("EXTERNE URLS", "Hauptdomain, z. B. ltwbh.de", cfg.get("base_domain") or "example.de"))
+    if not valid_host(cfg["base_domain"]):
+        raise SystemExit("FEHLER: Ungültige Hauptdomain.")
+    cfg["dns_target"] = normalize_domain(ask(
+        "DNS / DYNDNS",
+        f"Optionales CNAME-/DynDNS-Ziel, z. B. home.{cfg['base_domain']}. Leer = A/AAAA.",
+        cfg.get("dns_target", ""),
+    ))
+    if cfg["dns_target"] and not valid_host(cfg["dns_target"]):
+        raise SystemExit("FEHLER: Ungültiges CNAME-/DynDNS-Ziel.")
+    cfg["email"] = ask("LET'S ENCRYPT", "E-Mail für Let's Encrypt (optional)", cfg.get("email", ""))
+    refresh_backends(cfg)
+    if not configure_selection(cfg["services"], cfg["base_domain"]):
+        return False
+    return edit_loop(cfg)
+
+def main():
+    cfg = load_config()
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if mode == "--status":
+        refresh_backends(cfg)
+        show_status(cfg)
+        return
+
+    if mode == "--reapply":
+        if not cfg.get("base_domain"):
+            return
+        refresh_backends(cfg)
+        save_config(cfg)
+        apply(cfg)
+        return
+
+    try:
+        if not interactive(cfg):
+            print("Abgebrochen.")
+            return
+    except KeyboardInterrupt:
+        print("\nAbgebrochen.")
+        return
+
+    save_config(cfg)
+    print(f"\nDNS-Vorgaben: {DNS_FILE}")
+    print("WICHTIG: TCP 80 und 443 müssen aus dem Internet auf diesen Proxmox-Host zeigen.")
+    apply(cfg)
+
+    print("\n" + "=" * 68)
+    print(" EXTERNE URLS AKTIV")
+    print("=" * 68)
+    print(summary(cfg))
+    print(f"\nKonfiguration: {CONFIG_FILE}")
+    print(f"DNS-Vorgaben: {DNS_FILE}")
+    print(f"Log: {LOGFILE}")
+    print("\nHome Assistant: Falls HA '400 Bad Request' meldet, den Proxmox-Host")
+    print("unter http: trusted_proxies in Home Assistant freigeben.")
+
+if __name__ == "__main__":
+    main()
