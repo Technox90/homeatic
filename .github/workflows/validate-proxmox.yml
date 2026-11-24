@@ -188,6 +188,32 @@ jobs:
           assert 'data["favicon_url"] = ""' not in module
           PY
 
+      - name: V151 documentation synchronization
+        run: |
+          grep -q 'Aktueller Stand: V151' README.md
+          grep -q 'Installationskandidat: V151' proxmox/README.md
+          grep -q 'Aktueller Stand: V151' proxmox/HISTORY.md
+          grep -q 'V151 · Generisches Dashboard-Branding / Update-Schutz' proxmox/HISTORY.md
+          grep -q 'V151 · Generisches Dashboard-Branding / Update-Schutz' proxmox/history.txt
+          grep -q 'Aktueller Installationskandidat: V151' proxmox/CHATGPT-HANDOFF.md
+          grep -q 'HISTORY.md' README.md
+          grep -q 'HISTORY.md' proxmox/README.md
+
+          python3 - <<'PY'
+          from pathlib import Path
+          master=Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
+          root=Path("README.md").read_text(encoding="utf-8")
+          readme=Path("proxmox/README.md").read_text(encoding="utf-8")
+          history=Path("proxmox/HISTORY.md").read_text(encoding="utf-8")
+          history_txt=Path("proxmox/history.txt").read_text(encoding="utf-8")
+
+          assert "PROXMOX MODULARER KOMPLETT-INSTALLER V151" in master
+          assert root.index("V151") < root.index("V139") if "V139" in root else True
+          assert readme.index("V151") < readme.index("V113")
+          assert history.index("V151") < history.index("V150")
+          assert history_txt.index("V151") < history_txt.index("V150")
+          PY
+
       - name: V149 Uptime Kuma external URL default
         run: |
           grep -q '("uptime", "Uptime Kuma", "up", True, False)' proxmox/tools/nodezero-external-urls
