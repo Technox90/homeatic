@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V152
+# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V153
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
@@ -23272,7 +23272,7 @@ install_dashboard_branding_v153() {
     WEBSITE_NAME="$website_name" \
     LOGO_TEXT="$logo_text" \
     LOGO_STYLE="$logo_style" \
-    python3 - "$settings" "$helper" "$index" "$cache/branding-v153.css" "$cache/branding-v153.js" <<'PYV151'
+    python3 - "$settings" "$helper" "$index" "$cache/branding-v153.css" "$cache/branding-v153.js" <<'PYV153'
 from pathlib import Path
 import json
 import os
