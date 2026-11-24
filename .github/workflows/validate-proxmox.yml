@@ -422,7 +422,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="4372ca664c59c0a113f2645b867c0549b097a8ee"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="eeaabdd9a561d25f536b8f3bfbb3c71e34d8eff5"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
@@ -473,3 +473,6 @@ jobs:
           assert 'margin:0!important;text-align:center!important' in css
           assert '#dashboardFixedToolbar{' in css and "button.id='brandMenuToggle'" in js
           PY
+
+      - name: V161 browser tab title regression tests
+        run: node dashboard/tests/browser-tab.test.js

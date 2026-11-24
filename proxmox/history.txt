@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V161 · Konfigurierbare Browser-Tab-Titel
+----------------------------------------------------
+- Browser-Tab-Anzeige in den Dashboard-Einstellungen getrennt für aktive und inaktive Tabs konfigurierbar.
+- Standard: aktiv nur Name; inaktiv Name → CPU/RAM → Leistungsaufnahme. Wechsel alle 5 Sekunden, Update-Hinweise alle 3 Sekunden.
+- Update-Hinweise haben optional Vorrang; Messwerte und Versionsstatus werden aus bestehenden Abfragen übernommen. Speicherung lokal pro Browser, ohne Änderungen an Logos oder Favicons.
+
 24.11.2026 – V160 · Dashboard-Zusammenführung und verpflichtende CI-Prüfungen
 ----------------------------------------------------------------------------
 - Zusammenführung der parallelen V159-Änderungen: `randMenuLogo`, mittiger Titel, Logo bis 350 × 60 px sowie zugängliche mobile Power-Icons.
