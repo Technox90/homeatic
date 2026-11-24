@@ -1,6 +1,26 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V151 · Generisches Dashboard-Branding / Update-Schutz
+-----------------------------------------------------------------------
+- Installer-Version auf V151 angehoben.
+- Dashboard-Branding vollständig von persönlichem LT-WBH-Branding entkoppelt.
+- Persönliche Dateien `dashboard/assets/logo-lt-wbh.png` und `dashboard/assets/favicon-lt-wbh.png` aus dem aktuellen `main` entfernt.
+- Alte V150-Branding-Dateien aus `main` entfernt; neuer generischer Stand: `dashboard/branding-v151.css` und `dashboard/branding-v151.js`.
+- Generische Bildpfade: `dashboard/assets/logo.png` und `dashboard/assets/favicon.png`.
+- Repository liefert für Neuinstallationen nur vollständig transparente, neutrale PNG-Platzhalter.
+- Zielpfade auf dem Server: `/opt/nodezero/dashboard/static/assets/logo.png` und `/opt/nodezero/dashboard/static/assets/favicon.png`.
+- Normale Dashboard-Updates laden Logo/Favicon nicht aus GitHub und überschreiben, löschen oder ersetzen bestehende Bilddateien niemals.
+- Erst-/Neuinstallationen laden neutrale Platzhalter ausschließlich dann, wenn die jeweilige Bilddatei noch nicht vorhanden ist.
+- Bestehende V150-Installationen werden kompatibel migriert: vorhandene Legacy-Bilder werden nur byte-identisch auf die generischen Dateinamen kopiert, falls diese fehlen.
+- Ein normales Update übernimmt Dashboard-Name, Logo-Text, Logo-Stil und ein vorhandenes Custom-Favicon unverändert.
+- Abfragen für Dashboard-Name/Fallback-Logo-Text erfolgen nur bei Erst-/Neuinstallation; ein normales Update bleibt rückfragefrei für Branding.
+- Standardwerte sind jetzt generisch: `PVE Hardware Monitor`, Fallback-Text `NODEZERO`, Stil `neon`.
+- Ist `logo.png` leer/transparent oder nicht vorhanden, zeigt das Menü automatisch den konfigurierten Text-Fallback.
+- Ein vorhandenes über die Dashboard-Einstellungen hochgeladenes Favicon behält Vorrang; `favicon_url` wird bei Updates nicht zurückgesetzt.
+- Feste Toolbar bleibt erhalten: Menü · LIVE · USV Online · Neustart · Herunterfahren.
+- README-Struktur modernisiert: aktueller Versionsstand steht oben; vollständige Historie wird separat in `proxmox/HISTORY.md` geführt.
+
 24.11.2026 – V150 · LT-WBH Branding-Reparatur nach Live-Test
 ---------------------------------------------------------------
 - Live-Test auf `dash.ltwbh.de` zeigte: Toolbar/USV-Patch aktiv, aber Seitentitel blieb `PVE Hardware Monitor`, Menü-Logo war nicht sichtbar und ein alter `favicon-custom.png`-Pfad lieferte HTTP 404.
@@ -617,3 +637,31 @@ Verfolgung der Änderungen
 -----------------
 - Versionsanzeige im Hauptmenü ergänzt.
 - Installer-Version zentral auf V118 angehoben.
+
+19.09.2026 – V117
+-----------------
+- PVE-UPS-Preflight vor die Optimal-Stack-Prüfung verschoben, damit die Funktion auf frischen Proxmox-Installationen bereits definiert ist.
+- Docker-LXC-Bootstrap gegen versehentliche Shell-Expansion in verschachtelten awk/sed/printf-Ausdrücken gehärtet.
+- Fresh-Install-Abläufe rund um PVE-UPS und Docker mehrfach korrigiert und stabilisiert.
+
+19.09.2026 – V116
+-----------------
+- Startreihenfolge auf frischen Proxmox-Systemen korrigiert.
+- Repository-Normalisierung auf pve-no-subscription und APT-Preflight laufen vor dem Auto-Updater.
+- Dadurch schlagen neue Installationen nicht mehr frühzeitig an aktiven Enterprise-Repositories mit HTTP 401 fehl.
+
+19.09.2026 – V115
+-----------------
+- Pi-hole-Standardlisten fest in den Installer integriert.
+- Standard-Blocklisten: HaGeZi Pro und HaGeZi TIF.
+- Standard-Allowlisten: Repository-Allowlist und HaGeZi Referral Native.
+
+19.09.2026 – V114
+-----------------
+- Pi-hole-GitHub-Quellen auf das Repository `Technox90/homeatic` umgestellt.
+
+19.09.2026 – V113
+-----------------
+- Erster im aktuellen GitHub-Verlauf nachvollziehbarer Stand des Proxmox Master-Installers V113.
+- Frühere Versionsstände V1–V112 sind im heutigen Repository nicht als vollständige, belastbare History dokumentiert und werden deshalb nicht nachträglich erfunden.
+
