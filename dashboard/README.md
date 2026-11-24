@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Branding: V151**
+**Dashboard-Stand: V152**
 
 Dateien:
 
@@ -16,6 +16,10 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## Update-Modus V152
+
+Ein bereits aktuelles Dashboard wird bei einem normalen Update in-place aktualisiert. Die vorhandenen `app.py`, `index.html` und `collector.py` werden nicht mehr durch die alte V139-Basis ersetzt. Historische UI-Migrationen werden nur noch als Kompatibilitäts-Bootstrap für alte/unvollständige Installationen oder Neuaufbauten ausgeführt.
 
 ## Branding-Regel V151
 
