@@ -56,13 +56,23 @@ jobs:
           assert "/api/status-page/heartbeat/" in m.extract(master, 'cat > "$tmp" <<\'KUMA_STATUS_HTML\'\n', '\nKUMA_STATUS_HTML\n')
           begin = "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */"
           end = "/* PVE_DASHBOARD_BRANDING_V154_END */"
-          index = "<style>" + begin + "old css" + end + "</style><img src='/assets/logo.png'><script>" + begin + "old js" + end + "</script>"
+          index = "<html><head><style>" + begin + "old css" + end + "</style></head><body><img src='/assets/logo.png'><script defer src=\"/installer-update-v155.js\">" + begin + "old js" + end + "</script><script defer src=\"/installer-update-v155.js\"></script></body></html>"
           css = Path("dashboard/branding-v154.css").read_text()
           js = Path("dashboard/branding-v154.js").read_text()
           result = m.dashboard_payload(index, css, js)
           assert css in result and js in result
           assert "<img src='/assets/logo.png'>" in result
           assert m.dashboard_payload(result, css, js) == result
+          assert result.count('<script defer src="/installer-update-v155.js"></script>') == 1
+          assert '<script id="nodezero-branding-v154">\n' + begin in result
+          assert '<script defer src="/installer-update-v155.js">' + begin not in result
+          module = Path("proxmox/modules/dashboard.sh").read_text()
+          fn = module.split("install_dashboard_branding_v154() {", 1)[1].split("\n}\n", 1)[0]
+          assert 'html.rfind("</script>")' not in fn
+          assert '<script id="nodezero-branding-v154">' in fn
+          runtime = Path("dashboard/views/runtime.js").read_text()
+          assert 'badge.remove()' in runtime
+          assert 'container.append(badge)' not in runtime
           try:
               m.dashboard_payload("<html>unmanaged</html>", css, js)
           except ValueError:
@@ -411,7 +421,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="7e8c0882b815e217e8eaf22913c0d825c087d746"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="ea44614871d583892b5bb3a2ef5b2c37a009dfac"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
