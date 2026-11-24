@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V146
+# PROXMOX MODULARER KOMPLETT-INSTALLER V147
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -60,6 +60,7 @@ set -Eeuo pipefail
 #   V143: Paperless-NAS wird bei externer Ablage direkt im Paperless-CT per NFS4 gemountet; kein PVE-Host-Mount/mp4 mehr
 #   V144: Installer-Artefakte konsistent unter /home: downloads, backups, diagnose; aktive Secrets bleiben unter /root/passwort
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
+#   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -106,6 +107,134 @@ if [[ "$NODEZERO_SELF_PATH" == /etc/apt/sources.list.d/* ]]; then
     install -m 0755 -- "$NODEZERO_SELF_PATH" "$NODEZERO_SAFE_SCRIPT"
     exec "$NODEZERO_SAFE_SCRIPT" "$@"
 fi
+
+# -----------------------------------------------------------------------------
+# V147 · automatisches Installer-Self-Update vor jedem normalen Start
+# -----------------------------------------------------------------------------
+# Bei "bash proxmox.sh" wird immer der aktuelle Stand von GitHub main geprüft.
+# Entscheidend ist der komplette Dateiinhalt, nicht nur die Versionsnummer.
+# Ein Update wird ausschließlich übernommen, wenn Download, Marker und
+# Bash-Syntaxprüfung erfolgreich sind. Danach wird die neue Version per exec
+# mit denselben Argumenten gestartet. Der Guard verhindert eine Neustartschleife.
+nodezero_self_update_v147() {
+    local self="$NODEZERO_SELF_PATH"
+    local url="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh"
+    local backup_dir="/home/backups/proxmox-installer-self-update"
+    local tmp=""
+    local stamp=""
+    local backup=""
+    local local_version="unbekannt"
+    local remote_version="unbekannt"
+
+    [[ "${NODEZERO_SELFUPDATE_DONE:-0}" == "1" ]] && return 0
+
+    echo
+    echo "============================================================"
+    echo " INSTALLER-UPDATEPRÜFUNG"
+    echo "============================================================"
+    echo "Quelle:"
+    echo "  $url"
+    echo
+
+    if [[ ! -f "$self" ]]; then
+        echo "[WARNUNG] Laufende Installer-Datei ist nicht als normale Datei verfügbar."
+        echo "          Self-Update wird für diesen Start übersprungen."
+        return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "[WARNUNG] curl ist noch nicht verfügbar."
+        echo "          Self-Update wird übersprungen; vorhandener Installer startet weiter."
+        return 0
+    fi
+
+    tmp="$(mktemp /tmp/nodezero-proxmox-selfupdate.XXXXXX)" || {
+        echo "[WARNUNG] Temporäre Update-Datei konnte nicht angelegt werden."
+        return 0
+    }
+
+    if ! curl --fail --silent --show-error --location \
+        --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 90 \
+        "$url" -o "$tmp"
+    then
+        echo "[WARNUNG] GitHub ist nicht erreichbar oder der Download ist fehlgeschlagen."
+        echo "          Vorhandener Installer startet unverändert weiter."
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    if [[ ! -s "$tmp" ]] ||
+       ! head -n1 "$tmp" | grep -qx '#!/usr/bin/env bash' ||
+       ! grep -q '^# PROXMOX MODULARER KOMPLETT-INSTALLER V[0-9][0-9]*$' "$tmp"
+    then
+        echo "[WARNUNG] Heruntergeladene Datei ist kein gültiger NodeZero-Proxmox-Installer."
+        echo "          Lokale Datei wird NICHT verändert."
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    if ! bash -n "$tmp"; then
+        echo "[WARNUNG] GitHub-Version hat die Bash-Syntaxprüfung nicht bestanden."
+        echo "          Lokale Datei wird NICHT verändert."
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    local_version="$(
+        grep -m1 -oE 'KOMPLETT-INSTALLER V[0-9]+' "$self" 2>/dev/null |
+        awk '{print $NF}' || true
+    )"
+    remote_version="$(
+        grep -m1 -oE 'KOMPLETT-INSTALLER V[0-9]+' "$tmp" 2>/dev/null |
+        awk '{print $NF}' || true
+    )"
+    local_version="${local_version:-unbekannt}"
+    remote_version="${remote_version:-unbekannt}"
+
+    if cmp -s -- "$self" "$tmp"; then
+        echo "[OK] Installer ist aktuell: $local_version"
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    echo "[UPDATE] Neuer GitHub-Stand gefunden: $local_version -> $remote_version"
+
+    if ! install -d -m 0700 -o root -g root "$backup_dir"; then
+        echo "[WARNUNG] Backup-Verzeichnis konnte nicht angelegt werden."
+        echo "          Update wird aus Sicherheitsgründen nicht installiert."
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    stamp="$(date +%Y-%m-%d-%H-%M-%S)"
+    backup="$backup_dir/proxmox-${local_version}-${stamp}.sh"
+
+    if ! install -m 0700 -o root -g root -- "$self" "$backup"; then
+        echo "[WARNUNG] Bestehender Installer konnte nicht gesichert werden."
+        echo "          Update wird aus Sicherheitsgründen nicht installiert."
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    if ! install -m 0755 -o root -g root -- "$tmp" "$self"; then
+        echo "[WARNUNG] Neue Installer-Version konnte nicht installiert werden."
+        echo "          Backup: $backup"
+        rm -f -- "$tmp"
+        return 0
+    fi
+
+    rm -f -- "$tmp"
+
+    echo "[OK] Installer aktualisiert."
+    echo "     Backup: $backup"
+    echo "     Starte $remote_version jetzt neu ..."
+    echo
+
+    export NODEZERO_SELFUPDATE_DONE=1
+    exec /usr/bin/env bash "$self" "$@"
+}
+
+nodezero_self_update_v147 "$@"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -865,8 +994,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V146"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V146"
+TUI_TITLE="PROXMOX INSTALLER V147"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V147"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1269,7 +1398,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 146" \
+                    --title "HAUPTMENÜ · Version 147" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -7591,7 +7720,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V146",
+    "installer_version": "V147",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8065,7 +8194,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V146 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V147 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"

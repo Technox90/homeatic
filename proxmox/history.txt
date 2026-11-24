@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V147 · Automatisches Installer-Self-Update
+--------------------------------------------------------
+- Beim Start per `bash proxmox.sh` prüft der Installer vor dem Hauptmenü automatisch den aktuellen Stand von GitHub `main`.
+- Verglichen wird der vollständige Dateiinhalt und nicht nur die Versionsnummer.
+- Ein Download wird nur übernommen, wenn er nicht leer ist, den erwarteten Installer-Marker enthält und `bash -n` erfolgreich ist.
+- Vor dem Ersetzen wird die aktuell ausgeführte Datei unter `/home/backups/proxmox-installer-self-update/` gesichert.
+- Nach erfolgreichem Austausch startet die neue Installer-Version automatisch mit denselben Argumenten neu.
+- `NODEZERO_SELFUPDATE_DONE` verhindert eine Neustartschleife innerhalb desselben Starts.
+- Ist GitHub nicht erreichbar oder schlägt die Prüfung fehl, läuft die vorhandene lokale Installer-Version normal weiter.
+
 24.11.2026 – V146 · Logs, Updater und externe URLs
 ---------------------------------------------------
 - Pi-hole-Sprachlogs werden jetzt tatsächlich unter /home/diagnose/pihole-language/ gespeichert; die in V144 dokumentierte, aber im Code fehlende Umstellung ist damit umgesetzt.

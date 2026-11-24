@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V146**
+Installationskandidat: **V147**
 
 Geplante Hauptdatei:
 
@@ -17,6 +17,7 @@ proxmox.sh
 - kompaktes Menü mit thematischen Untermenüs
 - `O – Optimale Installation`
 - automatische No-Subscription-Konfiguration
+- automatisches Self-Update des Installers beim Start gegen GitHub `main`
 - Storage-Preflight mit zusätzlicher Reserve
 - Home Assistant OS
 - Paperless-ngx + PostgreSQL + Redis + Ollama
@@ -240,3 +241,35 @@ Das Pi-hole-Sprach-/Update-Hilfswerkzeug schreibt keine Laufprotokolle mehr dire
 ```
 
 Alte Dateien `/root/pihole-sprache-*.txt` werden beim Installer-Start übernommen. Diagnose-Logs werden nach 60 Tagen bereinigt. Aktive Passwörter und Tokens bleiben davon getrennt unter `/root/passwort/`.
+
+
+## Automatisches Installer-Update · V147
+
+Ab V147 reicht nach der einmaligen Aktualisierung weiterhin:
+
+```bash
+bash proxmox.sh
+```
+
+Vor dem eigentlichen Installer-Start wird `proxmox/proxmox.sh` aus dem GitHub-`main`-Branch geladen und mit der lokalen Datei verglichen.
+
+Wenn beide Dateien identisch sind, startet die lokale Version direkt weiter. Bei einem Unterschied wird die GitHub-Datei zuerst geprüft:
+
+```text
+Download erfolgreich
+→ Installer-Marker vorhanden
+→ bash -n erfolgreich
+→ bestehende lokale Datei sichern
+→ neue Datei installieren
+→ neue Version automatisch starten
+```
+
+Backups der ersetzten Installer-Versionen liegen unter:
+
+```text
+/home/backups/proxmox-installer-self-update/
+```
+
+Ist GitHub nicht erreichbar oder ist die heruntergeladene Datei ungültig, wird **kein** Update installiert. Die vorhandene lokale Version startet in diesem Fall normal weiter.
+
+Der Vergleich erfolgt über den vollständigen Dateiinhalt. Dadurch werden auch Korrekturen erkannt, wenn die sichtbare Versionsnummer ausnahmsweise unverändert geblieben ist.
