@@ -1533,6 +1533,135 @@ sys.exit(0 if status == "OK" else 1)
 PY_STRESS_V155
 )
 
+install_kuma_public_status_v155() (
+    local id="" candidate="" count=0
+    for candidate in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$candidate" | awk '/^hostname: / {print tolower($2)}')" == uptime-kuma ]]; then
+            id="$candidate"
+            count=$((count+1))
+        fi
+    done
+    if (( count != 1 )); then
+        warn "Genau ein Uptime-Kuma-LXC erforderlich; gefunden: $count."
+        return 1
+    fi
+    if ! pct status "$id" | grep -q 'status: running'; then
+        warn "Uptime-Kuma-LXC ist nicht gestartet."
+        return 1
+    fi
+    pct exec "$id" -- bash -s <<'KUMA_STATUS_INSTALL'
+set -Eeuo pipefail
+conf=/etc/nginx/conf.d/pve-master-standard-web.conf
+dir=/var/www/nodezero-kuma-status
+page="$dir/index.html"
+test -f "$conf" || { echo "Verwaltete nginx-Konfiguration fehlt."; exit 1; }
+curl -fsS --max-time 10 http://127.0.0.1:3001/ >/dev/null
+nginx -t
+install -d -m 0755 "$dir"
+backup="$(mktemp -d /root/kuma-status-backup.XXXXXX)"
+cp -a "$conf" "$backup/nginx.conf"
+if [[ -f "$page" ]]; then cp -a "$page" "$backup/index.html"; fi
+tmp="$(mktemp "$dir/.index.XXXXXX")"
+rollback() {
+    cp -a "$backup/nginx.conf" "$conf"
+    if [[ -f "$backup/index.html" ]]; then cp -a "$backup/index.html" "$page"; else rm -f "$page"; fi
+    rm -f "$tmp"
+    nginx -t && systemctl reload nginx || true
+}
+trap rollback ERR
+cat > "$tmp" <<'KUMA_STATUS_HTML'
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Status & Antwortzeiten</title>
+<style>
+:root{color-scheme:dark light;font:16px system-ui}body{max-width:1000px;margin:30px auto;padding:0 16px}header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}input,button{font:inherit;padding:8px;border-radius:6px;border:1px solid #888}article{border:1px solid #8885;border-radius:12px;padding:16px;margin:12px 0}h2{font-size:1.2rem}h3{margin:0 0 12px}.stats{display:flex;gap:20px;flex-wrap:wrap}.stats span{display:block;font-size:.8rem;opacity:.75}.stats strong{font-size:1.2rem}.bars{display:flex;gap:3px;margin:12px 0;height:22px}.bars i{flex:1;border-radius:3px;background:#888}.up{color:#20a65b}.down{color:#dc4444}.pending{color:#c58b17}.bars .up{background:#20a65b}.bars .down{background:#dc4444}.bars .pending{background:#c58b17}svg{display:block;width:100%;height:auto;margin-top:12px}.muted{opacity:.75;font-size:.85rem}a{color:inherit}
+</style>
+<header><h1 id="title">Status & Antwortzeiten</h1></header>
+<form id="form"><label for="slug">Statusseiten-Name: </label><input id="slug" required maxlength="100" pattern="[A-Za-z0-9_-]+" placeholder="z. B. familie"><button>Öffnen</button></form>
+<p id="message" role="status">Öffentliche Kuma-Statusseite auswählen.</p><p><a id="original" hidden>Original-Statusseite</a></p><main id="groups"></main>
+<script>
+"use strict";
+const el=(tag,txt,cls)=>{const n=document.createElement(tag);if(txt!==undefined)n.textContent=txt;if(cls)n.className=cls;return n};
+const $=id=>document.getElementById(id);
+const valid=s=>/^[A-Za-z0-9_-]{1,100}$/.test(s);
+let active="", generation=0, busy=false;
+const state=s=>s===1?["Online","up"]:s===0?["Offline","down"]:s===2?["Ausstehend","pending"]:s===3?["Wartung","pending"]:["Unbekannt",""];
+const ms=p=>typeof p==="number"&&Number.isFinite(p)&&p>=0?p:null;
+const format=p=>p===null?"—":p.toFixed(1)+" ms";
+async function json(url){const response=await fetch(url,{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("HTTP "+response.status);return response.json()}
+function stat(parent,label,value){const n=el("div");n.append(el("span",label),el("strong",value));parent.append(n)}
+function graph(rows){
+ const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 640 130");svg.setAttribute("role","img");svg.setAttribute("aria-label","Antwortzeitverlauf in Millisekunden");
+ const pts=rows.map(r=>ms(r.ping));const finite=pts.filter(x=>x!==null);if(!finite.length)return el("p","Keine Antwortzeitdaten vorhanden.","muted");
+ const max=Math.max(1,...finite), min=0;
+ const add=(tag,attrs,text)=>{const n=document.createElementNS(svg.namespaceURI,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));if(text!==undefined)n.textContent=text;svg.append(n);return n};
+ for(const v of [0,max/2,max]){const y=105-v/max*90;add("line",{x1:55,x2:630,y1:y,y2:y,stroke:"currentColor",opacity:".15"});add("text",{x:2,y:y+4,fill:"currentColor","font-size":"10"},Math.round(v)+" ms")}
+ let segment=[];const flush=()=>{if(segment.length>1)add("polyline",{points:segment.join(" "),fill:"none",stroke:"#20a65b","stroke-width":"2"});else if(segment.length===1){const [cx,cy]=segment[0].split(",");add("circle",{cx,cy,r:3,fill:"#20a65b"})}segment=[]};
+ pts.forEach((p,i)=>{if(p===null){flush();return}segment.push((55+i*575/Math.max(1,pts.length-1))+","+(105-p/max*90))});flush();
+ return svg;
+}
+function render(config,heartbeat){
+ const root=document.createDocumentFragment();
+ for(const group of Array.isArray(config.publicGroupList)?config.publicGroupList:[]){
+  const section=el("section");section.append(el("h2",String(group.name||"Monitore")));
+  for(const monitor of Array.isArray(group.monitorList)?group.monitorList:[]){
+   const id=String(monitor.id);const rows=(Array.isArray(heartbeat.heartbeatList?.[id])?heartbeat.heartbeatList[id]:[]).slice(-100).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+   const latest=rows.at(-1);const [status,cls]=state(latest?.status);
+   const card=el("article");const heading=el("h3",String(monitor.name||"Monitor")+" · ");heading.append(el("span",status,cls));card.append(heading);
+   const bars=el("div",undefined,"bars");for(const row of rows.slice(-50)){const [label,c]=state(row.status);const bar=el("i",undefined,c);bar.title=String(row.time||"")+" · "+label+" · "+format(ms(row.ping));bars.append(bar)}card.append(bars);
+   const stats=el("div",undefined,"stats");const values=rows.map(r=>ms(r.ping)).filter(v=>v!==null);
+   stat(stats,"Letzte Antwort",format(ms(latest?.ping)));stat(stats,"Ø sichtbarer Verlauf",format(values.length?values.reduce((a,b)=>a+b,0)/values.length:null));
+   const uptime=heartbeat.uptimeList?.[id+"_24"];stat(stats,"Verfügbarkeit 24h",typeof uptime==="number"?(uptime*100).toFixed(2)+" %":"—");card.append(stats,graph(rows));
+   card.append(el("p",latest?"Letzte Messung (Kuma): "+String(latest.time||"—")+" · "+rows.length+" Messpunkte":"Noch keine Messwerte","muted"));section.append(card);
+  }root.append(section);
+ }
+ $("groups").replaceChildren(root);$("title").textContent=String(config.config?.title||"Status")+" · Antwortzeiten";
+}
+async function refresh(){
+ if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
+ try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("message").textContent="Aktualisiert: "+new Date().toLocaleTimeString()+" · alle 60 Sekunden";}
+ catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
+ finally{busy=false;if(token!==generation)refresh()}
+}
+function select(slug){if(!valid(slug))return;generation++;active=slug;$("slug").value=slug;$("groups").replaceChildren();$("message").textContent="Lade öffentliche Statusdaten …";$("original").href="/status/"+encodeURIComponent(slug);$("original").hidden=false;history.replaceState(null,"","?slug="+encodeURIComponent(slug));refresh()}
+$("form").addEventListener("submit",e=>{e.preventDefault();select($("slug").value.trim())});
+const initial=new URLSearchParams(location.search).get("slug");if(initial&&valid(initial))select(initial);setInterval(refresh,60000);
+</script></html>
+KUMA_STATUS_HTML
+chmod 0644 "$tmp"
+mv -f "$tmp" "$page"
+python3 - "$conf" <<'PY_KUMA_STATUS_NGINX'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1])
+s=p.read_text()
+marker="# NODEZERO KUMA PUBLIC STATUS V155"
+if marker not in s:
+    anchor="    location / {\n"
+    if s.count(anchor)!=1:
+        raise SystemExit("nginx location nicht eindeutig; keine automatische Änderung.")
+    block='''    # NODEZERO KUMA PUBLIC STATUS V155
+    location = /nodezero-status/ {
+        alias /var/www/nodezero-kuma-status/index.html;
+        default_type text/html;
+        add_header Cache-Control "no-store";
+        add_header X-Content-Type-Options nosniff;
+    }
+
+'''
+    p.write_text(s.replace(anchor,block+anchor,1))
+PY_KUMA_STATUS_NGINX
+output="$(nginx -t 2>&1)"
+printf '%s\n' "$output"
+if grep -q 'conflicting server name' <<<"$output"; then rollback; exit 1; fi
+systemctl reload nginx
+curl -fkSs --max-time 10 https://127.0.0.1/nodezero-status/ | grep -F 'Status & Antwortzeiten' >/dev/null
+trap - ERR
+echo "Statusansicht installiert. Backup: $backup"
+KUMA_STATUS_INSTALL
+    echo "Öffne auf deiner bisherigen Kuma-Domain: /nodezero-status/?slug=DEIN-STATUSSEITENNAME"
+)
+
 tui_maintenance_menu_v106() {
     local result=""
 
@@ -1555,13 +1684,14 @@ tui_maintenance_menu_v106() {
                 "17" "Setup-Profile · laden / verwalten" \
                 "19" "OpenRGB · Mainboard / RAM / USB-RGB" \
                 "22" "Stresstest · CPU / RAM / Festplatte" \
+                "23" "Uptime Kuma · öffentliche Statusseite mit Ping" \
                 3>&1 1>&2 2>&3
         )" || return 1
         printf '%s' "$result"
         return 0
     fi
 
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  22 Stresstest (CPU/RAM/Festplatte)\n  Z Zurück\nAuswahl: '
+    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  22 Stresstest (CPU/RAM/Festplatte)\n  23 Kuma Statusseite mit Ping\n  Z Zurück\nAuswahl: '
     read -r result
     [[ "${result^^}" == "Z" ]] && return 1
     printf '%s' "$result"
@@ -8587,6 +8717,11 @@ while true; do
             exit 0
         fi
 
+        continue
+    fi
+
+    if [[ "$INSTALL_SELECTION" == "23" ]]; then
+        install_kuma_public_status_v155 || warn "Kuma-Statusansicht konnte nicht installiert werden."
         continue
     fi
 
