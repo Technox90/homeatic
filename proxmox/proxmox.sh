@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V156
+# PROXMOX MODULARER KOMPLETT-INSTALLER V157
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1002,8 +1002,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V156"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V156"
+TUI_TITLE="PROXMOX INSTALLER V157"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V157"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1147,7 +1147,7 @@ tui_host_status_v106() {
 # Designpakete liegen unter /home/downloads/nodezero/dashboard-views/v1.
 install_nodezero_dashboard_view_manager_v1() {
     local target="/usr/local/sbin/nodezero-dashboard-views"
-    local cache="/home/downloads/nodezero/tools/nodezero-dashboard-views-v1"
+    local cache="/home/downloads/nodezero/tools/nodezero-dashboard-views-v2"
     local tmp="${cache}.tmp"
 
     mkdir -p "$(dirname "$cache")"
@@ -1155,7 +1155,7 @@ install_nodezero_dashboard_view_manager_v1() {
         rm -f "$tmp"
         if ! curl --fail --silent --show-error --location \
             --retry 3 --retry-delay 2 --connect-timeout 15 \
-            "https://raw.githubusercontent.com/Technox90/homeatic/main/proxmox/tools/nodezero-dashboard-views" \
+            "https://raw.githubusercontent.com/Technox90/homeatic/cf0482eaf2080929acc147beb50194d257f6ba28/proxmox/tools/nodezero-dashboard-views" \
             -o "$tmp"; then
             rm -f "$tmp"
             warn "NodeZero-Ansichtsauswahl konnte nicht von GitHub geladen werden."
@@ -1783,7 +1783,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 156" \
+                    --title "HAUPTMENÜ · Version 157" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -6181,7 +6181,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="238035bf241688bb69c1be5e3692081f767feae8"
+TOOLS_REF="9fe93cfd1d514cb95f92ded8398e6cc814c94652"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -8107,7 +8107,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V156",
+    "installer_version": "V157",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8581,7 +8581,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V156 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V157 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11724,7 +11724,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="7e8c0882b815e217e8eaf22913c0d825c087d746"
+NODEZERO_MODULE_REF="ea44614871d583892b5bb3a2ef5b2c37a009dfac"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
