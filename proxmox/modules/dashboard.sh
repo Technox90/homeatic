@@ -23078,8 +23078,10 @@ PY
 install_dashboard_branding_v150() {
     header "DASHBOARD · BRANDING / FESTE TOOLBAR"
 
-    local ref="0372af1b29614a37d2e0d8bdf46bd8c48985e22c"
+    local ref="c0c2a125d2d6bbddc29459e3b9dade15f2b04492"
     local index="/opt/nodezero/dashboard/static/index.html"
+    local static_dir="/opt/nodezero/dashboard/static"
+    local asset_dir="/opt/nodezero/dashboard/static/assets"
     local settings="/etc/pve-sensor-dashboard/ui.json"
     local helper="/usr/local/sbin/pve-dashboard-settings-helper"
     local cache="/home/downloads/nodezero/dashboard-branding/v150"
@@ -23092,13 +23094,33 @@ install_dashboard_branding_v150() {
     [[ -f "$settings" ]] || die "Dashboard Branding: ui.json fehlt."
     [[ -x "$helper" ]] || die "Dashboard Branding: Settings-Helper fehlt."
 
-    mkdir -p "$cache" "$backup"
+    mkdir -p "$cache" "$backup" "$asset_dir"
 
     curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v150.css" -o "$cache/branding-v150.css"
     curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v150.js" -o "$cache/branding-v150.js"
+    curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/assets/logo-lt-wbh.png" -o "$cache/logo-lt-wbh.png"
+    curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/assets/favicon-lt-wbh.png" -o "$cache/favicon-lt-wbh.png"
 
     grep -Fq 'NodeZero Dashboard Branding V150' "$cache/branding-v150.css" || die "Branding CSS ungültig."
     grep -Fq 'NodeZero Dashboard Branding V150' "$cache/branding-v150.js" || die "Branding JavaScript ungültig."
+
+    python3 - "$cache/logo-lt-wbh.png" "$cache/favicon-lt-wbh.png" <<'PYPNG'
+from pathlib import Path
+import sys
+
+for raw in sys.argv[1:]:
+    p = Path(raw)
+    data = p.read_bytes()
+    if len(data) < 33 or data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"FEHLER: Kein gültiges PNG: {p}")
+    color_type = data[25]
+    has_alpha = color_type in (4, 6) or b"tRNS" in data
+    if not has_alpha:
+        raise SystemExit(f"FEHLER: PNG ohne Alpha-Transparenz: {p}")
+PYPNG
+
+    install -m 0644 -o root -g root "$cache/logo-lt-wbh.png" "$asset_dir/logo-lt-wbh.png"
+    install -m 0644 -o root -g root "$cache/favicon-lt-wbh.png" "$asset_dir/favicon-lt-wbh.png"
 
     cp -a "$index" "$backup/index.html"
     cp -a "$settings" "$backup/ui.json"
@@ -23172,9 +23194,9 @@ for marker in ("dashboardFixedToolbarV150","dashboardBrandLogoV150","toDataURL('
         raise SystemExit("FEHLER: Branding-Marker fehlt: "+marker)
 PY
 
-    chown root:root "$index" "$helper"
+    chown root:root "$index" "$helper" "$asset_dir/logo-lt-wbh.png" "$asset_dir/favicon-lt-wbh.png"
     chown root:pve-monitor "$settings"
-    chmod 644 "$index"
+    chmod 644 "$index" "$asset_dir/logo-lt-wbh.png" "$asset_dir/favicon-lt-wbh.png"
     chmod 755 "$helper"
     chmod 640 "$settings"
 
@@ -23184,7 +23206,8 @@ PY
 
     ok "Dashboard Branding aktiv: $website_name · $logo_text ($logo_style)"
     info "Feste Leiste: Menü · LIVE · USV Online · Neustart · Herunterfahren"
-    info "Fallback-Favicon: transparentes PNG mit Alpha-Kanal; eigenes Upload-Favicon hat Vorrang."
+    info "LT-WBH Logo/Favicon: echte PNG-Dateien mit Alpha-Transparenz aus GitHub."
+    info "Eigenes Upload-Favicon hat weiterhin Vorrang; andere Branding-Namen nutzen das wählbare Design."
 }
 
 # =============================================================================
