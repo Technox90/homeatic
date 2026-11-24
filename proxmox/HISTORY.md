@@ -1,12 +1,26 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V152 · 24.11.2026**  
+> **Aktueller Stand: V153 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V153 · Toolbar mit Logo-Menü-Toggle
+--------------------------------------------------------
+- Obere Dashboard-Leiste vollständig neu angeordnet.
+- Links befindet sich jetzt ein kombinierter Menü-Toggle aus Hamburger-Symbol und vorhandenem `logo.png`; bei transparentem/fehlendem Logo wird der konfigurierte Logo-Text angezeigt.
+- Der bisherige separate Button „Menü“ entfällt.
+- Derselbe Logo-/Hamburger-Button öffnet und schließt das Seitenmenü.
+- LIVE und USV Online sind mittig gruppiert.
+- Neustart und Herunterfahren sind rechtsbündig gruppiert.
+- Der Seitenmenü-Kopf mit zusätzlichem Logo/Schließen-X wird ausgeblendet; das Seitenmenü beginnt direkt unterhalb der festen Toolbar.
+- Toolbar und Logo-Menü liegen über SideNav/Overlay, damit der Menü-Toggle auch bei geöffnetem Menü immer sichtbar und bedienbar bleibt.
+- Responsive Layout für kleinere Bildschirmbreiten ergänzt.
+- V151/V152-Schutz bleibt bestehen: eigene `logo.png` und `favicon.png` werden bei Updates nicht überschrieben.
+- Neue Frontend-Dateien: `dashboard/branding-v153.css` und `dashboard/branding-v153.js`.
 
 24.11.2026 – V152 · In-place Dashboard-Updates / Legacy-Bereinigung
 ---------------------------------------------------------------------
