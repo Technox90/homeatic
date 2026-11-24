@@ -1337,9 +1337,18 @@ tui_vm_os_menu_v106() {
 }
 
 run_stress_test_v155() (
-    local minutes="" answer="" workers="" logfile=""
+    local minutes="" answer="" workers="" logfile="" mode="" limit="" target=""
+    while true; do
+        if (( TUI_AVAILABLE )); then
+            mode="$(whiptail --title "STRESSTEST" --cancel-button "Zurück" --menu "Testart auswählen" 15 76 4 CPU "Prozessor" RAM "Arbeitsspeicher" DISK "Festplatte / SSD (Testdatei)" 3>&1 1>&2 2>&3)" || return 0
+        else
+            read -rp "Testart (CPU/RAM/DISK/Z=Zurück): " mode || return 0
+            mode="$(printf "%s" "$mode" | tr "[:lower:]" "[:upper:]")"
+        fi
+        case "$mode" in CPU|RAM|DISK) break ;; Z) return 0 ;; *) warn "Ungültige Testart." ;; esac
+    done
     if (( TUI_AVAILABLE )); then
-        minutes="$(whiptail --title "CPU-STRESSTEST" --inputbox "Dauer in Minuten (1-120)" 10 65 10 3>&1 1>&2 2>&3)" || return 0
+        minutes="$(whiptail --title "$mode-STRESSTEST" --inputbox "Dauer in Minuten (1-120)" 10 65 10 3>&1 1>&2 2>&3)" || return 0
     else
         read -rp "Dauer in Minuten (1-120) [10]: " minutes || return 0
         [[ -n "$minutes" ]] || minutes=10
@@ -1349,9 +1358,28 @@ run_stress_test_v155() (
         return 0
     fi
     minutes=$((10#$minutes))
+    if (( TUI_AVAILABLE )); then
+        limit="$(whiptail --title "TEMPERATURSCHUTZ" --inputbox "Testabbruch bei Temperatur (60-99 °C)" 10 70 95 3>&1 1>&2 2>&3)" || return 0
+    else
+        read -rp "Temperaturgrenze 60-99 °C [95]: " limit || return 0
+        [[ -n "$limit" ]] || limit=95
+    fi
+    if [[ ! "$limit" =~ ^[0-9]{2}$ ]] || (( 10#$limit < 60 || 10#$limit > 99 )); then
+        warn "Temperaturgrenze muss zwischen 60 und 99 °C liegen."
+        return 0
+    fi
+    if [[ "$mode" == DISK ]]; then
+        echo "Verfügbare Dateisysteme:"
+        df -hT -x tmpfs -x devtmpfs
+        read -rp "Vorhandenes lokales Zielverzeichnis [/home/diagnose/stresstest]: " target || return 0
+        [[ -n "$target" ]] || target=/home/diagnose/stresstest
+    fi
     workers="$(nproc)"
     if (( workers > 1 )); then workers=$((workers-1)); fi
-    echo "CPU-Stresstest: $minutes Minuten, $workers Worker, niedrige Prozesspriorität."
+    echo "$mode-Stresstest: $minutes Minuten, Temperaturgrenze $limit °C."
+    echo "Nur der Test wird beim Erreichen der Grenze beendet, nicht der Proxmox-Host."
+    if [[ "$mode" == RAM ]]; then echo "RAM: maximal 50 % des aktuell verfügbaren Speichers, höchstens 8 GiB."; fi
+    if [[ "$mode" == DISK ]]; then echo "DISK: temporäre Datei bis 1 GiB, wiederholte Schreib-/Lesezugriffe; SSD-Verschleiß möglich."; fi
     echo "Produktive VMs und LXC können langsamer werden. Abbruch mit Strg+C."
     read -rp "Test starten? [j/N]: " answer || return 0
     [[ "$answer" =~ ^[jJyY]$ ]] || return 0
@@ -1369,12 +1397,14 @@ run_stress_test_v155() (
     install -d -m 0750 /home/diagnose/stresstest || return 1
     logfile="/home/diagnose/stresstest/test$(date +%Y%m%d-%H%M%S).txt"
     (umask 077; set -o noclobber; : > "$logfile") || return 1
-    python3 - "$minutes" "$workers" "$logfile" <<'PY_STRESS_V155'
-import datetime, glob, os, signal, subprocess, sys, time
+    python3 - "$minutes" "$workers" "$logfile" "$mode" "$limit" "$target" <<'PY_STRESS_V155'
+import datetime, glob, os, signal, subprocess, sys, time, tempfile, shutil
 
 duration = int(sys.argv[1]) * 60
 workers = int(sys.argv[2])
 path = sys.argv[3]
+mode, limit, target = sys.argv[4], int(sys.argv[5]), sys.argv[6]
+workdir = None
 interrupted = False
 process = None
 def stop(signum, frame):
@@ -1388,9 +1418,13 @@ def cpu():
         v = list(map(int, f.readline().split()[1:9]))
     return sum(v), v[3] + v[4]
 
-def memory():
+def meminfo():
     with open("/proc/meminfo") as f:
         m = {line.split(":")[0]: int(line.split()[1]) for line in f if ":" in line}
+    return m
+
+def memory():
+    m = meminfo()
     total = m["MemTotal"]
     return 100 * (total-m["MemAvailable"])/total
 
@@ -1410,8 +1444,8 @@ with open(path, "a", buffering=1) as log:
     def emit(line):
         print(line, flush=True)
         print(line, file=log, flush=True)
-    emit(f"CPU-STRESSTEST | {datetime.datetime.now().isoformat(timespec='seconds')} | {os.uname().nodename}")
-    emit(f"Dauer: {duration}s | Worker: {workers} | Temperatur: Maximum verfügbarer hwmon-Sensoren")
+    emit(f"{mode}-STRESSTEST | {datetime.datetime.now().isoformat(timespec='seconds')} | {os.uname().nodename}")
+    emit(f"Dauer: {duration}s | Temperaturgrenze: {limit} C | Temperatur: Maximum verfügbarer hwmon-Sensoren")
     start = time.monotonic()
     peak_cpu = peak_ram = 0.0
     peak_temp = None
@@ -1419,7 +1453,35 @@ with open(path, "a", buffering=1) as log:
     status = "FEHLER"
     try:
         previous = cpu()
-        process = subprocess.Popen(["nice", "-n", "15", "stress-ng", "--cpu", str(workers), "--timeout", f"{duration}s", "--metrics-brief"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        initial_temp = temperature()
+        if initial_temp is None:
+            raise RuntimeError("Keine Temperatursensoren verfügbar; sicherer Teststart verweigert.")
+        if initial_temp >= limit:
+            raise RuntimeError("Temperaturgrenze bereits erreicht.")
+        if memory() >= 95:
+            raise RuntimeError("RAM-Sicherheitsgrenze bereits erreicht.")
+        args = ["nice", "-n", "15", "stress-ng", "--timeout", f"{duration}s", "--metrics-brief"]
+        if mode == "CPU":
+            args += ["--cpu", str(workers)]
+        elif mode == "RAM":
+            mib = min(8192, meminfo()["MemAvailable"] // 2048)
+            if mib < 128:
+                raise RuntimeError("Zu wenig freier RAM.")
+            args += ["--vm", "1", "--vm-bytes", f"{mib}M", "--vm-keep", "--verify"]
+            emit(f"RAM-Testgröße: {mib} MiB")
+        elif mode == "DISK":
+            target = os.path.realpath(target)
+            if not os.path.isdir(target) or target.startswith(("/dev/", "/proc/", "/sys/", "/run/")) or target == "/":
+                raise RuntimeError("Ungültiges Testverzeichnis.")
+            fs = subprocess.check_output(["findmnt", "-n", "-o", "FSTYPE", "-T", target], text=True).strip()
+            if fs not in {"ext4", "xfs", "btrfs", "zfs", "f2fs"}:
+                raise RuntimeError(f"Nur lokale Dateisysteme unterstützt: {fs}")
+            if shutil.disk_usage(target).free < 3 * 1024**3:
+                raise RuntimeError("Mindestens 3 GiB freier Speicher erforderlich.")
+            workdir = tempfile.mkdtemp(prefix=".pve-stress-", dir=target)
+            args += ["--hdd", "1", "--hdd-bytes", "1G", "--temp-path", workdir, "--verify"]
+            emit(f"Festplattentest: {target} | {fs} | 1 GiB Testdatei")
+        process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         while not interrupted and process.poll() is None:
             time.sleep(1)
             elapsed = time.monotonic()-start
@@ -1437,7 +1499,10 @@ with open(path, "a", buffering=1) as log:
             temp_text = f"{temp:.1f} C" if temp is not None else "n/a"
             bar = "#" * min(20, max(0, int(usage/5)))
             emit(f"{datetime.datetime.now():%H:%M:%S} | {min(int(elapsed),duration):4d}/{duration}s | CPU [{bar:<20}] {usage:5.1f}% | RAM {ram:5.1f}% | Temp {temp_text} | Load {os.getloadavg()[0]:.2f}")
-            if temp is not None and temp >= 90:
+            if temp is None:
+                status = "SENSORABBRUCH"
+                break
+            if temp >= limit:
                 status = "TEMPERATURABBRUCH"
                 break
             if ram >= 95:
@@ -1448,6 +1513,8 @@ with open(path, "a", buffering=1) as log:
                 break
         else:
             status = "ABGEBROCHEN" if interrupted else ("OK" if process.returncode == 0 else "FEHLER")
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        emit(f"Fehler: {exc}")
     finally:
         if process is not None and process.poll() is None:
             try:
@@ -1458,6 +1525,8 @@ with open(path, "a", buffering=1) as log:
                 process.wait()
             except ProcessLookupError:
                 pass
+        if workdir is not None:
+            shutil.rmtree(workdir)
         emit(f"Ergebnis: {status} | Messwerte: {count} | CPU max: {peak_cpu:.1f}% | RAM max: {peak_ram:.1f}% | Temp max: {peak_temp if peak_temp is not None else 'n/a'}")
         emit(f"Bericht: {path}")
 sys.exit(0 if status == "OK" else 1)
@@ -1485,14 +1554,14 @@ tui_maintenance_menu_v106() {
                 "15" "PVE Storage-Share-Helper" \
                 "17" "Setup-Profile · laden / verwalten" \
                 "19" "OpenRGB · Mainboard / RAM / USB-RGB" \
-                "22" "CPU-Stresstest · 1-120 Min / Live / Diagnose" \
+                "22" "Stresstest · CPU / RAM / Festplatte" \
                 3>&1 1>&2 2>&3
         )" || return 1
         printf '%s' "$result"
         return 0
     fi
 
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  22 CPU-Stresstest\n  Z Zurück\nAuswahl: '
+    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  22 Stresstest (CPU/RAM/Festplatte)\n  Z Zurück\nAuswahl: '
     read -r result
     [[ "${result^^}" == "Z" ]] && return 1
     printf '%s' "$result"
