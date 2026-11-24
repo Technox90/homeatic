@@ -22991,6 +22991,467 @@ __PVE_DASHBOARD_SETTINGS_PANELS_V81__
 }
 
 # =============================================================================
+# V150 · LT-WBH BRANDING + STICKY CONTROL BAR
+# =============================================================================
+
+install_dashboard_ltwbh_branding_v150() {
+    header "DASHBOARD LT-WBH · BRANDING / STICKY TOPBAR"
+
+    local index="/opt/nodezero/dashboard/static/index.html"
+    local settings="/etc/pve-sensor-dashboard/ui.json"
+    local backup="/home/backups/pve-dashboard-ltwbh-v150-$(date +%Y%m%d-%H%M%S)"
+
+    [[ -f "$index" ]] || {
+        warn "Dashboard LT-WBH Branding: index.html fehlt."
+        return 1
+    }
+
+    mkdir -p "$backup"
+    cp -a "$index" "$backup/index.html"
+    [[ -f "$settings" ]] && cp -a "$settings" "$backup/ui.json"
+
+    python3 - "$index" "$settings" <<'PYLTWBH150'
+from pathlib import Path
+import json
+import re
+import sys
+
+index_path = Path(sys.argv[1])
+settings_path = Path(sys.argv[2])
+html = index_path.read_text(encoding="utf-8")
+
+MARKER = "PVE_DASHBOARD_LTW_Branding_V150"
+
+css = r'''
+/* PVE_DASHBOARD_LTW_Branding_V150 */
+.top{
+  position:sticky!important;
+  top:0!important;
+  z-index:24!important;
+  margin:0 -22px 18px!important;
+  padding:12px 22px!important;
+  flex-wrap:nowrap!important;
+  background:linear-gradient(110deg,rgba(7,16,29,.96),rgba(12,27,46,.93))!important;
+  border-bottom:1px solid rgba(100,167,255,.34)!important;
+  box-shadow:0 16px 38px rgba(0,0,0,.38),0 1px 0 rgba(105,220,255,.10) inset!important;
+  backdrop-filter:blur(16px) saturate(135%);
+  -webkit-backdrop-filter:blur(16px) saturate(135%);
+}
+.toolbar{
+  flex:1 1 auto;
+  min-width:0;
+  flex-wrap:nowrap!important;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  overscroll-behavior-x:contain;
+  padding:2px 0;
+}
+.toolbar::-webkit-scrollbar{display:none}
+.toolbar>*{flex:0 0 auto}
+.top .brand{
+  flex:0 0 auto;
+  margin-left:auto!important;
+  text-align:right;
+}
+.top .brand h1{
+  font-size:18px!important;
+  letter-spacing:.02em;
+  background:linear-gradient(90deg,#effbff,#75dfff 48%,#a995ff);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.top .brand p{font-size:11px!important}
+.ltwbhMenuBrandV150{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:11px;
+}
+.ltwbhMenuLogoV150{
+  width:48px;
+  height:48px;
+  flex:0 0 48px;
+  display:block;
+  filter:drop-shadow(0 0 7px rgba(71,221,255,.52)) drop-shadow(0 0 13px rgba(145,115,255,.22));
+}
+.ltwbhMenuCopyV150{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.ltwbhMenuCopyV150 strong{
+  display:block;
+  font-size:16px!important;
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  background:linear-gradient(90deg,#f1fbff,#68ddff 55%,#aa95ff);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.ltwbhMenuCopyV150 span{
+  color:#7187a5;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.menuBtn{
+  box-shadow:0 0 0 1px rgba(92,190,255,.06) inset;
+}
+.menuBtn:hover{
+  border-color:#54d8ff!important;
+  box-shadow:0 0 20px rgba(80,201,255,.14);
+}
+@media(max-width:900px){
+  .top .brand{display:none!important}
+}
+@media(max-width:760px){
+  .top{
+    margin:0 -14px 14px!important;
+    padding:9px 14px!important;
+  }
+  .toolbar{width:100%!important}
+}
+'''
+
+if MARKER not in html:
+    if "</style>" not in html:
+        raise SystemExit("FEHLER: Dashboard </style> fehlt.")
+
+    html = html.replace(
+        "</style>",
+        css + "\n</style>",
+        1,
+    )
+
+    html = re.sub(
+        r'<title(?:\s+id="pageTitle")?>.*?</title>',
+        '<title id="pageTitle">Dashboard LT-WBH</title>',
+        html,
+        count=1,
+        flags=re.S,
+    )
+
+    html = re.sub(
+        r'(<h1\s+id="websiteTitle"[^>]*>).*?(</h1>)',
+        r'\1Dashboard LT-WBH\2',
+        html,
+        count=1,
+        flags=re.S,
+    )
+
+    menu_title = re.search(
+        r'<strong\s+id="navMenuTitle"[^>]*>.*?</strong>',
+        html,
+        flags=re.S,
+    )
+
+    if not menu_title:
+        raise SystemExit(
+            "FEHLER: navMenuTitle für LT-WBH Branding nicht gefunden."
+        )
+
+    brand = r'''<div class="ltwbhMenuBrandV150">
+      <canvas
+        id="ltwbhMenuLogoV150"
+        class="ltwbhMenuLogoV150"
+        width="96"
+        height="96"
+        aria-label="LT-WBH Logo"
+      ></canvas>
+      <div class="ltwbhMenuCopyV150">
+        <strong id="navMenuTitle">Dashboard LT-WBH</strong>
+        <span>Home Automation Control</span>
+      </div>
+    </div>'''
+
+    html = (
+        html[:menu_title.start()]
+        + brand
+        + html[menu_title.end():]
+    )
+
+    js = r'''
+/* PVE_DASHBOARD_LTW_Branding_V150 */
+function drawLtwbhLogoV150(canvas){
+  if(!canvas||!canvas.getContext)return;
+
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width||96;
+  const h=canvas.height||96;
+  const cx=w/2;
+  const cy=h/2;
+
+  ctx.clearRect(0,0,w,h);
+
+  const hex=(radius)=>{
+    const points=[];
+    const rot=-Math.PI/6;
+
+    for(let i=0;i<6;i++){
+      const a=rot+i*Math.PI/3;
+      points.push([
+        cx+radius*Math.cos(a),
+        cy+radius*Math.sin(a)
+      ]);
+    }
+
+    return points;
+  };
+
+  const pathHex=(points)=>{
+    ctx.beginPath();
+    ctx.moveTo(points[0][0],points[0][1]);
+
+    for(let i=1;i<points.length;i++){
+      ctx.lineTo(points[i][0],points[i][1]);
+    }
+
+    ctx.closePath();
+  };
+
+  ctx.save();
+  ctx.shadowColor='rgba(70,220,255,.72)';
+  ctx.shadowBlur=w*.11;
+
+  const outer=hex(w*.35);
+  pathHex(outer);
+
+  const gradient=ctx.createLinearGradient(
+    w*.18,h*.18,w*.82,h*.82
+  );
+  gradient.addColorStop(0,'#43e0ff');
+  gradient.addColorStop(.52,'#64a9ff');
+  gradient.addColorStop(1,'#9b73ff');
+
+  ctx.strokeStyle=gradient;
+  ctx.lineWidth=Math.max(2,w*.035);
+  ctx.stroke();
+  ctx.restore();
+
+  const inner=hex(w*.285);
+  pathHex(inner);
+  ctx.fillStyle='rgba(7,18,34,.90)';
+  ctx.fill();
+  ctx.strokeStyle='rgba(106,195,255,.72)';
+  ctx.lineWidth=Math.max(1,w*.012);
+  ctx.stroke();
+
+  ctx.strokeStyle='#59dcff';
+  ctx.fillStyle='#a276ff';
+  ctx.lineWidth=Math.max(1,w*.018);
+
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI/3;
+    const x1=cx+w*.31*Math.cos(a);
+    const y1=cy+h*.31*Math.sin(a);
+    const x2=cx+w*.40*Math.cos(a);
+    const y2=cy+h*.40*Math.sin(a);
+
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(
+      x2,y2,
+      Math.max(1.5,w*.018),
+      0,Math.PI*2
+    );
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.font='800 '+Math.round(w*.34)+'px Inter,Segoe UI,Arial,sans-serif';
+  ctx.shadowColor='rgba(64,213,255,.7)';
+  ctx.shadowBlur=w*.055;
+  ctx.lineWidth=Math.max(1,w*.016);
+  ctx.strokeStyle='#4c9fff';
+  ctx.fillStyle='#f1fbff';
+  ctx.strokeText('LT',cx,cy-h*.015);
+  ctx.fillText('LT',cx,cy-h*.015);
+  ctx.restore();
+}
+
+function ltwbhDefaultFaviconV150(){
+  const canvas=document.createElement('canvas');
+  canvas.width=64;
+  canvas.height=64;
+  drawLtwbhLogoV150(canvas);
+
+  try{
+    return canvas.toDataURL('image/png');
+  }catch{
+    return '';
+  }
+}
+
+const applyUiSettingsBeforeV150=
+  typeof applyUiSettings==='function'
+    ? applyUiSettings
+    : null;
+
+if(applyUiSettingsBeforeV150){
+  applyUiSettings=function(settings){
+    const normalized={
+      ...(settings||{})
+    };
+
+    if(
+      !normalized.website_name
+      ||normalized.website_name==='PVE Hardware Monitor'
+    ){
+      normalized.website_name='Dashboard LT-WBH';
+    }
+
+    if(
+      !normalized.menu_name
+      ||normalized.menu_name==='Server-Menü'
+    ){
+      normalized.menu_name='Dashboard LT-WBH';
+    }
+
+    applyUiSettingsBeforeV150(normalized);
+
+    if(!normalized.favicon_url){
+      const favicon=ensureFaviconLink();
+      const png=ltwbhDefaultFaviconV150();
+
+      if(png){
+        favicon.type='image/png';
+        favicon.href=png;
+      }
+    }
+  };
+}
+
+function initLtwbhBrandingV150(){
+  drawLtwbhLogoV150(
+    document.getElementById('ltwbhMenuLogoV150')
+  );
+
+  const favicon=ensureFaviconLink();
+
+  if(!favicon.getAttribute('href')){
+    const png=ltwbhDefaultFaviconV150();
+
+    if(png){
+      favicon.type='image/png';
+      favicon.href=png;
+    }
+  }
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener(
+    'DOMContentLoaded',
+    initLtwbhBrandingV150,
+    {once:true}
+  );
+}else{
+  initLtwbhBrandingV150();
+}
+'''
+
+    script_end = html.rfind("</script>")
+
+    if script_end < 0:
+        raise SystemExit("FEHLER: Dashboard </script> fehlt.")
+
+    html = (
+        html[:script_end]
+        + js
+        + "\n"
+        + html[script_end:]
+    )
+
+settings = {}
+
+try:
+    settings = json.loads(
+        settings_path.read_text(encoding="utf-8")
+    )
+except Exception:
+    settings = {}
+
+if not isinstance(settings, dict):
+    settings = {}
+
+branding_version = int(
+    settings.get("ltwbh_branding_version", 0) or 0
+)
+
+if branding_version < 150:
+    settings["website_name"] = "Dashboard LT-WBH"
+    settings["menu_name"] = "Dashboard LT-WBH"
+    settings["ltwbh_branding_version"] = 150
+
+    settings_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    tmp = settings_path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(
+            settings,
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    tmp.chmod(0o640)
+    tmp.replace(settings_path)
+
+index_path.write_text(
+    html,
+    encoding="utf-8",
+)
+
+for required in (
+    MARKER,
+    "ltwbhMenuLogoV150",
+    "drawLtwbhLogoV150",
+    "ltwbhDefaultFaviconV150",
+    "position:sticky!important",
+):
+    if required not in html:
+        raise SystemExit(
+            "FEHLER: LT-WBH Branding-Marker fehlt: "
+            + required
+        )
+
+print("[OK] Dashboard LT-WBH Branding V150 installiert.")
+PYLTWBH150
+
+    chown root:root "$index"
+    chmod 0644 "$index"
+
+    if [[ -f "$settings" ]]; then
+        chown root:pve-monitor "$settings" 2>/dev/null || true
+        chmod 0640 "$settings" 2>/dev/null || true
+    fi
+
+    systemctl restart pve-sensor-web.service
+    nginx -t
+    systemctl reload nginx
+
+    ok "Dashboard LT-WBH aktiv · Topbar bleibt beim Scrollen sichtbar."
+    info "Logo/Favicon: futuristisches LT-Monogramm · Favicon als PNG mit Alpha."
+    info "Backup: $backup"
+}
+
+# =============================================================================
 # V69 · DASHBOARD FINALEN UI-STAND PRÜFEN
 # =============================================================================
 
@@ -23027,6 +23488,9 @@ validate_dashboard_final_state_v69() {
         'id="settingsHubTabPihole"'
         'PVE_PIHOLE_MENU_ISOLATION_V80'
         'PVE_SETTINGS_PANELS_HOST_V81'
+        'PVE_DASHBOARD_LTW_Branding_V150'
+        'id="ltwbhMenuLogoV150"'
+        'drawLtwbhLogoV150'
     )
 
     for marker in "${index_markers[@]}"; do
