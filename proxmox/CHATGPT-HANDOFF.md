@@ -238,7 +238,7 @@ Die obere Bedienleiste ist fest/sticky und bleibt beim Scrollen sichtbar, in die
 - Neustart
 - Herunterfahren
 
-Das Seitenmenü zeigt das gewählte Branding-Logo. Ohne eigenes hochgeladenes Favicon erzeugt das Frontend ein PNG-Favicon mit echtem transparentem Alpha-Hintergrund. Ein eigenes Favicon aus den Dashboard-Einstellungen hat Vorrang.
+Das Seitenmenü zeigt das Branding bewusst als schmaler Wordmark-Schriftzug (bei Tobias `LT-WBH`) statt als großes Badge. Der Schriftzug wird automatisch im Menükopf `#sideNav .navHead` eingefügt. Ohne eigenes hochgeladenes Favicon verwendet LT-WBH das feste PNG-Favicon mit echter Alpha-Transparenz. Ein eigenes Favicon aus den Dashboard-Einstellungen hat Vorrang.
 
 Persistenz:
 
