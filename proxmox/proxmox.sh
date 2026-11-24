@@ -5664,7 +5664,7 @@ if ! command -v jq >/dev/null 2>&1 || \
         xz-utils
 fi
 
-# V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.\n# Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.\n\nTOOLS_REF="47b54390ce9d97c3360cec99be462abf33c292d2"
+# V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.\n# Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.\n\nTOOLS_REF="378f411d6c00ad2bd02a5687a934244d031002e2"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
