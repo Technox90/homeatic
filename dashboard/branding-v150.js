@@ -20,23 +20,27 @@ function menuLogoV150(settings){
   let logo=document.getElementById('dashboardBrandLogoV150');
   if(!logo){
     logo=document.createElement('div');logo.id='dashboardBrandLogoV150';logo.className='brandLogoV150';
-    logo.innerHTML='<span id="dashboardBrandTextV150" class="brandLogoTextV150">LT-WBH</span>';
+    logo.innerHTML='<img id="dashboardBrandImageV150" class="brandLogoImageV150" src="/assets/logo-lt-wbh.png" alt="LT-WBH"><span id="dashboardBrandTextV150" class="brandLogoTextV150">LT-WBH</span>';
     head.prepend(logo);
   }
   const text=String(settings.logo_text||'LT-WBH').trim()||'LT-WBH';
   const style=['neon','orbit','pulse','minimal'].includes(String(settings.logo_style||'').toLowerCase())?String(settings.logo_style).toLowerCase():'neon';
   logo.dataset.style=style;
+  const useAsset=text.toUpperCase()==='LT-WBH';
+  logo.classList.toggle('assetLogoV150',useAsset);
+  const img=document.getElementById('dashboardBrandImageV150');
+  if(img){img.src='/assets/logo-lt-wbh.png?v=150';img.alt=useAsset?'LT-WBH':''}
   document.getElementById('dashboardBrandTextV150').textContent=text;
 }
 function faviconV150(settings){
-  if(settings.favicon_url)return;
   const text=String(settings.logo_text||'LT-WBH').trim().toUpperCase();
   if(text==='LT-WBH'){
     const link=ensureFaviconLink();
     link.type='image/png';
-    link.href='/assets/favicon-lt-wbh.png';
+    link.href='/assets/favicon-lt-wbh.png?v=150';
     return;
   }
+  if(settings.favicon_url)return;
   const c=document.createElement('canvas');c.width=64;c.height=64;
   const x=c.getContext('2d');if(!x)return;
   x.clearRect(0,0,64,64);
@@ -49,7 +53,16 @@ function faviconV150(settings){
   x.shadowBlur=7;x.fillStyle='#eef5ff';x.font='900 18px system-ui';x.textAlign='center';x.textBaseline='middle';x.fillText(brandCompactV150(settings.logo_text),32,33);
   const link=ensureFaviconLink();link.type='image/png';link.href=c.toDataURL('image/png');
 }
-function applyBrandingV150(settings){settings=settings||{};menuLogoV150(settings);faviconV150(settings);fixedToolbarV150()}
+function applyBrandingV150(settings){
+  settings=settings||{};
+  const website=String(settings.website_name||'Dashboard LT-WBH').trim()||'Dashboard LT-WBH';
+  document.title=website;
+  const h1=document.getElementById('websiteTitle')||document.querySelector('.top .brand h1')||document.querySelector('.brand h1');
+  if(h1){h1.id='websiteTitle';h1.textContent=website}
+  menuLogoV150(settings);
+  faviconV150(settings);
+  fixedToolbarV150();
+}
 if(typeof applyUiSettings==='function'){const oldApplyUiV150=applyUiSettings;applyUiSettings=function(s){const r=oldApplyUiV150(s);applyBrandingV150(s);return r}}
 if(typeof setUpsTopState==='function'){const oldUpsV150=setUpsTopState;setUpsTopState=function(d){const r=oldUpsV150(d),t=document.getElementById('upsTopStateText');if(t&&d&&d.ok&&d.reachable&&String(d.power_source||'').toLowerCase()==='mains')t.textContent='USV Online';fixedToolbarV150();return r}}
 setTimeout(async function(){fixedToolbarV150();try{applyBrandingV150(await getJSON('/api/ui-settings'))}catch(e){applyBrandingV150({logo_text:'LT-WBH',logo_style:'neon'})}},0);
