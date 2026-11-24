@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V151 · 24.11.2026**
+**Installationskandidat: V152 · 24.11.2026**
 
 ### Neu in V152
 
