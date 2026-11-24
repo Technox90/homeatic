@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V152**
+**Dashboard-Stand: V153**
 
 Dateien:
 
@@ -16,6 +16,18 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## Toolbar V153
+
+Die feste obere Leiste ist in drei Bereiche geteilt:
+
+```text
+links:  ☰ + Logo
+mitte:  LIVE + USV Online
+rechts: Neustart + Herunterfahren
+```
+
+Der kombinierte Hamburger-/Logo-Button ersetzt den früheren separaten Menübutton und öffnet bzw. schließt das Seitenmenü. Das Seitenmenü selbst besitzt keinen zusätzlichen sichtbaren Kopf oder X-Button mehr.
 
 ## Update-Modus V152
 
