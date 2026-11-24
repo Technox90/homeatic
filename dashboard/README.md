@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V153**
+**Dashboard-Stand: V154**
 
 Dateien:
 
@@ -16,6 +16,10 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## Feinschliff V154
+
+Der kombinierte Hamburger-/Logo-Toggle bleibt links angeordnet, wird aber optisch freier dargestellt: größeres Logo, kein sichtbarer Rahmen und transparenter Grundzustand. Die komplette Klickfläche bleibt erhalten.
 
 ## Toolbar V153
 
