@@ -13,6 +13,9 @@ Verfolgung der Änderungen
 - Ohne eigenes Upload-Favicon wird clientseitig ein PNG-Favicon mit echtem transparentem Alpha-Hintergrund erzeugt; ein eigenes hochgeladenes Favicon hat Vorrang.
 - Branding wird persistent in `/etc/pve-sensor-dashboard/ui.json` gespeichert und bei späteren Farb-/HTTPS-/Favicon-Änderungen erhalten.
 - Neue modulare Assets: `dashboard/branding-v150.css` und `dashboard/branding-v150.js`.
+- Persönliche LT-WBH-Bilddateien fest im Repository ergänzt: `dashboard/assets/logo-lt-wbh.png` und `dashboard/assets/favicon-lt-wbh.png`.
+- Beide Dateien sind PNG mit echtem Alpha-Kanal/Transparenz und werden vom Installer geprüft und nach `/opt/nodezero/dashboard/static/assets/` installiert.
+- Bei `logo_text=LT-WBH` nutzt das Seitenmenü das feste PNG-Logo und der Browser das feste PNG-Favicon; andere Branding-Namen nutzen weiterhin das dynamische Design.
 - Dashboard-Modul und Master-Installer verwenden unveränderliche Commit-Pins; CI prüft V150-Marker, Modul-Pin und Branding-Assets.
 
 24.11.2026 – Uptime-Kuma-TLS erfolgreich erweitert
