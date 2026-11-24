@@ -324,7 +324,7 @@ dashboard/assets/logo-lt-wbh.png
 dashboard/assets/favicon-lt-wbh.png
 ```
 
-Für `LT-WBH` werden die echten PNG-Dateien verwendet. Beide besitzen echte Alpha-Transparenz. Für andere Installationen bleiben Logo-Text und Design auswählbar; ein eigenes hochgeladenes Favicon hat Vorrang.
+Für `LT-WBH` werden die echten PNG-Dateien verwendet. Beide besitzen echte Alpha-Transparenz. Das Seitenmenü zeigt jedoch bewusst keinen großen Badge, sondern einen schmalen Wordmark-Schriftzug mit dem gewählten Logo-Text (bei Tobias: `LT-WBH`). Das große PNG bleibt als Branding-/Asset-Datei erhalten und das feste PNG-Favicon wird im Browser verwendet. Für andere Installationen bleiben Logo-Text und Design auswählbar; ein eigenes hochgeladenes Favicon hat Vorrang.
 
 ## Uptime Kuma URL · V149
 
