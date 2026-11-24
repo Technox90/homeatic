@@ -120,6 +120,70 @@ apt install -y python3-certbot-nginx
 
 Danach denselben Certbot-Befehl erneut ausführen.
 
+## Aktueller Status 24.11.2026 · Uptime-Kuma-TLS
+
+Das Zertifikatsproblem für `https://up.ltwbh.de` ist behoben.
+
+Installiert wurde auf dem Proxmox-Host:
+
+```bash
+apt install -y python3-certbot-nginx
+```
+
+Danach wurde das bestehende Zertifikat `ltwbh-services` erfolgreich erweitert. Certbot meldete:
+
+```text
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/ltwbh-services/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/ltwbh-services/privkey.pem
+This certificate expires on 2027-02-22.
+```
+
+Aktueller SAN-Stand:
+
+- `dash.ltwbh.de`
+- `ha.ltwbh.de`
+- `paper.ltwbh.de`
+- `pdf.ltwbh.de`
+- `up.ltwbh.de`
+- `vault.ltwbh.de`
+
+`nginx -t` war erfolgreich und nginx wurde neu geladen.
+
+Damit ist der frühere Fehler
+
+```text
+SSL: no alternative certificate subject name matches target hostname 'up.ltwbh.de'
+```
+
+behoben.
+
+Uptime-Kuma-Backend laut bestehender Installation:
+
+```text
+Proxmox/nginx 192.168.178.100:443
+  -> CT 105 192.168.178.105:443
+  -> Uptime Kuma 127.0.0.1:3001 im CT
+```
+
+Der nächste Prüfschritt betrifft nur noch Reverse Proxy / Backend-Antwort, falls der externe curl-Aufruf nicht sauber mit einem HTTP-Status endet.
+
+Diagnose:
+
+```bash
+curl -vk --connect-timeout 5 --max-time 15 https://up.ltwbh.de/
+
+curl -kI --connect-timeout 5 --max-time 15 https://192.168.178.105/
+
+pct exec 105 -- bash -lc '
+  echo "=== Listener ==="
+  ss -lntp | grep -E ":(443|3001)\\b" || true
+  echo
+  echo "=== Kuma lokal ==="
+  curl -sS -I --connect-timeout 3 --max-time 10 http://127.0.0.1:3001/ || true
+'
+```
+
 ## External-URL-Tool / wichtiger Migrationshinweis
 
 Das aktuelle Repository-Tool `nodezero-external-urls` verwendet als eigenen Zertifikatsnamen:
