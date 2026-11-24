@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V147
+# PROXMOX MODULARER KOMPLETT-INSTALLER V148
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -61,6 +61,7 @@ set -Eeuo pipefail
 #   V144: Installer-Artefakte konsistent unter /home: downloads, backups, diagnose; aktive Secrets bleiben unter /root/passwort
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
+#   V148: Stirling PDF verwendet offiziellen GHCR-Pfad; bestehende Compose-Installationen werden beim Updater sicher migriert
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
 #   V99: Paperless NAS-Eingangsordner standardmäßig /volume1/Rechnungen/inbox
 #   V101: O = Optimale Installation · kompletter Guest-Reset + fester Optimal-Stack unattended; nur NAS interaktiv
@@ -994,8 +995,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V147"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V147"
+TUI_TITLE="PROXMOX INSTALLER V148"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V148"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1398,7 +1399,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 147" \
+                    --title "HAUPTMENÜ · Version 148" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -5796,7 +5797,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="47ef534c0afa1d63e5d869c9d7bc1a54c0d65726"
+TOOLS_REF="282d0dbf07999132faf60516e41cad716529b210"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -7720,7 +7721,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V147",
+    "installer_version": "V148",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8194,7 +8195,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V147 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V148 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -14237,7 +14238,7 @@ install_stirling_pdf() {
     cat > /tmp/stirling-compose.yml <<EOF
 services:
   stirling-pdf:
-    image: docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest
+    image: ghcr.io/stirling-tools/stirling-pdf:latest
     container_name: stirling-pdf
     restart: unless-stopped
     ports:
