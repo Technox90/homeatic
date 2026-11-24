@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V158 · 24.11.2026**
+**Installationskandidat: V159 · 24.11.2026**
 
 ## Installation
 
@@ -305,6 +305,13 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V159
+
+- Dauerhafte Namen für Branding-CSS-Klassen, HTML-IDs und JavaScript-Funktionen statt Versionssuffixen.
+- Desktop-Logo bis 350 × 60 px, responsive Skalierung auf kleineren Bildschirmen.
+- Mobile Neustart- und Herunterfahren-Schaltflächen mit Icons und barrierefreien Beschriftungen; Sicherheitsabfragen bleiben erhalten.
+- Installer und Auto-Updater migrieren das Branding; alte interne Kompatibilitätsmarker bleiben erhalten.
+
 ### V158
 
 - Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
@@ -337,13 +344,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 - Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
 - Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
 - Wildcard-DNS bleibt unverändert.
-
-### V154
-
-- Logo im linken kombinierten Menü-Toggle vergrößert.
-- Kein sichtbarer Rahmen mehr.
-- Kein permanenter Button-Hintergrund mehr.
-- Klickfläche und Menü-Toggle bleiben unverändert funktionsfähig.
-- Responsive Größen ebenfalls angepasst.
 
 **[Vollständige Versionshistorie](HISTORY.md)**
