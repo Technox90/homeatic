@@ -140,7 +140,7 @@ def dashboard_update(master,download):
     runtime=download("dashboard/views/runtime.js")
     if b"nz-view-badge" not in runtime or b'createElement("span")' not in runtime or b"badge.remove()" not in runtime:
         raise ValueError("Theme-Runtime ungültig")
-    for target in (DASH/"nodezero-views/runtime.js",pathlib.Path("/home/downloads/nodezero/dashboard-views/v1/runtime.js")):
+    for target in (DASH/"nodezero-views/runtime.js",pathlib.Path("/home/downloads/nodezero/dashboard-views/v1/runtime.js"),pathlib.Path("/home/downloads/nodezero/dashboard-views/v2/runtime.js")):
         if target.is_file(): pairs.append((target,runtime))
     if replace_files(pairs,"dashboard"):
         report("UPDATED","Dashboard: verwaltete Toolbar und Installer-Updateanzeige")
