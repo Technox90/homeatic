@@ -58,7 +58,7 @@ jobs:
 
       - name: Paperless direct NFS checks
         run: |
-          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V150' proxmox/proxmox.sh
+          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V151' proxmox/proxmox.sh
           grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
           grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
           grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
@@ -102,30 +102,90 @@ jobs:
           grep -q '"/root/diagnose:$DIAGNOSE_ROOT"' proxmox/proxmox.sh
           grep -q '"/root/downloads:$NODEZERO_DOWNLOAD_DIR"' proxmox/proxmox.sh
 
-      - name: V150 Dashboard branding checks
+      - name: V151 generic dashboard branding and image protection
         run: |
-          grep -q '^prepare_dashboard_branding_v150() {' proxmox/modules/dashboard.sh
-          grep -q '^install_dashboard_branding_v150() {' proxmox/modules/dashboard.sh
-          grep -q 'prepare_dashboard_branding_v150' proxmox/proxmox.sh
-          grep -q 'install_dashboard_branding_v150' proxmox/proxmox.sh
-          grep -q 'Dashboard LT-WBH' proxmox/modules/dashboard.sh
-          grep -q 'USV Online' dashboard/branding-v150.js
-          grep -q "toDataURL('image/png')" dashboard/branding-v150.js
-          grep -q 'dashboardFixedToolbarV150' dashboard/branding-v150.css
-          grep -Fq "document.querySelector('.top .brand h1')" dashboard/branding-v150.js
-          grep -Fq "logo-lt-wbh.png?v=150" dashboard/branding-v150.js
-          grep -Fq "favicon-lt-wbh.png?v=150" dashboard/branding-v150.js
-          grep -Fq 'V150_FIXED_NAV_OFFSET' dashboard/branding-v150.css
-          grep -q 'PVE_DASHBOARD_BRANDING_V150' proxmox/modules/dashboard.sh
-          test -s dashboard/assets/logo-lt-wbh.png
-          test -s dashboard/assets/favicon-lt-wbh.png
+          grep -q '^prepare_dashboard_branding_v151() {' proxmox/modules/dashboard.sh
+          grep -q '^install_dashboard_branding_v151() {' proxmox/modules/dashboard.sh
+          grep -q 'prepare_dashboard_branding_v151' proxmox/proxmox.sh
+          grep -q 'install_dashboard_branding_v151' proxmox/proxmox.sh
+          grep -q 'Dashboard-Update: logo.png/favicon.png werden NICHT verändert' proxmox/modules/dashboard.sh
+          grep -q 'DASHBOARD_BRANDING_NEW_V151' proxmox/modules/dashboard.sh
+          grep -q '/opt/nodezero/dashboard/static/assets/logo.png' proxmox/modules/dashboard.sh
+          grep -q '/opt/nodezero/dashboard/static/assets/favicon.png' proxmox/modules/dashboard.sh
+          grep -q 'NodeZero Dashboard Branding V151' dashboard/branding-v151.js
+          grep -q 'NodeZero Dashboard Branding V151' dashboard/branding-v151.css
+          grep -q '/assets/logo.png' dashboard/branding-v151.js
+          grep -q '/assets/favicon.png' dashboard/branding-v151.js
+          grep -q 'dashboardFixedToolbarV151' dashboard/branding-v151.css
+          grep -q 'PVE_DASHBOARD_BRANDING_V151' proxmox/modules/dashboard.sh
+
+          test -s dashboard/assets/logo.png
+          test -s dashboard/assets/favicon.png
+
+          test ! -e dashboard/assets/logo-lt-wbh.png
+          test ! -e dashboard/assets/favicon-lt-wbh.png
+          test ! -e dashboard/branding-v150.js
+          test ! -e dashboard/branding-v150.css
+
           python3 - <<'PY'
           from pathlib import Path
-          for name in ("dashboard/assets/logo-lt-wbh.png","dashboard/assets/favicon-lt-wbh.png"):
-              data=Path(name).read_bytes()
-              assert data[:8] == b"\x89PNG\r\n\x1a\n", name
+          import struct
+          import zlib
+
+          def assert_transparent_blank(path):
+              data=Path(path).read_bytes()
+              assert data[:8] == b"\x89PNG\r\n\x1a\n", path
               color_type=data[25]
-              assert color_type in (4,6) or b"tRNS" in data, f"{name} has no alpha transparency"
+              assert color_type in (4,6) or b"tRNS" in data, f"{path}: no alpha transparency"
+
+              pos=8
+              idat=b""
+              width=height=None
+              bit_depth=None
+              while pos < len(data):
+                  length=struct.unpack(">I",data[pos:pos+4])[0]
+                  kind=data[pos+4:pos+8]
+                  body=data[pos+8:pos+8+length]
+                  if kind==b"IHDR":
+                      width,height,bit_depth,color_type,_,_,_=struct.unpack(">IIBBBBB",body)
+                  elif kind==b"IDAT":
+                      idat += body
+                  pos += 12+length
+
+              assert bit_depth == 8 and color_type == 6, f"{path}: expected RGBA8 placeholder"
+              raw=zlib.decompress(idat)
+              stride=width*4
+              prev=bytearray(stride)
+              offset=0
+              for _ in range(height):
+                  ft=raw[offset]; offset+=1
+                  row=bytearray(raw[offset:offset+stride]); offset+=stride
+                  bpp=4
+                  for i in range(stride):
+                      a=row[i-bpp] if i>=bpp else 0
+                      b=prev[i]
+                      cc=prev[i-bpp] if i>=bpp else 0
+                      if ft==1: row[i]=(row[i]+a)&255
+                      elif ft==2: row[i]=(row[i]+b)&255
+                      elif ft==3: row[i]=(row[i]+((a+b)//2))&255
+                      elif ft==4:
+                          p=a+b-cc
+                          pa=abs(p-a); pb=abs(p-b); pc=abs(p-cc)
+                          pr=a if pa<=pb and pa<=pc else (b if pb<=pc else cc)
+                          row[i]=(row[i]+pr)&255
+                      elif ft!=0:
+                          raise AssertionError(f"{path}: unsupported PNG filter {ft}")
+                  assert all(row[i] == 0 for i in range(3,stride,4)), f"{path}: placeholder is not fully transparent"
+                  prev=row
+
+          assert_transparent_blank("dashboard/assets/logo.png")
+          assert_transparent_blank("dashboard/assets/favicon.png")
+
+          module=Path("proxmox/modules/dashboard.sh").read_text(encoding="utf-8")
+          assert 'if (( DASHBOARD_BRANDING_NEW_V151 )); then' in module
+          assert 'install -m 0644 -o root -g root "$cache/logo.png" "$logo_target"' in module
+          assert 'install -m 0644 -o root -g root "$cache/favicon.png" "$favicon_target"' in module
+          assert 'data["favicon_url"] = ""' not in module
           PY
 
       - name: V149 Uptime Kuma external URL default
@@ -150,7 +210,7 @@ jobs:
 
       - name: V147 installer self-update checks
         run: |
-          grep -q '^# PROXMOX MODULARER KOMPLETT-INSTALLER V150$' proxmox/proxmox.sh
+          grep -q '^# PROXMOX MODULARER KOMPLETT-INSTALLER V151$' proxmox/proxmox.sh
           grep -q '^nodezero_self_update_v147() {' proxmox/proxmox.sh
           grep -q 'raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh' proxmox/proxmox.sh
           grep -q 'bash -n "$tmp"' proxmox/proxmox.sh
@@ -163,7 +223,7 @@ jobs:
           text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
           update_fn = text.index("nodezero_self_update_v147() {")
           update_call = text.index('nodezero_self_update_v147 "$@"')
-          menu = text.index('TUI_TITLE="PROXMOX INSTALLER V150"')
+          menu = text.index('TUI_TITLE="PROXMOX INSTALLER V151"')
           assert update_fn < update_call < menu
           assert text.count("nodezero_self_update_v147() {") == 1
           assert text.count('nodezero_self_update_v147 "$@"') == 1
@@ -205,7 +265,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="15ea65f95bcdec977975c02e297e655720d5582e"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="aaacc4f03689e166a5b2e3482bd1ae78b3446b96"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
