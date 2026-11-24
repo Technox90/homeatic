@@ -11170,7 +11170,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="aabdeda7f6ae610b6e8d9843f8e9a6c2e2ca1926"
+NODEZERO_MODULE_REF="5d7b9475a5aa46826cbc58c272f4ec4642e3c19b"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
