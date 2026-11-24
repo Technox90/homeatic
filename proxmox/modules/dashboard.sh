@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V153
+# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V154
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
@@ -367,7 +367,7 @@ dashboard_has_current_state_v152() {
         grep -Fq "$marker" "$index" || return 1
     done
 
-    grep -Eq 'PVE_DASHBOARD_BRANDING_V(151|153)' "$index" || return 1
+    grep -Eq 'PVE_DASHBOARD_BRANDING_V(151|153|154)' "$index" || return 1
 
     grep -Fq '"theme_bg"' "$app" || return 1
     grep -Fq 'PVE_UPS_SETTINGS_V2' "$app" || return 1
@@ -23193,10 +23193,10 @@ PYV151READ
     info "Fallback-Logo-Text: ${DASHBOARD_INSTALL_LOGO_TEXT_V151}"
 }
 
-install_dashboard_branding_v153() {
-    header "DASHBOARD · TOOLBAR / BRANDING V153"
+install_dashboard_branding_v154() {
+    header "DASHBOARD · TOOLBAR / BRANDING V154"
 
-    local ref="842b0e1c91f3706fa3c04bc6c21e200c8b96ab1c"
+    local ref="e0dd2ba30d01fc99133d78a8537d0810e8b1edf3"
     local index="/opt/nodezero/dashboard/static/index.html"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"
@@ -23205,8 +23205,8 @@ install_dashboard_branding_v153() {
     local legacy_favicon="${asset_dir}/favicon-lt-wbh.png"
     local settings="/etc/pve-sensor-dashboard/ui.json"
     local helper="/usr/local/sbin/pve-dashboard-settings-helper"
-    local cache="/home/downloads/nodezero/dashboard-branding/v153"
-    local backup="/home/backups/pve-dashboard-branding-v153-$(date +%Y%m%d-%H%M%S)"
+    local cache="/home/downloads/nodezero/dashboard-branding/v154"
+    local backup="/home/backups/pve-dashboard-branding-v154-$(date +%Y%m%d-%H%M%S)"
     local website_name="${DASHBOARD_INSTALL_NAME_V151:-PVE Hardware Monitor}"
     local logo_text="${DASHBOARD_INSTALL_LOGO_TEXT_V151:-NODEZERO}"
     local logo_style="${DASHBOARD_INSTALL_LOGO_STYLE_V151:-neon}"
@@ -23228,18 +23228,18 @@ install_dashboard_branding_v153() {
     fi
 
     curl -fsSL \
-        "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v153.css" \
-        -o "$cache/branding-v153.css"
+        "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v154.css" \
+        -o "$cache/branding-v154.css"
 
     curl -fsSL \
-        "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v153.js" \
-        -o "$cache/branding-v153.js"
+        "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v154.js" \
+        -o "$cache/branding-v154.js"
 
-    grep -Fq 'NodeZero Dashboard Toolbar V153' "$cache/branding-v153.css" ||
-        die "Branding CSS V153 ungültig."
+    grep -Fq 'NodeZero Dashboard Toolbar V154' "$cache/branding-v154.css" ||
+        die "Branding CSS V154 ungültig."
 
-    grep -Fq 'NodeZero Dashboard Toolbar V153' "$cache/branding-v153.js" ||
-        die "Branding JavaScript V153 ungültig."
+    grep -Fq 'NodeZero Dashboard Toolbar V154' "$cache/branding-v154.js" ||
+        die "Branding JavaScript V154 ungültig."
 
     if (( DASHBOARD_BRANDING_NEW_V151 )); then
         if [[ ! -e "$logo_target" ]]; then
@@ -23272,7 +23272,7 @@ install_dashboard_branding_v153() {
     WEBSITE_NAME="$website_name" \
     LOGO_TEXT="$logo_text" \
     LOGO_STYLE="$logo_style" \
-    python3 - "$settings" "$helper" "$index" "$cache/branding-v153.css" "$cache/branding-v153.js" <<'PYV153'
+    python3 - "$settings" "$helper" "$index" "$cache/branding-v154.css" "$cache/branding-v154.js" <<'PYV154'
 from pathlib import Path
 import json
 import os
@@ -23356,23 +23356,23 @@ css = css_path.read_text(encoding="utf-8")
 js = js_path.read_text(encoding="utf-8")
 
 html = re.sub(
-    r'/\* PVE_DASHBOARD_BRANDING_V(?:150|151|153)_BEGIN \*/.*?'
-    r'/\* PVE_DASHBOARD_BRANDING_V(?:150|151|153)_END \*/\n?',
+    r'/\* PVE_DASHBOARD_BRANDING_V(?:150|151|153|154)_BEGIN \*/.*?'
+    r'/\* PVE_DASHBOARD_BRANDING_V(?:150|151|153|154)_END \*/\n?',
     '',
     html,
     flags=re.S,
 )
 
 css_block = (
-    "/* PVE_DASHBOARD_BRANDING_V153_BEGIN */\n"
+    "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */\n"
     + css
-    + "\n/* PVE_DASHBOARD_BRANDING_V153_END */"
+    + "\n/* PVE_DASHBOARD_BRANDING_V154_END */"
 )
 
 js_block = (
-    "/* PVE_DASHBOARD_BRANDING_V153_BEGIN */\n"
+    "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */\n"
     + js
-    + "\n/* PVE_DASHBOARD_BRANDING_V153_END */"
+    + "\n/* PVE_DASHBOARD_BRANDING_V154_END */"
 )
 
 style_end = html.find("</style>")
@@ -23389,16 +23389,16 @@ html = html[:script_end] + js_block + "\n" + html[script_end:]
 index_path.write_text(html, encoding="utf-8")
 
 for marker in (
-    "PVE_DASHBOARD_BRANDING_V153",
-    "dashboardFixedToolbarV153",
-    "brandMenuToggleV153",
+    "PVE_DASHBOARD_BRANDING_V154",
+    "dashboardFixedToolbarV154",
+    "brandMenuToggleV154",
     "/assets/logo.png",
     "/assets/favicon.png",
     "USV Online",
 ):
     if marker not in html:
         raise SystemExit("FEHLER: Branding-Marker fehlt: " + marker)
-PYV153
+PYV154
 
     chown root:root "$index" "$helper"
     chmod 644 "$index"
@@ -23421,7 +23421,7 @@ PYV153
     nginx -t
     systemctl reload nginx
 
-    ok "Dashboard Toolbar/Branding V153 aktiv: $website_name"
+    ok "Dashboard Toolbar/Branding V154 aktiv: $website_name"
     info "Toolbar: links ☰+Logo · mittig LIVE/USV · rechts Neustart/Herunterfahren"
     info "Eigene Bilder: $logo_target und $favicon_target"
     info "Updates überschreiben diese beiden Dateien niemals."
@@ -23465,7 +23465,7 @@ validate_dashboard_final_state_v69() {
         'id="settingsHubTabPihole"'
         'PVE_PIHOLE_MENU_ISOLATION_V80'
         'PVE_SETTINGS_PANELS_HOST_V81'
-        'PVE_DASHBOARD_BRANDING_V153'
+        'PVE_DASHBOARD_BRANDING_V154'
     )
 
     for marker in "${index_markers[@]}"; do
