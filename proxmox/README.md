@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V156 · 24.11.2026**
+**Installationskandidat: V157 · 24.11.2026**
 
 ## Installation
 
@@ -305,6 +305,14 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V157
+
+- Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
+- Doppelte Einbindung der Installer-Updateanzeige wird entfernt; bestehende Logos, Favicons und Einstellungen bleiben erhalten.
+- Sichtbare Theme-Namen entfallen in allen fünf Ansichten; Animationen und Auswahl bleiben erhalten.
+- Auto-Updater repariert auch bestehende falsch platzierte Branding-Blöcke; Theme-Cache wird erneuert.
+- Regressionstest für externe Script-Tags und wiederholbare Dashboard-Aktualisierung.
+
 ### V156
 
 - Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
@@ -342,14 +350,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 - Der alte separate „Menü“-Button und der sichtbare Seitenmenü-Kopf entfallen.
 - Das Logo bleibt in der festen Toolbar immer sichtbar.
 - Bestehende `logo.png` / `favicon.png` bleiben weiterhin updategeschützt.
-
-### V152
-
-- Aktuelle Dashboard-Installationen werden **in-place** aktualisiert.
-- `app.py`, `index.html` und `collector.py` werden bei einem aktuellen Dashboard nicht mehr durch die alte V139-Basis ersetzt.
-- Historische Migrationsschritte V42–V81 werden bei einem bereits vollständigen aktuellen Dashboard übersprungen.
-- Alte/unvollständige Installationen werden automatisch erkannt und erhalten einmalig den Kompatibilitäts-Bootstrap.
-- Reset/Neuaufbau nutzt weiterhin den vollständigen Bootstrap.
-- Logo/Favicon bleiben unverändert geschützt.
 
 **[Vollständige Versionshistorie](HISTORY.md)**
