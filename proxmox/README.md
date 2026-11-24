@@ -6,6 +6,17 @@ Modularer Komplett-Installer für Proxmox VE.
 
 **Installationskandidat: V152 · 24.11.2026**
 
+### Neu in V153
+
+- Toolbar-Layout neu strukturiert.
+- Links: kombinierter Menübutton aus Hamburger + `logo.png` bzw. Text-Fallback.
+- Mitte: `LIVE` und `USV Online`.
+- Rechts: `Neustart` und `Herunterfahren`.
+- Der Logo-/Hamburger-Button öffnet und schließt das Seitenmenü.
+- Der alte separate „Menü“-Button und der sichtbare Seitenmenü-Kopf entfallen.
+- Das Logo bleibt in der festen Toolbar immer sichtbar.
+- Bestehende `logo.png` / `favicon.png` bleiben weiterhin updategeschützt.
+
 ### Neu in V152
 
 - Aktuelle Dashboard-Installationen werden **in-place** aktualisiert.
