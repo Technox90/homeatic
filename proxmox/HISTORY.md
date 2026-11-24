@@ -1,12 +1,24 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V153 · 24.11.2026**  
+> **Aktueller Stand: V154 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V154 · Größeres Logo / rahmenloser Menü-Toggle
+-------------------------------------------------------------------
+- Linkes Logo im kombinierten Hamburger-/Menü-Toggle vergrößert.
+- Desktop-Logo jetzt bis ca. 230 px Breite und 38 px Höhe.
+- Sichtbarer Button-Rahmen entfernt.
+- Permanenter Button-Hintergrund entfernt; Grundzustand transparent.
+- Nur ein sehr dezenter Hover-/Focus-Hintergrund bleibt zur Bedienrückmeldung.
+- Hamburger-Symbol leicht vergrößert.
+- Mobile/Tablet-Größen ebenfalls angepasst.
+- Klickfläche bleibt erhalten; Menü öffnen/schließen funktioniert weiterhin über Hamburger + Logo.
+- V151/V152-Schutz für logo.png und favicon.png bleibt unverändert bestehen.
 
 24.11.2026 – V153 · Toolbar mit Logo-Menü-Toggle
 --------------------------------------------------------
