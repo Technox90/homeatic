@@ -1336,6 +1336,126 @@ tui_vm_os_menu_v106() {
     esac
 }
 
+run_stress_test_v155() {
+    local minutes="" answer="" workers="" logfile=""
+    if (( TUI_AVAILABLE )); then
+        minutes="$(whiptail --title "CPU-STRESSTEST" --inputbox "Dauer in Minuten (1-120)" 10 65 10 3>&1 1>&2 2>&3)" || return 0
+    else
+        read -rp "Dauer in Minuten (1-120) [10]: " minutes || return 0
+        [[ -n "$minutes" ]] || minutes=10
+    fi
+    if [[ ! "$minutes" =~ ^[0-9]{1,3}$ ]] || (( 10#$minutes < 1 || 10#$minutes > 120 )); then
+        warn "Ungültige Dauer: 1 bis 120 Minuten."
+        return 0
+    fi
+    minutes=$((10#$minutes))
+    workers="$(nproc)"
+    if (( workers > 1 )); then workers=$((workers-1)); fi
+    echo "CPU-Stresstest: $minutes Minuten, $workers Worker, niedrige Prozesspriorität."
+    echo "Produktive VMs und LXC können langsamer werden. Abbruch mit Strg+C."
+    read -rp "Test starten? [j/N]: " answer || return 0
+    [[ "$answer" =~ ^[jJyY]$ ]] || return 0
+    if ! command -v stress-ng >/dev/null 2>&1; then
+        echo "Installiere stress-ng (kein Systemupgrade)."
+        apt-get install -y stress-ng || return 1
+    fi
+    install -d -m 0750 /home/diagnose/stresstest || return 1
+    logfile="$(mktemp /home/diagnose/stresstest/test$(date +%Y%m%d-%H%M%S)-XXXXXX.txt)" || return 1
+    python3 - "$minutes" "$workers" "$logfile" <<'PY_STRESS_V155'
+import datetime, glob, os, signal, subprocess, sys, time
+
+duration = int(sys.argv[1]) * 60
+workers = int(sys.argv[2])
+path = sys.argv[3]
+interrupted = False
+process = None
+def stop(signum, frame):
+    global interrupted
+    interrupted = True
+for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(sig, stop)
+
+def cpu():
+    with open("/proc/stat") as f:
+        v = list(map(int, f.readline().split()[1:9]))
+    return sum(v), v[3] + v[4]
+
+def memory():
+    with open("/proc/meminfo") as f:
+        m = {line.split(":")[0]: int(line.split()[1]) for line in f if ":" in line}
+    total = m["MemTotal"]
+    return 100 * (total-m["MemAvailable"])/total
+
+def temperature():
+    values = []
+    for name in glob.glob("/sys/class/hwmon/hwmon*/temp*_input"):
+        try:
+            with open(name) as f:
+                t = int(f.read()) / 1000
+            if 0 < t < 150:
+                values.append(t)
+        except (OSError, ValueError):
+            pass
+    return max(values, default=None)
+
+with open(path, "a", buffering=1) as log:
+    def emit(line):
+        print(line, flush=True)
+        print(line, file=log, flush=True)
+    emit(f"CPU-STRESSTEST | {datetime.datetime.now().isoformat(timespec='seconds')} | {os.uname().nodename}")
+    emit(f"Dauer: {duration}s | Worker: {workers} | Temperatur: Maximum verfügbarer hwmon-Sensoren")
+    start = time.monotonic()
+    peak_cpu = peak_ram = 0.0
+    peak_temp = None
+    count = 0
+    status = "FEHLER"
+    try:
+        previous = cpu()
+        process = subprocess.Popen(["nice", "-n", "15", "stress-ng", "--cpu", str(workers), "--timeout", f"{duration}s", "--metrics-brief"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        while not interrupted and process.poll() is None:
+            time.sleep(1)
+            elapsed = time.monotonic()-start
+            current = cpu()
+            delta = current[0]-previous[0]
+            usage = 100*(1-(current[1]-previous[1])/delta) if delta > 0 else 0
+            previous = current
+            ram = memory()
+            temp = temperature()
+            peak_cpu = max(peak_cpu, usage)
+            peak_ram = max(peak_ram, ram)
+            count += 1
+            if temp is not None:
+                peak_temp = max(peak_temp if peak_temp is not None else temp, temp)
+            temp_text = f"{temp:.1f} C" if temp is not None else "n/a"
+            bar = "#" * min(20, max(0, int(usage/5)))
+            emit(f"{datetime.datetime.now():%H:%M:%S} | {min(int(elapsed),duration):4d}/{duration}s | CPU [{bar:<20}] {usage:5.1f}% | RAM {ram:5.1f}% | Temp {temp_text} | Load {os.getloadavg()[0]:.2f}")
+            if temp is not None and temp >= 90:
+                status = "TEMPERATURABBRUCH"
+                break
+            if ram >= 95:
+                status = "RAM-SICHERHEITSABBRUCH"
+                break
+            if elapsed >= duration+5:
+                status = "ZEITLIMIT"
+                break
+        else:
+            status = "ABGEBROCHEN" if interrupted else ("OK" if process.returncode == 0 else "FEHLER")
+    finally:
+        if process is not None and process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+            except ProcessLookupError:
+                pass
+        emit(f"Ergebnis: {status} | Messwerte: {count} | CPU max: {peak_cpu:.1f}% | RAM max: {peak_ram:.1f}% | Temp max: {peak_temp if peak_temp is not None else 'n/a'}")
+        emit(f"Bericht: {path}")
+sys.exit(0 if status == "OK" else 1)
+PY_STRESS_V155
+}
+
 tui_maintenance_menu_v106() {
     local result=""
 
@@ -1357,13 +1477,14 @@ tui_maintenance_menu_v106() {
                 "15" "PVE Storage-Share-Helper" \
                 "17" "Setup-Profile · laden / verwalten" \
                 "19" "OpenRGB · Mainboard / RAM / USB-RGB" \
+                "22" "CPU-Stresstest · 1-120 Min / Live / Diagnose" \
                 3>&1 1>&2 2>&3
         )" || return 1
         printf '%s' "$result"
         return 0
     fi
 
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  Z Zurück\nAuswahl: '
+    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  22 CPU-Stresstest\n  Z Zurück\nAuswahl: '
     read -r result
     [[ "${result^^}" == "Z" ]] && return 1
     printf '%s' "$result"
@@ -8389,6 +8510,11 @@ while true; do
             exit 0
         fi
 
+        continue
+    fi
+
+    if [[ "$INSTALL_SELECTION" == "22" ]]; then
+        run_stress_test_v155 || warn "Stresstest beendet; Diagnosebericht prüfen."
         continue
     fi
 
