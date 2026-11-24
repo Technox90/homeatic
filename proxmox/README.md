@@ -6,59 +6,6 @@ Modularer Komplett-Installer für Proxmox VE.
 
 **Installationskandidat: V155 · 24.11.2026**
 
-### Neu in V155
-
-- Einheitliche Nummerierung der sieben Haupt-Untermenüs; interne IDs bleiben stabil.
-- Dashboard-Updates starten keine automatische Paperless-Migration mehr; vorhandene Paperless-, Kuma- und PVE-UPS-Container werden bei erneuter Installation übersprungen.
-- Neue Kuma-Installationen verwenden das LXC-Hostnetz mit Bindung an 127.0.0.1:3001; IPv6 setzt funktionierendes LXC-IPv6 voraus.
-- PVE-UPS erhält zusätzlich nicht vererbtes Sys.Audit auf /; PowerMgmt bleibt am Knoten.
-- Wartung → 10: CPU-, RAM- und dateibasierter Festplattentest, 1–120 Minuten, Temperaturgrenze 60–99 °C (Standard 95 °C), Live-Messung und Bericht unter `/home/diagnose/stresstest/`.
-- Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
-- Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
-- Wildcard-DNS bleibt unverändert.
-
-### Neu in V154
-
-- Logo im linken kombinierten Menü-Toggle vergrößert.
-- Kein sichtbarer Rahmen mehr.
-- Kein permanenter Button-Hintergrund mehr.
-- Klickfläche und Menü-Toggle bleiben unverändert funktionsfähig.
-- Responsive Größen ebenfalls angepasst.
-
-### Neu in V153
-
-- Toolbar-Layout neu strukturiert.
-- Links: kombinierter Menübutton aus Hamburger + `logo.png` bzw. Text-Fallback.
-- Mitte: `LIVE` und `USV Online`.
-- Rechts: `Neustart` und `Herunterfahren`.
-- Der Logo-/Hamburger-Button öffnet und schließt das Seitenmenü.
-- Der alte separate „Menü“-Button und der sichtbare Seitenmenü-Kopf entfallen.
-- Das Logo bleibt in der festen Toolbar immer sichtbar.
-- Bestehende `logo.png` / `favicon.png` bleiben weiterhin updategeschützt.
-
-### Neu in V152
-
-- Aktuelle Dashboard-Installationen werden **in-place** aktualisiert.
-- `app.py`, `index.html` und `collector.py` werden bei einem aktuellen Dashboard nicht mehr durch die alte V139-Basis ersetzt.
-- Historische Migrationsschritte V42–V81 werden bei einem bereits vollständigen aktuellen Dashboard übersprungen.
-- Alte/unvollständige Installationen werden automatisch erkannt und erhalten einmalig den Kompatibilitäts-Bootstrap.
-- Reset/Neuaufbau nutzt weiterhin den vollständigen Bootstrap.
-- Logo/Favicon bleiben unverändert geschützt.
-
-### Neu in V151
-
-- Dashboard-Branding vollständig generisch.
-- Persönliche LT-WBH-Logo-/Favicon-Dateien aus dem aktuellen Repository entfernt.
-- Neue neutrale Bildnamen:
-  - `dashboard/assets/logo.png`
-  - `dashboard/assets/favicon.png`
-- Beide Repository-Bilder sind vollständig transparente PNG-Platzhalter.
-- Bei einem **normalen Dashboard-Update werden Logo und Favicon niemals verändert**.
-- Erst-/Neuinstallationen legen die Platzhalter nur an, wenn die jeweilige Datei fehlt.
-- Bestehende ältere Branding-Dateien werden bei Bedarf nur byte-identisch auf die generischen Namen übernommen.
-- Dashboard-Name und Branding-Metadaten bleiben bei normalen Updates erhalten.
-- Die vollständige History steht separat in **[HISTORY.md](HISTORY.md)**.
-
 ## Installation
 
 Auf dem Proxmox-Host als `root`:
@@ -345,13 +292,70 @@ Die belastbare GitHub-Historie reicht aktuell bis V113 zurück. Für frühere Ve
 
 Bei jeder neuen Installer-Version müssen gemeinsam aktualisiert werden:
 
-1. `proxmox/proxmox.sh`
+1. `README.md` und `proxmox/proxmox.sh`
 2. `proxmox/README.md`
 3. `proxmox/HISTORY.md`
 4. `proxmox/history.txt`
 5. `proxmox/CHATGPT-HANDOFF.md`
 6. passende GitHub-CI-Tests
 
-Der **neueste Versionsstand steht immer oben**.
+In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuesten Versionen (neueste zuerst). Die vollständige Historie bleibt in HISTORY.md und history.txt erhalten.
 
 > **Achtung:** Optimal-, Reset- und Neuaufbau-Funktionen können bestehende VMs/LXC oder Dashboard-Daten löschen. Vor destruktiven Aktionen Backups prüfen.
+
+## Versionsverlauf – letzte 5 Versionen
+
+### V155
+
+- Einheitliche Nummerierung der sieben Haupt-Untermenüs; interne IDs bleiben stabil.
+- Dashboard-Updates starten keine automatische Paperless-Migration mehr; vorhandene Paperless-, Kuma- und PVE-UPS-Container werden bei erneuter Installation übersprungen.
+- Neue Kuma-Installationen verwenden das LXC-Hostnetz mit Bindung an 127.0.0.1:3001; IPv6 setzt funktionierendes LXC-IPv6 voraus.
+- PVE-UPS erhält zusätzlich nicht vererbtes Sys.Audit auf /; PowerMgmt bleibt am Knoten.
+- Wartung → 10: CPU-, RAM- und dateibasierter Festplattentest, 1–120 Minuten, Temperaturgrenze 60–99 °C (Standard 95 °C), Live-Messung und Bericht unter `/home/diagnose/stresstest/`.
+- Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
+- Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
+- Wildcard-DNS bleibt unverändert.
+
+### V154
+
+- Logo im linken kombinierten Menü-Toggle vergrößert.
+- Kein sichtbarer Rahmen mehr.
+- Kein permanenter Button-Hintergrund mehr.
+- Klickfläche und Menü-Toggle bleiben unverändert funktionsfähig.
+- Responsive Größen ebenfalls angepasst.
+
+### V153
+
+- Toolbar-Layout neu strukturiert.
+- Links: kombinierter Menübutton aus Hamburger + `logo.png` bzw. Text-Fallback.
+- Mitte: `LIVE` und `USV Online`.
+- Rechts: `Neustart` und `Herunterfahren`.
+- Der Logo-/Hamburger-Button öffnet und schließt das Seitenmenü.
+- Der alte separate „Menü“-Button und der sichtbare Seitenmenü-Kopf entfallen.
+- Das Logo bleibt in der festen Toolbar immer sichtbar.
+- Bestehende `logo.png` / `favicon.png` bleiben weiterhin updategeschützt.
+
+### V152
+
+- Aktuelle Dashboard-Installationen werden **in-place** aktualisiert.
+- `app.py`, `index.html` und `collector.py` werden bei einem aktuellen Dashboard nicht mehr durch die alte V139-Basis ersetzt.
+- Historische Migrationsschritte V42–V81 werden bei einem bereits vollständigen aktuellen Dashboard übersprungen.
+- Alte/unvollständige Installationen werden automatisch erkannt und erhalten einmalig den Kompatibilitäts-Bootstrap.
+- Reset/Neuaufbau nutzt weiterhin den vollständigen Bootstrap.
+- Logo/Favicon bleiben unverändert geschützt.
+
+### V151
+
+- Dashboard-Branding vollständig generisch.
+- Persönliche LT-WBH-Logo-/Favicon-Dateien aus dem aktuellen Repository entfernt.
+- Neue neutrale Bildnamen:
+  - `dashboard/assets/logo.png`
+  - `dashboard/assets/favicon.png`
+- Beide Repository-Bilder sind vollständig transparente PNG-Platzhalter.
+- Bei einem **normalen Dashboard-Update werden Logo und Favicon niemals verändert**.
+- Erst-/Neuinstallationen legen die Platzhalter nur an, wenn die jeweilige Datei fehlt.
+- Bestehende ältere Branding-Dateien werden bei Bedarf nur byte-identisch auf die generischen Namen übernommen.
+- Dashboard-Name und Branding-Metadaten bleiben bei normalen Updates erhalten.
+- Die vollständige History steht separat in **[HISTORY.md](HISTORY.md)**.
+
+**[Vollständige Versionshistorie](HISTORY.md)**
