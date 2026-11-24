@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V149**
+Installationskandidat: **V150**
 
 Geplante Hauptdatei:
 
@@ -212,7 +212,7 @@ ha.ltwbh.de        → Home Assistant
 paper.ltwbh.de     → Paperless
 vault.ltwbh.de     → Vaultwarden
 pdf.ltwbh.de       → Stirling PDF
-uptime.ltwbh.de    → Uptime Kuma
+up.ltwbh.de        → Uptime Kuma
 ```
 
 Die vorgeschlagenen Hostnamen und internen Backend-URLs können einzeln bearbeitet werden. Zusätzliche eigene Dienste lassen sich ergänzen. Sensible Admin-Oberflächen sind standardmäßig nicht für externen Zugriff ausgewählt.
@@ -288,6 +288,39 @@ Der bisherige Pfad `docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest` bl
 
 Bestehende NodeZero-Stirling-Container werden beim Auto-Updater einmalig migriert. Vor der Änderung wird die aktive Compose-Datei gesichert und anschließend mit `docker compose config -q` validiert. Bei einem Fehler wird automatisch das Backup wiederhergestellt.
 
+
+## Dashboard Branding · V150
+
+V150 erweitert das Dashboard um persistentes, frei wählbares Branding.
+
+Bei einer normalen Dashboard-Installation bzw. -Aktualisierung fragt der Installer nach:
+
+- Dashboard-Name, Standard für LT-WBH: `Dashboard LT-WBH`
+- Logo-Text, Standard: `LT-WBH`
+- Logo-Design: `Neon Hex`, `Orbit`, `Pulse` oder `Minimal`
+
+Im rückfragefreien Optimalmodus bleiben vorhandene Werte erhalten; bei einer Neuinstallation gelten die Standards.
+
+Die Bedienleiste bleibt dauerhaft oben sichtbar und behält die feste Reihenfolge:
+
+```text
+Menü · LIVE · USV Online · Neustart · Herunterfahren
+```
+
+Das ausgewählte Branding erscheint zusätzlich im Seitenmenü. Wenn kein eigenes Favicon hochgeladen wurde, erzeugt das Dashboard ein modernes PNG-Favicon auf transparentem Canvas mit echtem Alpha-Hintergrund. Ein bereits hochgeladenes eigenes Favicon hat immer Vorrang.
+
+Persistente Branding-Werte liegen zusammen mit den vorhandenen UI-Einstellungen in:
+
+```text
+/etc/pve-sensor-dashboard/ui.json
+```
+
+Modulare Frontend-Assets:
+
+```text
+dashboard/branding-v150.css
+dashboard/branding-v150.js
+```
 
 ## Uptime Kuma URL · V149
 
