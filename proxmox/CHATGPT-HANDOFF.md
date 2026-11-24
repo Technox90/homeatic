@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V150
+- Aktueller Installationskandidat: V151
 - External-URL-Tool: `proxmox/tools/nodezero-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -218,61 +218,77 @@ nodezero-external-urls --reapply
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
 
-## Dashboard · V150 umgesetzt
+## Dashboard · V151 generisch / Update-Schutz
 
-### Live-Test-Reparatur 24.11.2026
+V151 ersetzt das persönliche V150-Branding durch eine vollständig generische Lösung.
 
-Auf dem produktiven Dashboard wurde geprüft, dass die feste Toolbar und `USV Online` aktiv waren, während der sichtbare Titel noch `PVE Hardware Monitor` zeigte, das Menü-Branding fehlte und ein alter `/favicon-custom.png`-Pfad HTTP 404 verursachte.
-
-Der GitHub-Stand wurde daraufhin korrigiert:
-- Titel wird robust über `document.title` plus `.top .brand h1` gesetzt.
-- Seitenmenü beginnt unterhalb der festen Toolbar.
-- `dashboard/assets/logo-lt-wbh.png` ist jetzt der schmale grafische LT-WBH-PNG-Schriftzug.
-- LT-WBH nutzt das feste PNG-Favicon unabhängig von einem alten Custom-Favicon.
-- Beim LT-WBH-Installationslauf wird ein alter `favicon_url`-Eintrag geleert.
-
-
-
-Persönlicher Standard:
+### Serverpfade
 
 ```text
-Dashboard-Name: Dashboard LT-WBH
-Logo-Text:      LT-WBH
-Logo-Design:    Neon Hex
+/opt/nodezero/dashboard/static/assets/logo.png
+/opt/nodezero/dashboard/static/assets/favicon.png
 ```
 
-V150 fragt bei einer normalen Dashboard-Installation/-Aktualisierung nach Dashboard-Name, Logo-Text und Logo-Design. Verfügbare Designs: `neon`, `orbit`, `pulse`, `minimal`. Im Optimalmodus erfolgen keine Rückfragen; vorhandene Werte bzw. Standards bleiben erhalten.
+### Repository
 
-Die obere Bedienleiste ist fest/sticky und bleibt beim Scrollen sichtbar, in dieser Reihenfolge:
+```text
+dashboard/branding-v151.css
+dashboard/branding-v151.js
+dashboard/assets/logo.png
+dashboard/assets/favicon.png
+```
+
+Die beiden Repository-PNGs sind neutrale, vollständig transparente Platzhalter.
+
+### Harte Update-Regel
+
+Bei einem normalen Dashboard-Update dürfen `logo.png` und `favicon.png` niemals:
+
+- aus GitHub neu geladen,
+- überschrieben,
+- ersetzt,
+- gelöscht,
+- auf Standard zurückgesetzt werden.
+
+Nur CSS/JavaScript des Brandings wird aktualisiert.
+
+Erst-/Neuinstallationen legen die neutralen Platzhalter ausschließlich an, wenn die jeweilige Zieldatei fehlt.
+
+### Migration V150 → V151
+
+Falls auf einer bestehenden Installation noch Legacy-Dateien mit alten persönlichen Namen vorhanden sind und die generischen Dateien fehlen, werden die vorhandenen Bildbytes einmalig auf `logo.png` bzw. `favicon.png` kopiert. Es findet kein Bildaustausch statt.
+
+### Branding-Einstellungen
+
+Normales Update:
+- vorhandener Webseitenname bleibt erhalten,
+- vorhandener Logo-Text bleibt erhalten,
+- vorhandener Logo-Stil bleibt erhalten,
+- vorhandenes Custom-Favicon / `favicon_url` bleibt erhalten,
+- keine Branding-Rückfragen.
+
+Erst-/Neuinstallation:
+- Webseitenname wird abgefragt,
+- Fallback-Logo-Text wird abgefragt,
+- Fallback-Stil wird abgefragt.
+
+Generische Defaults:
+
+```text
+PVE Hardware Monitor
+NODEZERO
+neon
+```
+
+Ist `logo.png` leer/transparent oder nicht vorhanden, zeigt das Menü automatisch den Text-Fallback.
+
+Die obere Bedienleiste bleibt sticky:
 
 - Menü
 - LIVE
 - USV Online
 - Neustart
 - Herunterfahren
-
-Das Seitenmenü zeigt das Branding bewusst als schmaler Wordmark-Schriftzug (bei Tobias `LT-WBH`) statt als großes Badge. Der Schriftzug wird automatisch im Menükopf `#sideNav .navHead` eingefügt. Ohne eigenes hochgeladenes Favicon verwendet LT-WBH das feste PNG-Favicon mit echter Alpha-Transparenz. Ein eigenes Favicon aus den Dashboard-Einstellungen hat Vorrang.
-
-Persistenz:
-
-```text
-/etc/pve-sensor-dashboard/ui.json
-```
-
-Dort werden neben den bisherigen UI-Werten auch `website_name`, `logo_text` und `logo_style` erhalten.
-
-Modulare Assets:
-
-```text
-dashboard/branding-v150.css
-dashboard/branding-v150.js
-dashboard/assets/logo-lt-wbh.png
-dashboard/assets/favicon-lt-wbh.png
-```
-
-Für Tobias' Standard-Branding `LT-WBH` sind Logo und Favicon damit echte, versionierte PNG-Dateien im Repository. Beide haben echte Alpha-Transparenz. Der Installer lädt sie aus einem unveränderlichen Commit-Ref und installiert sie nach `/opt/nodezero/dashboard/static/assets/`.
-
-Bestehende Dashboard-Funktionen, Messdaten, Menü-Editor, Einstellungen, USV-, Pi-hole- und Layout-Funktionen bleiben erhalten.
 
 Dashboard-Ansichten:
 - Boot Sequence
@@ -282,7 +298,28 @@ Dashboard-Ansichten:
 - Status Control
 
 Tool:
-`/usr/local/sbin/nodezero-dashboard-views`
+
+```text
+/usr/local/sbin/nodezero-dashboard-views
+```
+
+### Dokumentation
+
+Aktuelle Bedien-/Installationsdokumentation:
+
+```text
+README.md
+proxmox/README.md
+```
+
+Vollständige nachvollziehbare History:
+
+```text
+proxmox/HISTORY.md
+proxmox/history.txt
+```
+
+Neue Versionen müssen immer oben dokumentiert werden.
 
 ## Grundregeln für weitere Änderungen
 
@@ -312,7 +349,8 @@ Wichtig:
 - Aktuelle Hauptdomain ist ltwbh.de.
 - Uptime Kuma soll extern über https://up.ltwbh.de erreichbar sein.
 - Das produktive Sammelzertifikat heißt derzeit ltwbh-services.
-- Dashboard V150 verwendet für diese Installation standardmäßig "Dashboard LT-WBH" und "LT-WBH"; Name, Logo-Text und Logo-Stil sind bei normaler Installation auswählbar.
+- Dashboard V151 ist generisch; eigene Bilder liegen nur lokal als logo.png/favicon.png und werden bei Updates niemals überschrieben.
+- Erst-/Neuinstallationen erhalten nur bei fehlenden Dateien neutrale transparente Platzhalter.
 - Die obere Leiste bleibt sticky: Menü · LIVE · USV Online · Neustart · Herunterfahren.
 
 Setze die Arbeit auf Basis des aktuellen GitHub-Stands fort.
