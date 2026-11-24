@@ -23078,7 +23078,7 @@ PY
 install_dashboard_branding_v150() {
     header "DASHBOARD · BRANDING / FESTE TOOLBAR"
 
-    local ref="b9af18eacfbec3723f42c12201c6529a398bd158"
+    local ref="0372af1b29614a37d2e0d8bdf46bd8c48985e22c"
     local index="/opt/nodezero/dashboard/static/index.html"
     local settings="/etc/pve-sensor-dashboard/ui.json"
     local helper="/usr/local/sbin/pve-dashboard-settings-helper"
