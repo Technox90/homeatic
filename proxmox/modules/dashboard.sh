@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V160
+# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V162
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
@@ -23196,7 +23196,7 @@ PYV151READ
 install_dashboard_branding_v154() {
     header "DASHBOARD · TOOLBAR / BRANDING"
 
-    local ref="a74c21de705338e649ad7f3f5f911790ce9620b0"
+    local ref="91ddb215fd515740068a565c939f78cbf8390288"
     local index="/opt/nodezero/dashboard/static/index.html"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"

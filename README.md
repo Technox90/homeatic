@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V160 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V162 · Proxmox Master Installer · 24.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -135,6 +135,18 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V162
+
+- Freigabestand mit allen V161-Funktionen: individuell konfigurierbare aktive/inaktive Browser-Tab-Titel und priorisierte Update-Hinweise.
+- Logo wird bei unveränderten Einstellungen während der laufenden USV-Statusabfragen nicht erneut geladen; bewusste Branding-Aktualisierung bleibt möglich.
+- V162 enthält die bisherigen Änderungen kumulativ; der bestehende automatische Update-Zeitplan und die Opt-in-Einstellungen bleiben unverändert.
+
+### V161
+
+- Browser-Tab-Anzeige in den Dashboard-Einstellungen getrennt für aktive und inaktive Tabs konfigurierbar.
+- Standard: aktiv nur Name; inaktiv Name → CPU/RAM → Leistungsaufnahme. Wechsel alle 5 Sekunden, Update-Hinweise alle 3 Sekunden.
+- Update-Hinweise haben optional Vorrang; Messwerte und Versionsstatus werden aus bestehenden Abfragen übernommen. Speicherung lokal pro Browser, ohne Änderungen an Logos oder Favicons.
+
 ### V160
 
 - Zusammenführung der parallelen V159-Änderungen: `randMenuLogo`, mittiger Titel, Logo bis 350 × 60 px sowie zugängliche mobile Power-Icons.
@@ -153,21 +165,5 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 - Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
 - Die lokale Installer-Version ersetzt dort den Hostnamen; die Versionsangabe wird aus dem vorhandenen Update-Status gelesen.
 - Copyright © Technox1990 mit GitHub-Link; bestehende Logos, Themes und Einstellungen bleiben unverändert.
-
-### V157
-
-- Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
-- Doppelte Einbindung der Installer-Updateanzeige wird entfernt; bestehende Logos, Favicons und Einstellungen bleiben erhalten.
-- Sichtbare Theme-Namen entfallen in allen fünf Ansichten; Animationen und Auswahl bleiben erhalten.
-- Auto-Updater repariert auch bestehende falsch platzierte Branding-Blöcke; Theme-Cache wird erneuert.
-- Regressionstest für externe Script-Tags und wiederholbare Dashboard-Aktualisierung.
-
-### V156
-
-- Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
-- Abruf aus veröffentlichtem `main`-Commit; Installer-Syntaxprüfung, keine Downgrades, Backups und atomarer Dateiaustausch.
-- Keine Neuinstallation, kein Reset, keine Änderung an nginx, Zertifikaten, Logos/Favicons oder Datenbanken. Dashboard-Backend-Migrationen bleiben manuell.
-- Update-Ergebnisse erscheinen im vorhandenen Auto-Updater-Bericht und in Pushover, sofern aktiviert.
-- Menü: Wartung → Auto-Updater → 5; dort die gewünschten Komponenten einschalten.
 
 **[Vollständige Versionshistorie](proxmox/HISTORY.md)**

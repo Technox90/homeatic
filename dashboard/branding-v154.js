@@ -1,6 +1,130 @@
 /* Legacy updater compatibility signature: NodeZero Dashboard Toolbar V154; brandMenuToggleV154 */
 (()=>{
 /* NodeZero Dashboard Toolbar */
+
+// Browser-tab preferences are local to this browser and origin, independent of server branding.
+const tabStorageKey='nodezero.browserTabSettings';
+const tabFields=[['name','Dashboard-Name'],['cpu','CPU-Auslastung'],['ram','RAM-Auslastung'],['power','Leistungsaufnahme (Watt)']];
+const tabDefaults={active:['name'],inactive:['name','cpu','ram','power'],interval:5,updateInterval:3,update:true};
+function normalizeTabSettings(raw){
+  raw=raw&&typeof raw==='object'?raw:{};
+  const result={};
+  for(const mode of ['active','inactive']){
+    const selected=Array.isArray(raw[mode])?tabFields.map(([key])=>key).filter(key=>raw[mode].includes(key)):tabDefaults[mode].slice();
+    result[mode]=selected.length?selected:['name'];
+  }
+  result.interval=[3,5,10,15,30].includes(raw.interval)?raw.interval:5;
+  result.updateInterval=[2,3,5,10].includes(raw.updateInterval)?raw.updateInterval:3;
+  result.update=raw.update!==false;
+  return result;
+}
+function readTabSettings(){
+  try{return normalizeTabSettings(JSON.parse(localStorage.getItem(tabStorageKey)))}catch(e){return normalizeTabSettings(null)}
+}
+let tabSettings=readTabSettings();
+let tabName=document.title||'PVE Hardware Monitor';
+let tabMetrics=null,tabMetricsTime=0,tabUpdate=null,tabUpdateTime=0;
+let tabIndex=0,tabMode='',tabTimer=null;
+function tabNumber(value,digits=0){
+  if(typeof value!=='number'||!Number.isFinite(value)||value<0)return null;
+  return value.toLocaleString('de-DE',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+}
+function buildTabFrames(mode,now=Date.now()){
+  if(tabSettings.update&&tabUpdate&&now-tabUpdateTime<3600000){
+    return ['Update verfügbar','Update V'+tabUpdate,tabName];
+  }
+  const selected=tabSettings[mode];
+  const frames=[];
+  if(selected.includes('name'))frames.push(tabName);
+  const d=tabMetrics&&now-tabMetricsTime<120000?tabMetrics:{};
+  const usage=[];
+  for(const [key,field,label] of [['cpu','cpu_percent','CPU'],['ram','ram_percent','RAM']]){
+    if(!selected.includes(key))continue;
+    const value=tabNumber(d[field]);
+    if(value!==null)usage.push(label+' '+value+' %');
+  }
+  if(usage.length)frames.push(usage.join(' | '));
+  if(selected.includes('power')){
+    for(const [field,label] of [['system_power_w',''],['cpu_power_w','CPU '],['gpu_power_w','GPU ']]){
+      const value=tabNumber(d[field],2);
+      if(value!==null){frames.push(label+value+' W');break}
+    }
+  }
+  return frames.length?frames:[tabName];
+}
+function refreshTabTitle(reset=false){
+  const visible=document.visibilityState==='visible';
+  const mode=tabSettings.update&&tabUpdate&&Date.now()-tabUpdateTime<3600000?'update':visible?'active':'inactive';
+  if(reset||mode!==tabMode){tabMode=mode;tabIndex=0}
+  const frames=buildTabFrames(visible?'active':'inactive');
+  document.title=frames[tabIndex%frames.length];
+}
+function restartTabRotation(){
+  if(tabTimer!==null)window.clearTimeout(tabTimer);
+  refreshTabTitle(true);
+  function tick(){
+    tabIndex++;
+    refreshTabTitle();
+    tabTimer=window.setTimeout(tick,(tabMode==='update'?tabSettings.updateInterval:tabSettings.interval)*1000);
+  }
+  tabTimer=window.setTimeout(tick,(tabMode==='update'?tabSettings.updateInterval:tabSettings.interval)*1000);
+}
+function setTabUpdateStatus(data){
+  const valid=Number.isSafeInteger(data?.remote)&&Number.isSafeInteger(data?.local)&&data.remote>data.local&&data.status==='available';
+  const next=valid?data.remote:null;
+  const checked=Date.parse(data?.checked||'');
+  const timestamp=Number.isFinite(checked)?Math.min(checked,Date.now()):0;
+  const changed=next!==tabUpdate;
+  tabUpdate=next;tabUpdateTime=timestamp;
+  if(changed)restartTabRotation();else refreshTabTitle();
+}
+if(typeof getJSON==='function'){
+  const originalGetJSON=getJSON;
+  getJSON=async function(url,...args){
+    const data=await originalGetJSON.call(this,url,...args);
+    if(typeof url==='string'&&url.split('?')[0]==='/api/current'&&data&&typeof data==='object'){
+      tabMetrics=data;tabMetricsTime=Date.now();refreshTabTitle();
+    }
+    return data;
+  };
+}
+function installTabSettings(){
+  if(document.getElementById('browserTabSettings'))return;
+  const anchor=document.getElementById('settingsSave')?.closest('.modalButtons');
+  if(!anchor)return;
+  const panel=document.createElement('section');
+  panel.id='browserTabSettings';
+  panel.className='browserTabSettings';
+  const checks=(mode,title)=>'<fieldset><legend>'+title+'</legend>'+tabFields.map(([key,label])=>'<label><input type="checkbox" data-tab-mode="'+mode+'" value="'+key+'"> '+label+'</label>').join('')+'</fieldset>';
+  const options=values=>values.map(v=>'<option value="'+v+'">'+v+' Sekunden</option>').join('');
+  panel.innerHTML='<h3>Browser-Tab-Anzeige</h3><p>Individuell für diesen Browser. CPU und RAM erscheinen gemeinsam, wenn beide ausgewählt sind.</p><div class="browserTabChoices">'+checks('active','Aktiver Tab')+checks('inactive','Inaktiver Tab')+'</div><label>Wechselintervall <select data-tab-setting="interval">'+options([3,5,10,15,30])+'</select></label><label><input type="checkbox" data-tab-setting="update"> Update-Hinweise priorisieren (auch im aktiven Tab)</label><label>Update-Wechselintervall <select data-tab-setting="updateInterval">'+options([2,3,5,10])+'</select></label><div class="browserTabActions"><button type="button" data-tab-reset>Standard wiederherstellen</button><span role="status" data-tab-message></span></div>';
+  anchor.before(panel);
+  function sync(){
+    panel.querySelectorAll('[data-tab-mode]').forEach(el=>{el.checked=tabSettings[el.dataset.tabMode].includes(el.value)});
+    panel.querySelectorAll('[data-tab-setting]').forEach(el=>{const v=tabSettings[el.dataset.tabSetting];if(el.type==='checkbox')el.checked=v;else el.value=String(v)});
+  }
+  function save(){
+    const msg=panel.querySelector('[data-tab-message]');
+    try{localStorage.setItem(tabStorageKey,JSON.stringify(tabSettings));msg.textContent='Gespeichert.'}
+    catch(e){msg.textContent='Nur für diese Sitzung gespeichert.'}
+    sync();restartTabRotation();
+  }
+  panel.addEventListener('change',()=>{
+    const next={...tabSettings};
+    for(const mode of ['active','inactive'])next[mode]=Array.from(panel.querySelectorAll('[data-tab-mode="'+mode+'"]:checked'),el=>el.value);
+    for(const key of ['interval','updateInterval'])next[key]=Number(panel.querySelector('[data-tab-setting="'+key+'"]').value);
+    next.update=panel.querySelector('[data-tab-setting="update"]').checked;
+    tabSettings=normalizeTabSettings(next);save();
+  });
+  panel.querySelector('[data-tab-reset]').addEventListener('click',()=>{tabSettings=normalizeTabSettings(null);save()});
+  window.addEventListener('storage',e=>{if(e.key===tabStorageKey||e.key===null){tabSettings=readTabSettings();sync();restartTabRotation()}});
+  sync();
+}
+document.addEventListener('visibilitychange',restartTabRotation);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installTabSettings,{once:true});
+else installTabSettings();
+restartTabRotation();
+
 function brandImageHasVisiblePixels(img){
   try{
     const max=64;
@@ -33,9 +157,12 @@ function toggleBrandMenu(){
   }
 }
 
-function configureBrandMenu(button,settings){
+const brandMenuConfigured=new WeakMap();
+function configureBrandMenu(button,settings,force=false){
   if(!button)return;
   const text=String(settings?.logo_text||'NODEZERO').trim()||'NODEZERO';
+  if(!force&&brandMenuConfigured.get(button)===text&&button.querySelector('#randMenuLogo'))return;
+  brandMenuConfigured.set(button,text);
 
   button.id='brandMenuToggle';
   button.classList.add('brandMenuToggle');
@@ -80,7 +207,7 @@ function preparePowerButton(button,label,symbol){
   button.replaceChildren(icon,text);
 }
 
-function ensureBrandToolbarLayout(settings={}){
+function ensureBrandToolbarLayout(settings={},refreshLogo=false){
   const bar=document.querySelector('.toolbar');
   if(!bar)return;
 
@@ -121,7 +248,7 @@ function ensureBrandToolbarLayout(settings={}){
   const reboot=bar.querySelector('.reboot');
   const shutdown=bar.querySelector('.danger');
 
-  if(menu){configureBrandMenu(menu,settings);left.appendChild(menu)}
+  if(menu){configureBrandMenu(menu,settings,refreshLogo);left.appendChild(menu)}
   if(live)center.appendChild(live);
   if(ups)center.appendChild(ups);
   if(reboot){preparePowerButton(reboot,'Neustart','↻');right.appendChild(reboot);}
@@ -145,7 +272,8 @@ function applyBrandFavicon(settings){
 function applyDashboardBranding(settings){
   settings=settings||{};
   const website=String(settings.website_name||'PVE Hardware Monitor').trim()||'PVE Hardware Monitor';
-  document.title=website;
+  tabName=website;
+  refreshTabTitle();
 
   const h1=
     document.getElementById('websiteTitle')
@@ -158,7 +286,7 @@ function applyDashboardBranding(settings){
   }
 
   applyBrandFavicon(settings);
-  ensureBrandToolbarLayout(settings);
+  ensureBrandToolbarLayout(settings,true);
 }
 
 if(typeof applyUiSettings==='function'){
@@ -231,6 +359,7 @@ function installSystemFooter(){
       const response=await fetch('/installer-update-status.json',{cache:'no-store'});
       if(!response.ok)throw Error('status');
       const data=await response.json();
+      setTabUpdateStatus(data);
       if(Number.isSafeInteger(data.local)&&data.local>0){
         version='Version '+data.local;
         render();

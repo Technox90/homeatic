@@ -124,3 +124,17 @@ body.dashboardToolbarFixed .top .brand{
   flex:1 1 100%;width:100%;min-width:0;margin:0!important;text-align:center!important
 }
 body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-wrap:anywhere}
+
+/* Browser tab settings are independent of dashboard-wide branding. */
+.browserTabSettings{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:12px}
+.browserTabSettings h3{margin:0 0 6px;font-size:16px}
+.browserTabSettings p{margin:0 0 12px;color:var(--muted);font-size:12px}
+.browserTabChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.browserTabSettings fieldset{min-width:0;margin:0;padding:10px;border:1px solid var(--line);border-radius:8px}
+.browserTabSettings legend{font-weight:700}
+.browserTabSettings label{display:flex!important;align-items:center;gap:8px;margin:6px 0!important}
+.browserTabSettings input[type=checkbox]{width:auto!important;flex:none;accent-color:var(--accent)}
+.browserTabSettings select{width:auto!important;max-width:100%}
+.browserTabActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.browserTabActions [role=status]{color:var(--muted);font-size:12px}
+@media(max-width:480px){.browserTabChoices{grid-template-columns:1fr}}

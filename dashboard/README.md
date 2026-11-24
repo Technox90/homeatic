@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V160**
+**Dashboard-Stand: V162**
 
 Dateien:
 
@@ -16,6 +16,18 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## Freigabestand V162
+
+- Freigabestand mit allen V161-Funktionen: individuell konfigurierbare aktive/inaktive Browser-Tab-Titel und priorisierte Update-Hinweise.
+- Logo wird bei unveränderten Einstellungen während der laufenden USV-Statusabfragen nicht erneut geladen; bewusste Branding-Aktualisierung bleibt möglich.
+- V162 enthält die bisherigen Änderungen kumulativ; der bestehende automatische Update-Zeitplan und die Opt-in-Einstellungen bleiben unverändert.
+
+## Browser-Tab-Anzeige V161
+
+- Browser-Tab-Anzeige in den Dashboard-Einstellungen getrennt für aktive und inaktive Tabs konfigurierbar.
+- Standard: aktiv nur Name; inaktiv Name → CPU/RAM → Leistungsaufnahme. Wechsel alle 5 Sekunden, Update-Hinweise alle 3 Sekunden.
+- Update-Hinweise haben optional Vorrang; Messwerte und Versionsstatus werden aus bestehenden Abfragen übernommen. Speicherung lokal pro Browser, ohne Änderungen an Logos oder Favicons.
 
 ## Branding V160
 
