@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V157
+# PROXMOX MODULARER KOMPLETT-INSTALLER V158
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1002,8 +1002,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V157"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V157"
+TUI_TITLE="PROXMOX INSTALLER V158"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V158"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1783,7 +1783,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 157" \
+                    --title "HAUPTMENÜ · Version 158" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8107,7 +8107,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V157",
+    "installer_version": "V158",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8581,7 +8581,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V157 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V158 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11724,7 +11724,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="ea44614871d583892b5bb3a2ef5b2c37a009dfac"
+NODEZERO_MODULE_REF="2793e0826a8a8f21b391e49884db0068d600d383"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
