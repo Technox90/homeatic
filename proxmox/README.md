@@ -14,6 +14,7 @@ Modularer Komplett-Installer für Proxmox VE.
 - PVE-UPS erhält zusätzlich nicht vererbtes Sys.Audit auf /; PowerMgmt bleibt am Knoten.
 - Wartung → 10: CPU-, RAM- und dateibasierter Festplattentest, 1–120 Minuten, Temperaturgrenze 60–99 °C (Standard 95 °C), Live-Messung und Bericht unter `/home/diagnose/stresstest/`.
 - Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
+- Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
 - Wildcard-DNS bleibt unverändert.
 
 ### Neu in V154
