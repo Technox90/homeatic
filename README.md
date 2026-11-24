@@ -4,7 +4,14 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V151 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V152 · Proxmox Master Installer · 24.11.2026**
+
+Neu in V152:
+- Normale Dashboard-Updates arbeiten jetzt **in-place**.
+- Ein bereits aktuelles Dashboard wird nicht mehr auf die alte V139-Basis zurückgesetzt.
+- Historische UI-Migrationen V42 bis V81 werden auf einem aktuellen Dashboard übersprungen.
+- Nur alte/unvollständige Installationen oder bewusste Neuaufbauten verwenden einmalig den Kompatibilitäts-Bootstrap.
+- Eigene Logo-/Favicon-Dateien bleiben weiterhin geschützt.
 
 Neu in V151:
 - Dashboard-Branding ist vollständig generisch und für andere Installationen nutzbar.
@@ -63,7 +70,7 @@ Der Installer kann unter anderem verwalten:
 - Dashboard mit Menü, Kategorien, USV, Pi-hole, Layouts und mehreren Ansichten
 - automatische Updates, Diagnose und Healthchecks
 
-## Dashboard V151
+## Dashboard V152
 
 Das Dashboard liegt lokal unter:
 
@@ -78,7 +85,7 @@ Eigene Branding-Dateien:
 /opt/nodezero/dashboard/static/assets/favicon.png
 ```
 
-**Update-Regel:** Ein normales Dashboard-Update verändert diese beiden Dateien niemals.
+**Update-Regel:** Ein normales Dashboard-Update verändert diese beiden Dateien niemals. Seit V152 bleiben außerdem die bereits aktuellen Dashboard-Programmdateien erhalten; der Installer setzt sie nicht mehr auf die V139-Basis zurück.
 
 Bei Erst-/Neuinstallation werden nur dann neutrale, vollständig transparente PNG-Platzhalter aus dem Repository angelegt, wenn die jeweilige Datei noch fehlt.
 
