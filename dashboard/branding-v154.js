@@ -178,3 +178,53 @@ setTimeout(async()=>{
   window.__nodezeroUiSettingsV154=settings||{};
   applyBrandingV154(settings||{});
 },0);
+
+
+// V158: System details belong at the bottom, not under the dashboard title.
+function installSystemFooterV158(){
+  const source=document.getElementById('hostinfo');
+  if(!source || document.getElementById('nodezeroSystemFooterV158'))return;
+  const footer=document.createElement('footer');
+  footer.id='nodezeroSystemFooterV158';
+  const details=document.createElement('div');
+  details.className='nodezeroFooterDetailsV158';
+  const credit=document.createElement('div');
+  credit.className='nodezeroFooterCreditV158';
+  credit.append(document.createTextNode('Copyright © Technox1990 · '));
+  const link=document.createElement('a');
+  link.href='https://github.com/Technox90/homeatic';
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  link.textContent='GitHub';
+  credit.append(link);
+  footer.append(details,credit);
+  document.body.append(footer);
+  source.classList.add('nodezeroHostInfoHiddenV158');
+  let version='Version unbekannt';
+  const render=()=>{
+    const parts=source.textContent.trim().split(/\s+·\s+/);
+    details.textContent=[version,...(parts.length>1?parts.slice(1):[])].join(' · ');
+  };
+  render();
+  if(window.MutationObserver){
+    new MutationObserver(render).observe(source,{childList:true,characterData:true,subtree:true});
+  }
+  const refresh=async()=>{
+    try{
+      const response=await fetch('/installer-update-status.json',{cache:'no-store'});
+      if(!response.ok)throw Error('status');
+      const data=await response.json();
+      if(Number.isSafeInteger(data.local)&&data.local>0){
+        version='Version '+data.local;
+        render();
+      }
+    }catch(e){/* keep last confirmed local version */}
+  };
+  refresh();
+  window.setInterval(refresh,60000);
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',installSystemFooterV158,{once:true});
+}else{
+  installSystemFooterV158();
+}

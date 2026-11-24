@@ -1,12 +1,18 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V157 · 24.11.2026**  
+> **Aktueller Stand: V158 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V158 · Dashboard-Fußzeile und Versionsanzeige
+----------------------------------------------------------
+- Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
+- Die lokale Installer-Version ersetzt dort den Hostnamen; die Versionsangabe wird aus dem vorhandenen Update-Status gelesen.
+- Copyright © Technox1990 mit GitHub-Link; bestehende Logos, Themes und Einstellungen bleiben unverändert.
 
 24.11.2026 – V157 · Dashboard-Branding und Theme-Anzeige
 --------------------------------------------------------
