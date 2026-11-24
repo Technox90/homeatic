@@ -327,6 +327,75 @@ PYV134LINKS
 # DASHBOARD
 # =============================================================================
 
+# =============================================================================
+# V152 · DASHBOARD UPDATE-MODUS
+# =============================================================================
+#
+# Ein bereits vollständig aktuelles Dashboard wird bei einem normalen Update
+# NICHT mehr auf die alte V139-Basis zurückgesetzt und anschließend durch alle
+# historischen Migrationen V42..V81 wieder hochgepatcht.
+#
+# Nur alte/unvollständige Installationen sowie bewusste Neuaufbauten benutzen
+# den Legacy-Bootstrap. Aktuelle Installationen werden in-place aktualisiert.
+# =============================================================================
+
+DASHBOARD_FAST_UPDATE_V152="${DASHBOARD_FAST_UPDATE_V152:-0}"
+
+dashboard_has_current_state_v152() {
+    local index="/opt/nodezero/dashboard/static/index.html"
+    local app="/opt/nodezero/dashboard/app.py"
+    local collector="/opt/nodezero/dashboard/collector.py"
+    local marker=""
+
+    [[ -f "$index" && -f "$app" && -f "$collector" ]] || return 1
+
+    local index_markers=(
+        'id="dashboardSettingsHubButton"'
+        'id="dashboardGithubLink"'
+        'PVE_SETTINGS_MENU_VISIBILITY_V133'
+        'PVE_CATEGORY_UI_TEST_V1'
+        'PVE_CATEGORY_ASSIGNMENT_FIX_V2'
+        'PVE_UPS_UI_FIX_V3'
+        'SETTINGS_REMEMBER_KEY'
+        'PVE_DASHBOARD_LAYOUT_UI_V71'
+        'PVE_PIHOLE_SETTINGS_UI_V78'
+        'PVE_PIHOLE_MENU_ISOLATION_V80'
+        'PVE_SETTINGS_PANELS_HOST_V81'
+        'PVE_DASHBOARD_BRANDING_V151'
+    )
+
+    for marker in "${index_markers[@]}"; do
+        grep -Fq "$marker" "$index" || return 1
+    done
+
+    grep -Fq '"theme_bg"' "$app" || return 1
+    grep -Fq 'PVE_UPS_SETTINGS_V2' "$app" || return 1
+    grep -Fq 'PVE_DASHBOARD_LAYOUT_API_V71' "$app" || return 1
+    grep -Fq 'PVE_PIHOLE_SETTINGS_API_V78' "$app" || return 1
+    grep -Fq 'PVE_PIHOLE_COLLECTOR_SETTINGS_V78' "$collector" || return 1
+
+    return 0
+}
+
+prepare_dashboard_update_mode_v152() {
+    DASHBOARD_FAST_UPDATE_V152=0
+
+    if (( ${RESET_DASHBOARD_DATA:-0} || ${RESET_DASHBOARD_APP_ONLY:-0} )); then
+        info "Dashboard V152: Neuaufbau gewählt · vollständiger Bootstrap erforderlich."
+        return 0
+    fi
+
+    if dashboard_has_current_state_v152; then
+        DASHBOARD_FAST_UPDATE_V152=1
+        ok "Dashboard V152: aktueller Stand erkannt · schnelles In-place-Update."
+        info "Historische Dashboard-Migrationen werden übersprungen."
+        info "Bestehende App-, Frontend-, Logo- und Favicon-Dateien bleiben erhalten."
+    else
+        info "Dashboard V152: älterer/unvollständiger Stand erkannt."
+        info "Einmaliger Kompatibilitäts-Bootstrap wird ausgeführt."
+    fi
+}
+
 # V139: Die großen Dashboard-Quellen liegen als echte Dateien im Repository.
 # Der Ref zeigt auf den unveränderlichen Commit, in dem die V139-Basisdateien
 # abgelegt wurden. Dadurch kann ein späteres main-Update keinen alten Installer
@@ -481,7 +550,12 @@ EOF
     # Collector
     # -------------------------------------------------------------------------
 
-    install_nodezero_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"
+    if (( DASHBOARD_FAST_UPDATE_V152 )); then
+        ok "Dashboard-Programmstand bleibt erhalten · kein Rücksetzen auf V139-Basis."
+        info "Aktualisiert werden nur aktuelle V152-Komponenten und Konfigurationen."
+    else
+        install_nodezero_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"
+    fi
 
     # -------------------------------------------------------------------------
     # Flask App
