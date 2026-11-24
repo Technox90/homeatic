@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V150
+# PROXMOX MODULARER KOMPLETT-INSTALLER V151
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -62,6 +62,7 @@ set -Eeuo pipefail
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
 #   V148: Stirling PDF verwendet offiziellen GHCR-Pfad; bestehende Compose-Installationen werden beim Updater sicher migriert
+#   V151: Dashboard-Branding generisch; Updates überschreiben logo.png/favicon.png niemals
 #   V150: Dashboard-Name/Logo bei Installation wählbar; feste Toolbar und transparentes PNG-Favicon
 #   V149: Uptime Kuma erhält als Standard-Subdomain up.<domain> statt uptime.<domain>
 #   V98: Standardressourcen angepasst: Uptime Kuma 4/4/4, Stirling PDF 8/8/8
@@ -997,8 +998,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V150"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V150"
+TUI_TITLE="PROXMOX INSTALLER V151"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V151"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1401,7 +1402,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 150" \
+                    --title "HAUPTMENÜ · Version 151" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -7723,7 +7724,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V150",
+    "installer_version": "V151",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8197,7 +8198,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V150 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V151 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11170,7 +11171,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="15ea65f95bcdec977975c02e297e655720d5582e"
+NODEZERO_MODULE_REF="aaacc4f03689e166a5b2e3482bd1ae78b3446b96"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {
@@ -19520,7 +19521,7 @@ if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX ||
         prepare_lxc_template
 fi
 
-(( INSTALL_DASHBOARD )) && prepare_dashboard_branding_v150
+(( INSTALL_DASHBOARD )) && prepare_dashboard_branding_v151
 (( INSTALL_DASHBOARD )) && run_install_step "Server-Dashboard" install_dashboard
 (( INSTALL_OS )) && run_install_step "Betriebssystem · ${OS_LABEL}" install_operating_system_v61
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
@@ -19667,7 +19668,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]
     install_dashboard_pihole_settings_v78
     install_dashboard_pihole_menu_fix_v80
     install_dashboard_settings_panels_host_v81
-    install_dashboard_branding_v150
+    install_dashboard_branding_v151
 fi
 
 # V69:
