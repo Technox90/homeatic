@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V152
+- Aktueller Installationskandidat: V153
 - External-URL-Tool: `proxmox/tools/nodezero-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -217,6 +217,24 @@ nodezero-external-urls --reapply
 ```
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
+
+## Dashboard · V153 Toolbar
+
+Produktives Soll-Layout:
+
+```text
+LINKS                     MITTE                       RECHTS
+[ ☰ + Logo ]              [ LIVE ] [ USV Online ]   [ Neustart ] [ Herunterfahren ]
+```
+
+- Kein separater „Menü“-Button mehr.
+- Hamburger und `logo.png` bilden zusammen einen Button.
+- Dieser Button toggelt das Seitenmenü auf/zu.
+- Bei leerem/transparentem Logo wird `logo_text` als Fallback angezeigt.
+- Das Logo bleibt immer in der festen Toolbar sichtbar.
+- Seitenmenü-Kopf und zusätzliches X sind ausgeblendet.
+- SideNav/Overlay beginnen unterhalb der Toolbar, damit der Logo-Menübutton bedienbar bleibt.
+- Frontend: `dashboard/branding-v153.css` und `dashboard/branding-v153.js`.
 
 ## Dashboard · V152 Updatepfad
 
