@@ -1092,6 +1092,38 @@ send_summary() {
     fi
 }
 
+update_nodezero_components_v156() {
+    local helper=/usr/local/sbin/nodezero-managed-updates
+    local conf=/root/.config/proxmox-auto-updater/nodezero-updates.json
+    local output="" result=0 kind message
+    [[ -f "$conf" ]] || return 0
+    if [[ ! -x "$helper" ]]; then
+        add_failure "NodeZero-Updatewerkzeug fehlt"
+        return 0
+    fi
+    output="$(mktemp "$LOG_DIR/nodezero-update.XXXXXX")" || {
+        add_failure "NodeZero: temporäres Protokoll fehlt"
+        return 0
+    }
+    "$helper" > "$output" 2>&1 || result=$?
+    while IFS='|' read -r kind message; do
+        case "$kind" in
+            UPDATED) add_update "$message" ;;
+            MANUAL) add_manual "$message" ;;
+            FAILED) add_failure "$message" ;;
+            INFO) echo "[INFO] $message" ;;
+            *) echo "$kind $message" ;;
+        esac
+    done < "$output"
+    if (( result != 0 )); then
+        add_failure "NodeZero-Komponentenupdate nicht vollständig erfolgreich"
+    fi
+    rm -f "$output"
+    if systemctl is-active --quiet nodezero-installer-monitor.timer; then
+        systemctl start nodezero-installer-monitor.service || true
+    fi
+}
+
 # =============================================================================
 # START
 # =============================================================================
@@ -1104,6 +1136,7 @@ echo
 echo "Log:"
 echo "  $LOGFILE"
 
+update_nodezero_components_v156
 update_lxc_template_cache
 update_haos_cache
 update_misc_downloads
