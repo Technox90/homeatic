@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – Dokumentation · ChatGPT-Handoff / Uptime-Kuma-TLS
+----------------------------------------------------------------
+- Neue Datei `proxmox/CHATGPT-HANDOFF.md` für die Übergabe in einen neuen Chat.
+- Dokumentiert den aktuellen produktiven nginx-/Domain-/Zertifikatsstand ohne Secrets.
+- Uptime Kuma ist für `https://up.ltwbh.de` vorgesehen.
+- Fehlerbild `curl (60) ... no alternative certificate subject name` als fehlender SAN im bestehenden Zertifikat `ltwbh-services` dokumentiert.
+- Sichere Reparatur dokumentiert: bestehende SANs automatisch übernehmen, `up.ltwbh.de` ergänzen, Zertifikat erweitern, `nginx -t`, Reload und curl-Test.
+- Wichtiger Migrationshinweis ergänzt: das Repository-Tool `nodezero-external-urls` verwendet `nodezero-external`, während die bestehende manuelle Produktivkonfiguration aktuell `ltwbh-services` nutzt; doppelte nginx-VHosts vermeiden.
+- Direkt kopierbarer Startprompt für einen neuen Chat ergänzt.
+
 24.11.2026 – V149 · Uptime Kuma externe Standard-URL
 -------------------------------------------------------
 - Uptime Kuma verwendet bei der External-URL-Konfiguration standardmäßig `up.<hauptdomain>` statt `uptime.<hauptdomain>`.
