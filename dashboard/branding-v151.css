@@ -1,0 +1,49 @@
+/* NodeZero Dashboard Branding V151 */
+#dashboardFixedToolbarV151{
+  position:fixed;inset:0 0 auto 0;z-index:90;min-height:58px;
+  background:linear-gradient(180deg,rgba(8,16,27,.96),rgba(8,16,27,.82));
+  border-bottom:1px solid var(--line);box-shadow:0 12px 34px rgba(0,0,0,.22);
+  backdrop-filter:blur(18px) saturate(145%);
+  -webkit-backdrop-filter:blur(18px) saturate(145%)
+}
+#dashboardFixedToolbarV151 .toolbar{
+  width:min(1600px,100%);margin:0 auto;padding:10px 22px;min-height:58px
+}
+body.dashboardToolbarFixedV151{padding-top:58px}
+body.dashboardToolbarFixedV151 .wrap{padding-top:22px}
+
+#sideNav.sideNav{top:58px!important;bottom:0!important}
+
+.brandLogoV151{
+  display:flex;align-items:center;min-width:0;margin-right:auto;padding:3px 2px
+}
+.brandLogoImageV151{
+  display:none;width:min(190px,68vw);height:42px;object-fit:contain;
+  object-position:left center;flex:0 1 auto
+}
+.brandLogoTextV151{
+  position:relative;display:inline-block;min-width:0;
+  font-size:18px;font-weight:900;line-height:1;letter-spacing:.13em;
+  white-space:nowrap;background:linear-gradient(90deg,#f7fbff 0%,var(--accent) 50%,var(--accent2) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  padding:4px 0 7px
+}
+.brandLogoTextV151::after{
+  content:"";position:absolute;left:0;right:.13em;bottom:0;height:2px;
+  border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  opacity:.9
+}
+.brandLogoV151.hasImageV151 .brandLogoImageV151{display:block}
+.brandLogoV151.hasImageV151 .brandLogoTextV151{display:none}
+#sideNav .navHead{gap:9px}
+#sideNav .navHead>strong{display:none}
+
+@media(max-width:760px){
+  #dashboardFixedToolbarV151 .toolbar{padding:9px 12px;gap:7px}
+  #dashboardFixedToolbarV151 .toolbar button,
+  #dashboardFixedToolbarV151 .toolbar .live,
+  #dashboardFixedToolbarV151 .toolbar .upsTopState{padding:8px 9px;font-size:12px}
+  body.dashboardToolbarFixedV151{padding-top:106px}
+  #sideNav.sideNav{top:106px!important}
+  .brandLogoImageV151{width:min(170px,62vw);height:38px}
+}
