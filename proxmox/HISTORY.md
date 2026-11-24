@@ -27,6 +27,8 @@
 - Ein vorhandenes über die Dashboard-Einstellungen hochgeladenes Favicon behält Vorrang; `favicon_url` wird bei Updates nicht zurückgesetzt.
 - Feste Toolbar bleibt erhalten: Menü · LIVE · USV Online · Neustart · Herunterfahren.
 - README-Struktur modernisiert: aktueller Versionsstand steht oben; vollständige Historie wird separat in `proxmox/HISTORY.md` geführt.
+- Neutrale Platzhalter werden in CI als gültige RGBA-PNGs mit vollständiger Alpha-Transparenz geprüft.
+- CI liest die aktuelle Installer-Version automatisch aus `proxmox.sh` und erzwingt denselben Versionsstand in Root-README, Proxmox-README, HISTORY und ChatGPT-Handoff.
 
 24.11.2026 – V150 · LT-WBH Branding-Reparatur nach Live-Test
 ---------------------------------------------------------------
