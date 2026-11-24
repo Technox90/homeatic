@@ -152,7 +152,12 @@ jobs:
           test -s dashboard/app.py
           test -s dashboard/index.html
           grep -q '"20" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
-          grep -q 'TOOLS_REF="165f20b00119f3370bfb9a285c77580c083260bd"' proxmox/proxmox.sh
+          grep -q '^TOOLS_REF="165f20b00119f3370bfb9a285c77580c083260bd"
+          grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
+          grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
+          grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
+          test "$(wc -c < proxmox/proxmox.sh)" -lt 700000
+ proxmox/proxmox.sh
           grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
           grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
           grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
