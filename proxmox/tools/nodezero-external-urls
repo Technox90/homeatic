@@ -603,10 +603,10 @@ pat=re.compile(r"^(\s*"+re.escape(key)+r":\s*).*$", re.M)
 if pat.search(s):
     s=pat.sub(lambda m: m.group(1)+'"'+value+'"', s, count=1)
 else:
-    env=re.search(r"^(\\s*)environment:\\s*$", s, re.M)
+    env=re.search(r"^(\s*)environment:\s*$", s, re.M)
     if not env: raise SystemExit(3)
     line=env.group(1)+'  '+key+': "'+value+'"'
-    s=s[:env.end()]+'\\n'+line+s[env.end():]
+    s=s[:env.end()]+'\n'+line+s[env.end():]
 p.write_text(s, encoding="utf-8")
 """
     cp = run(["pct", "exec", ctid, "--", "env", f"NZ_FILE={file}", f"NZ_KEY={key}", f"NZ_VALUE={value}", "python3", "-c", code])
