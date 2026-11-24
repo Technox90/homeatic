@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V150 · LT-WBH Branding-Reparatur nach Live-Test
+---------------------------------------------------------------
+- Live-Test auf `dash.ltwbh.de` zeigte: Toolbar/USV-Patch aktiv, aber Seitentitel blieb `PVE Hardware Monitor`, Menü-Logo war nicht sichtbar und ein alter `favicon-custom.png`-Pfad lieferte HTTP 404.
+- Ursache behoben: Branding setzt den Titel jetzt zusätzlich über `.top .brand h1` und `document.title`, auch wenn ältere DOM-IDs fehlen.
+- Das Seitenmenü startet unterhalb der festen Toolbar, damit der Branding-Kopf nicht verdeckt wird.
+- `dashboard/assets/logo-lt-wbh.png` wurde durch den schmalen grafischen LT-WBH-PNG-Schriftzug ersetzt.
+- Für `logo_text=LT-WBH` wird dieses PNG im Menü angezeigt; andere Installationen behalten Text-/Design-Fallback.
+- Das feste LT-WBH-PNG-Favicon hat beim LT-WBH-Branding Vorrang vor einem alten Custom-Favicon.
+- Beim LT-WBH-Update wird ein alter/staler `favicon_url`-Eintrag aus `ui.json` geleert; eigene spätere Uploads bleiben weiterhin möglich.
+
 24.11.2026 – V150 · Menü-Logo als schmaler LT-WBH-Wordmark
 -------------------------------------------------------------
 - Großes LT-WBH-Badge aus dem Seitenmenü entfernt; dadurch bleibt der Menükopf kompakt.
