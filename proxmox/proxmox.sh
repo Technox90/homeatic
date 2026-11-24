@@ -1340,12 +1340,12 @@ run_stress_test_v155() (
     local minutes="" answer="" workers="" logfile="" mode="" limit="" target=""
     while true; do
         if (( TUI_AVAILABLE )); then
-            mode="$(whiptail --title "STRESSTEST" --cancel-button "Zurück" --menu "Testart auswählen" 15 76 4 CPU "Prozessor" RAM "Arbeitsspeicher" DISK "Festplatte / SSD (Testdatei)" 3>&1 1>&2 2>&3)" || return 0
+            mode="$(whiptail --title "STRESSTEST" --cancel-button "Zurück" --menu "Testart auswählen" 15 76 4 1 "CPU · Prozessor" 2 "RAM · Arbeitsspeicher" 3 "Festplatte / SSD (Testdatei)" 3>&1 1>&2 2>&3)" || return 0
         else
-            read -rp "Testart (CPU/RAM/DISK/Z=Zurück): " mode || return 0
+            read -rp "Testart (1=CPU / 2=RAM / 3=Festplatte / Z=Zurück): " mode || return 0
             mode="$(printf "%s" "$mode" | tr "[:lower:]" "[:upper:]")"
         fi
-        case "$mode" in CPU|RAM|DISK) break ;; Z) return 0 ;; *) warn "Ungültige Testart." ;; esac
+        case "$mode" in 1|CPU) mode=CPU; break ;; 2|RAM) mode=RAM; break ;; 3|DISK) mode=DISK; break ;; Z) return 0 ;; *) warn "Ungültige Testart." ;; esac
     done
     if (( TUI_AVAILABLE )); then
         minutes="$(whiptail --title "$mode-STRESSTEST" --inputbox "Dauer in Minuten (1-120)" 10 65 10 3>&1 1>&2 2>&3)" || return 0
@@ -1664,7 +1664,6 @@ KUMA_STATUS_INSTALL
 
 tui_maintenance_menu_v106() {
     local result=""
-
     if (( TUI_AVAILABLE )); then
         result="$(
             whiptail \
@@ -1674,27 +1673,50 @@ tui_maintenance_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Werkzeug oder Einstellung auswählen" \
                 25 96 11 \
-                "8"  "Pi-hole Authentifizierung / Home Assistant" \
-                "10" "Pi-hole Sprache · DE / EN" \
-                "11" "Auto-Updater · Zeitplan / Status / Sofortlauf" \
-                "20" "Pushover · Empfänger / Test / Ein-Aus" \
-                "21" "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" \
-                "12" "Installations-Passwörter anzeigen" \
-                "15" "PVE Storage-Share-Helper" \
-                "17" "Setup-Profile · laden / verwalten" \
-                "19" "OpenRGB · Mainboard / RAM / USB-RGB" \
-                "22" "Stresstest · CPU / RAM / Festplatte" \
-                "23" "Uptime Kuma · öffentliche Statusseite mit Ping" \
+                "1" "Pi-hole Authentifizierung / Home Assistant" \
+                "2" "Pi-hole Sprache · DE / EN" \
+                "3" "Auto-Updater · Zeitplan / Status / Sofortlauf" \
+                "4" "Pushover · Empfänger / Test / Ein-Aus" \
+                "5" "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" \
+                "6" "Installations-Passwörter anzeigen" \
+                "7" "PVE Storage-Share-Helper" \
+                "8" "Setup-Profile · laden / verwalten" \
+                "9" "OpenRGB · Mainboard / RAM / USB-RGB" \
+                "10" "Stresstest · CPU / RAM / Festplatte" \
+                "11" "Uptime Kuma · öffentliche Statusseite mit Ping" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nWARTUNG & EINSTELLUNGEN\n' >&2
+    printf '%2d  %s\n' 1 "Pi-hole Authentifizierung / Home Assistant" >&2
+    printf '%2d  %s\n' 2 "Pi-hole Sprache · DE / EN" >&2
+    printf '%2d  %s\n' 3 "Auto-Updater · Zeitplan / Status / Sofortlauf" >&2
+    printf '%2d  %s\n' 4 "Pushover · Empfänger / Test / Ein-Aus" >&2
+    printf '%2d  %s\n' 5 "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" >&2
+    printf '%2d  %s\n' 6 "Installations-Passwörter anzeigen" >&2
+    printf '%2d  %s\n' 7 "PVE Storage-Share-Helper" >&2
+    printf '%2d  %s\n' 8 "Setup-Profile · laden / verwalten" >&2
+    printf '%2d  %s\n' 9 "OpenRGB · Mainboard / RAM / USB-RGB" >&2
+    printf '%2d  %s\n' 10 "Stresstest · CPU / RAM / Festplatte" >&2
+    printf '%2d  %s\n' 11 "Uptime Kuma · öffentliche Statusseite mit Ping" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  22 Stresstest (CPU/RAM/Festplatte)\n  23 Kuma Statusseite mit Ping\n  Z Zurück\nAuswahl: '
-    read -r result
-    [[ "${result^^}" == "Z" ]] && return 1
-    printf '%s' "$result"
+    # Lokale Menüpositionen werden ausschließlich auf die stabilen internen IDs abgebildet.
+    case "$result" in
+        1) printf '%s' '8' ;;
+        2) printf '%s' '10' ;;
+        3) printf '%s' '11' ;;
+        4) printf '%s' '20' ;;
+        5) printf '%s' '21' ;;
+        6) printf '%s' '12' ;;
+        7) printf '%s' '15' ;;
+        8) printf '%s' '17' ;;
+        9) printf '%s' '19' ;;
+        10) printf '%s' '22' ;;
+        11) printf '%s' '23' ;;
+        *) return 1 ;;
+    esac
 }
 
 tui_reset_menu_v106() {
