@@ -2,6 +2,7 @@
 function brandCompactV150(value){
   const raw=String(value||'LT-WBH').trim();
   const parts=raw.split(/[^A-Za-z0-9ÄÖÜäöü]+/).filter(Boolean);
+  if(parts[0]&&parts[0].length>=2)return parts[0].slice(0,2).toUpperCase();
   if(parts.length>=2)return (parts[0][0]+parts[1][0]).toUpperCase();
   return (raw.replace(/[^A-Za-z0-9ÄÖÜäöü]/g,'').slice(0,2)||'LT').toUpperCase();
 }
