@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V151
+- Aktueller Installationskandidat: V152
 - External-URL-Tool: `proxmox/tools/nodezero-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -217,6 +217,26 @@ nodezero-external-urls --reapply
 ```
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
+
+## Dashboard · V152 Updatepfad
+
+Seit V152 wird ein bereits vollständiges Dashboard bei einem normalen Update nicht mehr auf die V139-Basis zurückgesetzt.
+
+Erkennung:
+- `prepare_dashboard_update_mode_v152`
+- `dashboard_has_current_state_v152`
+- `DASHBOARD_FAST_UPDATE_V152=1` bei vollständigem aktuellem Stand
+
+Fast-Update:
+- bestehende `app.py`, `index.html`, `collector.py` bleiben erhalten,
+- historische Patches V42–V81 werden übersprungen,
+- aktuelle Branding-/Konfigurations-/TLS-/Link-/Validierungslogik läuft weiter,
+- Logo/Favicon bleiben geschützt.
+
+Bootstrap:
+- nur bei Erstinstallation,
+- bewusstem Dashboard-Neuaufbau,
+- oder wenn Pflichtmarker eines aktuellen Dashboards fehlen.
 
 ## Dashboard · V151 generisch / Update-Schutz
 
