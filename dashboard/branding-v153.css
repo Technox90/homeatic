@@ -1,0 +1,86 @@
+/* NodeZero Dashboard Toolbar V153 */
+#dashboardFixedToolbarV153{
+  position:fixed;inset:0 0 auto 0;z-index:120;min-height:58px;
+  background:linear-gradient(180deg,rgba(8,16,27,.98),rgba(8,16,27,.9));
+  border-bottom:1px solid var(--line);
+  box-shadow:0 12px 34px rgba(0,0,0,.24);
+  backdrop-filter:blur(18px) saturate(145%);
+  -webkit-backdrop-filter:blur(18px) saturate(145%)
+}
+#dashboardFixedToolbarV153 .toolbar{
+  width:100%;max-width:none;margin:0;padding:8px 18px;min-height:58px;
+  display:grid!important;
+  grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr);
+  align-items:center;gap:14px;flex-wrap:nowrap!important
+}
+body.dashboardToolbarFixedV153{padding-top:58px}
+body.dashboardToolbarFixedV153 .wrap{padding-top:22px}
+
+.toolbarLeftV153{justify-self:start;display:flex;align-items:center;min-width:0}
+.toolbarCenterV153{justify-self:center;display:flex;align-items:center;gap:10px}
+.toolbarRightV153{justify-self:end;display:flex;align-items:center;gap:10px}
+
+.brandMenuToggleV153{
+  position:relative;z-index:130;
+  display:flex!important;align-items:center;gap:9px;
+  min-width:0;max-width:240px;height:40px;padding:7px 11px!important;
+  border-color:#315783!important;color:#a9ceff!important;
+  background:linear-gradient(180deg,rgba(18,32,50,.96),rgba(13,24,39,.96))!important
+}
+.brandMenuToggleV153:hover{border-color:var(--accent)!important}
+.brandMenuHamburgerV153{
+  flex:0 0 auto;font-size:17px;line-height:1;color:var(--accent);font-weight:900
+}
+.brandMenuLogoV153{
+  display:none;max-width:170px;height:25px;object-fit:contain;object-position:left center
+}
+.brandMenuTextV153{
+  display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:14px;font-weight:900;letter-spacing:.08em;
+  background:linear-gradient(90deg,#f7fbff,var(--accent) 55%,var(--accent2));
+  -webkit-background-clip:text;background-clip:text;color:transparent
+}
+.brandMenuToggleV153.hasImageV153 .brandMenuLogoV153{display:block}
+.brandMenuToggleV153.hasImageV153 .brandMenuTextV153{display:none}
+
+#sideNav.sideNav{
+  top:58px!important;bottom:0!important;z-index:110!important;
+  padding-top:12px!important
+}
+#navShade.navShade{top:58px!important;z-index:100!important}
+#sideNav .navHead{display:none!important}
+
+#dashboardFixedToolbarV153 .live,
+#dashboardFixedToolbarV153 .upsTopState,
+#dashboardFixedToolbarV153 .reboot,
+#dashboardFixedToolbarV153 .danger{margin:0!important}
+
+@media(max-width:900px){
+  #dashboardFixedToolbarV153 .toolbar{
+    grid-template-columns:auto 1fr auto;
+    gap:8px;padding:8px 10px
+  }
+  .brandMenuToggleV153{max-width:180px}
+  .brandMenuLogoV153,.brandMenuTextV153{max-width:115px}
+  .toolbarCenterV153{gap:6px}
+  .toolbarRightV153{gap:6px}
+}
+
+@media(max-width:760px){
+  #dashboardFixedToolbarV153 .toolbar{
+    grid-template-columns:1fr auto;
+    grid-template-areas:"left right" "center center";
+    min-height:96px;row-gap:7px
+  }
+  .toolbarLeftV153{grid-area:left}
+  .toolbarCenterV153{grid-area:center;justify-self:center}
+  .toolbarRightV153{grid-area:right}
+  body.dashboardToolbarFixedV153{padding-top:96px}
+  #sideNav.sideNav,#navShade.navShade{top:96px!important}
+  .brandMenuToggleV153{height:36px;max-width:170px;padding:6px 9px!important}
+  .brandMenuLogoV153{height:22px;max-width:112px}
+  .brandMenuTextV153{max-width:112px;font-size:13px}
+  #dashboardFixedToolbarV153 .toolbar button,
+  #dashboardFixedToolbarV153 .toolbar .live,
+  #dashboardFixedToolbarV153 .toolbar .upsTopState{padding:7px 8px;font-size:12px}
+}
