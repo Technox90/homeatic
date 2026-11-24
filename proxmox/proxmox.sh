@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V155
+# PROXMOX MODULARER KOMPLETT-INSTALLER V156
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1002,8 +1002,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V155"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V155"
+TUI_TITLE="PROXMOX INSTALLER V156"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V156"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1783,7 +1783,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 155" \
+                    --title "HAUPTMENÜ · Version 156" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -6181,7 +6181,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="2d0c56595148224ee5352cba7a2eeee907e15955"
+TOOLS_REF="238035bf241688bb69c1be5e3692081f767feae8"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -6235,6 +6235,8 @@ install_nodezero_tool_v141 "proxmox-auto-updater"
 install_nodezero_tool_v141 "proxmox-auto-updater-config"
 install_nodezero_tool_v141 "proxmox-pushover-config"
 install_nodezero_tool_v141 "nodezero-external-urls"
+install_nodezero_tool_v141 "nodezero-managed-updates"
+chmod 700 /usr/local/sbin/nodezero-managed-updates
 
 chmod 700 \
     /usr/local/sbin/proxmox-auto-updater \
@@ -8105,7 +8107,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V155",
+    "installer_version": "V156",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8579,7 +8581,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V155 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V156 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8735,7 +8737,7 @@ for i in (1,2):
     key = hashlib.sha256((user+"\0"+(device or "")).encode()).hexdigest()
     marker = state/f"sent-{key}"
     if marker.exists() and marker.read_text().strip()==str(result["remote"]): continue
-    data = {"token":cfg["PUSHOVER_APP_TOKEN"],"user":user,"title":f"Installer-Update V{result['remote']} verfügbar","message":f"Proxmox Master-Installer V{result['remote']} ist auf GitHub main verfügbar. Lokal: V{result['local']}. Installation beim nächsten manuellen Installerstart.","url":"https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md","url_title":"Versionshistorie"}
+    data = {"token":cfg["PUSHOVER_APP_TOKEN"],"user":user,"title":f"Installer-Update V{result['remote']} verfügbar","message":f"Proxmox Master-Installer V{result['remote']} ist auf GitHub main verfügbar. Lokal: V{result['local']}. Installation über den Installer oder den aktivierten Auto-Updater.","url":"https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md","url_title":"Versionshistorie"}
     if device: data["device"]=device
     try:
         with urllib.request.urlopen("https://api.pushover.net/1/messages.json",data=urllib.parse.urlencode(data).encode(),timeout=20) as response:
