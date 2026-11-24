@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V154
+# PROXMOX MODULARER KOMPLETT-INSTALLER V155
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -62,6 +62,7 @@ set -Eeuo pipefail
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
 #   V148: Stirling PDF verwendet offiziellen GHCR-Pfad; bestehende Compose-Installationen werden beim Updater sicher migriert
+#   V155: Paperless-Reparatur erhält öffentliche URL, CSRF, Hosts und CORS; kein erzwungener Recreate
 #   V154: Logo-Menü vergrößert; sichtbarer Rahmen/Button-Hintergrund entfernt, Klickfläche bleibt erhalten
 #   V153: Toolbar neu aufgebaut: links Hamburger+Logo als Menü-Toggle, LIVE/USV mittig, Neustart/Herunterfahren rechts
 #   V152: Dashboard-Updates bleiben in-place; kein Rücksetzen auf V139 und keine Legacy-Migrationen auf aktuellem Stand
@@ -1001,8 +1002,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V154"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V154"
+TUI_TITLE="PROXMOX INSTALLER V155"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V155"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1182,25 +1183,40 @@ tui_basis_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Basis-System oder Basis-Paket auswählen" \
                 21 88 9 \
-                "6" "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" \
-                "1" "Server-Dashboard installieren / aktualisieren" \
-                "DV" "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" \
-                "2" "Home Assistant OS" \
-                "3" "Paperless-ngx + Ollama" \
-                "4" "Pi-hole + Unbound" \
-                "5" "NetAlertX" \
-                "9" "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
+                "1" "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" \
+                "2" "Server-Dashboard installieren / aktualisieren" \
+                "3" "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" \
+                "4" "Home Assistant OS" \
+                "5" "Paperless-ngx + Ollama" \
+                "6" "Pi-hole + Unbound" \
+                "7" "NetAlertX" \
+                "8" "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nBASIS-SYSTEME\n' >&2
+        printf '%2d  %s\n' 1 "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" >&2
+        printf '%2d  %s\n' 2 "Server-Dashboard installieren / aktualisieren" >&2
+        printf '%2d  %s\n' 3 "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" >&2
+        printf '%2d  %s\n' 4 "Home Assistant OS" >&2
+        printf '%2d  %s\n' 5 "Paperless-ngx + Ollama" >&2
+        printf '%2d  %s\n' 6 "Pi-hole + Unbound" >&2
+        printf '%2d  %s\n' 7 "NetAlertX" >&2
+        printf '%2d  %s\n' 8 "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nBASIS-SYSTEME\n  6 Basis-Paket (empfohlen)\n  1 Dashboard\n  DV Dashboard-Ansichten auswählen\n  2 Home Assistant\n  3 Paperless\n  4 Pi-hole\n  5 NetAlertX\n  9 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [6]: '
-    read -r result
-    result="${result:-6}"
-    [[ "${result^^}" == "Z" ]] && return 1
-    printf '%s' "$result"
+    case "$result" in
+        1) printf '%s' '6' ;;
+        2) printf '%s' '1' ;;
+        3) printf '%s' 'DV' ;;
+        4) printf '%s' '2' ;;
+        5) printf '%s' '3' ;;
+        6) printf '%s' '4' ;;
+        7) printf '%s' '5' ;;
+        8) printf '%s' '9' ;;
+        *) return 1 ;;
+    esac
 }
 
 tui_apps_menu_v106() {
@@ -1215,24 +1231,26 @@ tui_apps_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Wie möchtest du Apps auswählen?" \
                 17 86 5 \
-                "APPS_REC" "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" \
-                "APPS"     "Apps einzeln auswählen · Checkliste" \
-                "APPS_ALL" "Alle Apps & Dienste auswählen" \
-                "9"        "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
+                "1" "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" \
+                "2" "Apps einzeln auswählen · Checkliste" \
+                "3" "Alle Apps & Dienste auswählen" \
+                "4" "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nAPPS & DIENSTE\n' >&2
+        printf '%2d  %s\n' 1 "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" >&2
+        printf '%2d  %s\n' 2 "Apps einzeln auswählen · Checkliste" >&2
+        printf '%2d  %s\n' 3 "Alle Apps & Dienste auswählen" >&2
+        printf '%2d  %s\n' 4 "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nAPPS & DIENSTE\n  1 Empfohlene Apps\n  2 Apps auswählen\n  3 Alle Apps\n  4 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf 'APPS_REC' ;;
-        2) printf 'APPS' ;;
-        3) printf 'APPS_ALL' ;;
-        4) printf '9' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' 'APPS_REC' ;;
+        2) printf '%s' 'APPS' ;;
+        3) printf '%s' 'APPS_ALL' ;;
+        4) printf '%s' '9' ;;
         *) return 1 ;;
     esac
 }
@@ -1249,24 +1267,26 @@ tui_monitoring_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Monitoring-/Infrastruktur-Paket auswählen" \
                 17 92 5 \
-                "MON_REC" "★ Empfohlen · Pulse + PVE-UPS + Prometheus + PVE Exporter + Grafana + EMQX" \
-                "MON"     "Dienste einzeln auswählen · Checkliste" \
-                "MON_ALL" "Alle Monitoring-/Infrastruktur-Dienste auswählen" \
-                "14"      "Alte komplette Community-Auswahl öffnen" \
+                "1" "★ Empfohlen · Pulse + PVE-UPS + Prometheus + PVE Exporter + Grafana + EMQX" \
+                "2" "Dienste einzeln auswählen · Checkliste" \
+                "3" "Alle Monitoring-/Infrastruktur-Dienste auswählen" \
+                "4" "Alte komplette Community-Auswahl öffnen" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nMONITORING & INFRASTRUKTUR\n' >&2
+        printf '%2d  %s\n' 1 "★ Empfohlen · Pulse + PVE-UPS + Prometheus + PVE Exporter + Grafana + EMQX" >&2
+        printf '%2d  %s\n' 2 "Dienste einzeln auswählen · Checkliste" >&2
+        printf '%2d  %s\n' 3 "Alle Monitoring-/Infrastruktur-Dienste auswählen" >&2
+        printf '%2d  %s\n' 4 "Alte komplette Community-Auswahl öffnen" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nMONITORING & INFRASTRUKTUR\n  1 Empfohlen\n  2 Einzeln auswählen\n  3 Alle\n  4 Komplette Community-Auswahl\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf 'MON_REC' ;;
-        2) printf 'MON' ;;
-        3) printf 'MON_ALL' ;;
-        4) printf '14' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' 'MON_REC' ;;
+        2) printf '%s' 'MON' ;;
+        3) printf '%s' 'MON_ALL' ;;
+        4) printf '%s' '14' ;;
         *) return 1 ;;
     esac
 }
@@ -1283,24 +1303,26 @@ tui_automation_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Automation-/Security-Dienste auswählen" \
                 16 88 4 \
-                "AUTOSEC" "Semaphore / Pocket ID / CrowdSec / Pangolin / Newt auswählen" \
-                "SEMAPHORE" "Nur Semaphore installieren" \
-                "REMOTE" "Remote-Stack · Pangolin + Newt" \
-                "14" "Alte komplette Community-Auswahl öffnen" \
+                "1" "Semaphore / Pocket ID / CrowdSec / Pangolin / Newt auswählen" \
+                "2" "Nur Semaphore installieren" \
+                "3" "Remote-Stack · Pangolin + Newt" \
+                "4" "Alte komplette Community-Auswahl öffnen" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nAUTOMATION & SECURITY\n' >&2
+        printf '%2d  %s\n' 1 "Semaphore / Pocket ID / CrowdSec / Pangolin / Newt auswählen" >&2
+        printf '%2d  %s\n' 2 "Nur Semaphore installieren" >&2
+        printf '%2d  %s\n' 3 "Remote-Stack · Pangolin + Newt" >&2
+        printf '%2d  %s\n' 4 "Alte komplette Community-Auswahl öffnen" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nAUTOMATION & SECURITY\n  1 Auswahl öffnen\n  2 Nur Semaphore\n  3 Pangolin + Newt\n  4 Komplette Community-Auswahl\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf 'AUTOSEC' ;;
-        2) printf 'SEMAPHORE' ;;
-        3) printf 'REMOTE' ;;
-        4) printf '14' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' 'AUTOSEC' ;;
+        2) printf '%s' 'SEMAPHORE' ;;
+        3) printf '%s' 'REMOTE' ;;
+        4) printf '%s' '14' ;;
         *) return 1 ;;
     esac
 }
@@ -1317,27 +1339,352 @@ tui_vm_os_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "VM/LXC-Verwaltung oder Betriebssystem-Installation" \
                 15 84 4 \
-                "0"  "VM / LXC verwalten" \
-                "16" "Betriebssystem installieren · Windows / Debian / Ubuntu / Mint" \
+                "1" "VM / LXC verwalten" \
+                "2" "Betriebssystem installieren · Windows / Debian / Ubuntu / Mint" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nVMs / BETRIEBSSYSTEME\n' >&2
+        printf '%2d  %s\n' 1 "VM / LXC verwalten" >&2
+        printf '%2d  %s\n' 2 "Betriebssystem installieren · Windows / Debian / Ubuntu / Mint" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nVMs / BETRIEBSSYSTEME\n  1 VM/LXC verwalten\n  2 Betriebssystem installieren\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf '0' ;;
-        2) printf '16' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' '0' ;;
+        2) printf '%s' '16' ;;
         *) return 1 ;;
     esac
 }
 
+run_stress_test_v155() (
+    local minutes="" answer="" workers="" logfile="" mode="" limit="" target=""
+    while true; do
+        if (( TUI_AVAILABLE )); then
+            mode="$(whiptail --title "STRESSTEST" --cancel-button "Zurück" --menu "Testart auswählen" 15 76 4 1 "CPU · Prozessor" 2 "RAM · Arbeitsspeicher" 3 "Festplatte / SSD (Testdatei)" 3>&1 1>&2 2>&3)" || return 0
+        else
+            read -rp "Testart (1=CPU / 2=RAM / 3=Festplatte / Z=Zurück): " mode || return 0
+            mode="$(printf "%s" "$mode" | tr "[:lower:]" "[:upper:]")"
+        fi
+        case "$mode" in 1|CPU) mode=CPU; break ;; 2|RAM) mode=RAM; break ;; 3|DISK) mode=DISK; break ;; Z) return 0 ;; *) warn "Ungültige Testart." ;; esac
+    done
+    if (( TUI_AVAILABLE )); then
+        minutes="$(whiptail --title "$mode-STRESSTEST" --inputbox "Dauer in Minuten (1-120)" 10 65 10 3>&1 1>&2 2>&3)" || return 0
+    else
+        read -rp "Dauer in Minuten (1-120) [10]: " minutes || return 0
+        [[ -n "$minutes" ]] || minutes=10
+    fi
+    if [[ ! "$minutes" =~ ^[0-9]{1,3}$ ]] || (( 10#$minutes < 1 || 10#$minutes > 120 )); then
+        warn "Ungültige Dauer: 1 bis 120 Minuten."
+        return 0
+    fi
+    minutes=$((10#$minutes))
+    if (( TUI_AVAILABLE )); then
+        limit="$(whiptail --title "TEMPERATURSCHUTZ" --inputbox "Testabbruch bei Temperatur (60-99 °C)" 10 70 95 3>&1 1>&2 2>&3)" || return 0
+    else
+        read -rp "Temperaturgrenze 60-99 °C [95]: " limit || return 0
+        [[ -n "$limit" ]] || limit=95
+    fi
+    if [[ ! "$limit" =~ ^[0-9]{2}$ ]] || (( 10#$limit < 60 || 10#$limit > 99 )); then
+        warn "Temperaturgrenze muss zwischen 60 und 99 °C liegen."
+        return 0
+    fi
+    if [[ "$mode" == DISK ]]; then
+        echo "Verfügbare Dateisysteme:"
+        df -hT -x tmpfs -x devtmpfs
+        read -rp "Vorhandenes lokales Zielverzeichnis [/home/diagnose/stresstest]: " target || return 0
+        [[ -n "$target" ]] || target=/home/diagnose/stresstest
+    fi
+    workers="$(nproc)"
+    if (( workers > 1 )); then workers=$((workers-1)); fi
+    echo "$mode-Stresstest: $minutes Minuten, Temperaturgrenze $limit °C."
+    echo "Nur der Test wird beim Erreichen der Grenze beendet, nicht der Proxmox-Host."
+    if [[ "$mode" == RAM ]]; then echo "RAM: maximal 50 % des aktuell verfügbaren Speichers, höchstens 8 GiB."; fi
+    if [[ "$mode" == DISK ]]; then echo "DISK: temporäre Datei bis 1 GiB, wiederholte Schreib-/Lesezugriffe; SSD-Verschleiß möglich."; fi
+    echo "Produktive VMs und LXC können langsamer werden. Abbruch mit Strg+C."
+    read -rp "Test starten? [j/N]: " answer || return 0
+    [[ "$answer" =~ ^[jJyY]$ ]] || return 0
+    local stress_lock_fd
+    exec {stress_lock_fd}>/run/lock/proxmox-master-stresstest.lock || return 1
+    if ! flock -n "$stress_lock_fd"; then
+        exec {stress_lock_fd}>&-
+        warn "Ein Stresstest läuft bereits."
+        return 0
+    fi
+    if ! command -v stress-ng >/dev/null 2>&1; then
+        echo "Installiere stress-ng (kein Systemupgrade)."
+        apt-get install -y stress-ng || return 1
+    fi
+    install -d -m 0750 /home/diagnose/stresstest || return 1
+    logfile="/home/diagnose/stresstest/test$(date +%Y%m%d-%H%M%S).txt"
+    (umask 077; set -o noclobber; : > "$logfile") || return 1
+    python3 - "$minutes" "$workers" "$logfile" "$mode" "$limit" "$target" <<'PY_STRESS_V155'
+import datetime, glob, os, signal, subprocess, sys, time, tempfile, shutil
+
+duration = int(sys.argv[1]) * 60
+workers = int(sys.argv[2])
+path = sys.argv[3]
+mode, limit, target = sys.argv[4], int(sys.argv[5]), sys.argv[6]
+workdir = None
+interrupted = False
+process = None
+def stop(signum, frame):
+    global interrupted
+    interrupted = True
+for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(sig, stop)
+
+def cpu():
+    with open("/proc/stat") as f:
+        v = list(map(int, f.readline().split()[1:9]))
+    return sum(v), v[3] + v[4]
+
+def meminfo():
+    with open("/proc/meminfo") as f:
+        m = {line.split(":")[0]: int(line.split()[1]) for line in f if ":" in line}
+    return m
+
+def memory():
+    m = meminfo()
+    total = m["MemTotal"]
+    return 100 * (total-m["MemAvailable"])/total
+
+def temperature():
+    values = []
+    for name in glob.glob("/sys/class/hwmon/hwmon*/temp*_input"):
+        try:
+            with open(name) as f:
+                t = int(f.read()) / 1000
+            if 0 < t < 150:
+                values.append(t)
+        except (OSError, ValueError):
+            pass
+    return max(values, default=None)
+
+with open(path, "a", buffering=1) as log:
+    def emit(line):
+        print(line, flush=True)
+        print(line, file=log, flush=True)
+    emit(f"{mode}-STRESSTEST | {datetime.datetime.now().isoformat(timespec='seconds')} | {os.uname().nodename}")
+    emit(f"Dauer: {duration}s | Temperaturgrenze: {limit} C | Temperatur: Maximum verfügbarer hwmon-Sensoren")
+    start = time.monotonic()
+    peak_cpu = peak_ram = 0.0
+    peak_temp = None
+    count = 0
+    status = "FEHLER"
+    try:
+        previous = cpu()
+        initial_temp = temperature()
+        if initial_temp is None:
+            raise RuntimeError("Keine Temperatursensoren verfügbar; sicherer Teststart verweigert.")
+        if initial_temp >= limit:
+            raise RuntimeError("Temperaturgrenze bereits erreicht.")
+        if memory() >= 95:
+            raise RuntimeError("RAM-Sicherheitsgrenze bereits erreicht.")
+        args = ["nice", "-n", "15", "stress-ng", "--timeout", f"{duration}s", "--metrics-brief"]
+        if mode == "CPU":
+            args += ["--cpu", str(workers)]
+        elif mode == "RAM":
+            mib = min(8192, meminfo()["MemAvailable"] // 2048)
+            if mib < 128:
+                raise RuntimeError("Zu wenig freier RAM.")
+            args += ["--vm", "1", "--vm-bytes", f"{mib}M", "--vm-keep", "--verify"]
+            emit(f"RAM-Testgröße: {mib} MiB")
+        elif mode == "DISK":
+            target = os.path.realpath(target)
+            if not os.path.isdir(target) or target.startswith(("/dev/", "/proc/", "/sys/", "/run/")) or target == "/":
+                raise RuntimeError("Ungültiges Testverzeichnis.")
+            fs = subprocess.check_output(["findmnt", "-n", "-o", "FSTYPE", "-T", target], text=True).strip()
+            if fs not in {"ext4", "xfs", "btrfs", "zfs", "f2fs"}:
+                raise RuntimeError(f"Nur lokale Dateisysteme unterstützt: {fs}")
+            if shutil.disk_usage(target).free < 3 * 1024**3:
+                raise RuntimeError("Mindestens 3 GiB freier Speicher erforderlich.")
+            workdir = tempfile.mkdtemp(prefix=".pve-stress-", dir=target)
+            args += ["--hdd", "1", "--hdd-bytes", "1G", "--temp-path", workdir, "--verify"]
+            emit(f"Festplattentest: {target} | {fs} | 1 GiB Testdatei")
+        process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        while not interrupted and process.poll() is None:
+            time.sleep(1)
+            elapsed = time.monotonic()-start
+            current = cpu()
+            delta = current[0]-previous[0]
+            usage = 100*(1-(current[1]-previous[1])/delta) if delta > 0 else 0
+            previous = current
+            ram = memory()
+            temp = temperature()
+            peak_cpu = max(peak_cpu, usage)
+            peak_ram = max(peak_ram, ram)
+            count += 1
+            if temp is not None:
+                peak_temp = max(peak_temp if peak_temp is not None else temp, temp)
+            temp_text = f"{temp:.1f} C" if temp is not None else "n/a"
+            bar = "#" * min(20, max(0, int(usage/5)))
+            emit(f"{datetime.datetime.now():%H:%M:%S} | {min(int(elapsed),duration):4d}/{duration}s | CPU [{bar:<20}] {usage:5.1f}% | RAM {ram:5.1f}% | Temp {temp_text} | Load {os.getloadavg()[0]:.2f}")
+            if temp is None:
+                status = "SENSORABBRUCH"
+                break
+            if temp >= limit:
+                status = "TEMPERATURABBRUCH"
+                break
+            if ram >= 95:
+                status = "RAM-SICHERHEITSABBRUCH"
+                break
+            if elapsed >= duration+5:
+                status = "ZEITLIMIT"
+                break
+        else:
+            status = "ABGEBROCHEN" if interrupted else ("OK" if process.returncode == 0 else "FEHLER")
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        emit(f"Fehler: {exc}")
+    finally:
+        if process is not None and process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+            except ProcessLookupError:
+                pass
+        if workdir is not None:
+            shutil.rmtree(workdir)
+        emit(f"Ergebnis: {status} | Messwerte: {count} | CPU max: {peak_cpu:.1f}% | RAM max: {peak_ram:.1f}% | Temp max: {peak_temp if peak_temp is not None else 'n/a'}")
+        emit(f"Bericht: {path}")
+sys.exit(0 if status == "OK" else 1)
+PY_STRESS_V155
+)
+
+install_kuma_public_status_v155() (
+    local id="" candidate="" count=0
+    for candidate in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$candidate" | awk '/^hostname: / {print tolower($2)}')" == uptime-kuma ]]; then
+            id="$candidate"
+            count=$((count+1))
+        fi
+    done
+    if (( count != 1 )); then
+        warn "Genau ein Uptime-Kuma-LXC erforderlich; gefunden: $count."
+        return 1
+    fi
+    if ! pct status "$id" | grep -q 'status: running'; then
+        warn "Uptime-Kuma-LXC ist nicht gestartet."
+        return 1
+    fi
+    pct exec "$id" -- bash -s <<'KUMA_STATUS_INSTALL'
+set -Eeuo pipefail
+conf=/etc/nginx/conf.d/pve-master-standard-web.conf
+dir=/var/www/nodezero-kuma-status
+page="$dir/index.html"
+test -f "$conf" || { echo "Verwaltete nginx-Konfiguration fehlt."; exit 1; }
+curl -fsS --max-time 10 http://127.0.0.1:3001/ >/dev/null
+nginx -t
+install -d -m 0755 "$dir"
+backup="$(mktemp -d /root/kuma-status-backup.XXXXXX)"
+cp -a "$conf" "$backup/nginx.conf"
+if [[ -f "$page" ]]; then cp -a "$page" "$backup/index.html"; fi
+tmp="$(mktemp "$dir/.index.XXXXXX")"
+rollback() {
+    cp -a "$backup/nginx.conf" "$conf"
+    if [[ -f "$backup/index.html" ]]; then cp -a "$backup/index.html" "$page"; else rm -f "$page"; fi
+    rm -f "$tmp"
+    nginx -t && systemctl reload nginx || true
+}
+trap rollback ERR
+cat > "$tmp" <<'KUMA_STATUS_HTML'
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Status & Antwortzeiten</title>
+<style>
+:root{color-scheme:dark light;font:16px system-ui}body{max-width:1000px;margin:30px auto;padding:0 16px}header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}input,button{font:inherit;padding:8px;border-radius:6px;border:1px solid #888}article{border:1px solid #8885;border-radius:12px;padding:16px;margin:12px 0}h2{font-size:1.2rem}h3{margin:0 0 12px}.stats{display:flex;gap:20px;flex-wrap:wrap}.stats span{display:block;font-size:.8rem;opacity:.75}.stats strong{font-size:1.2rem}.bars{display:flex;gap:3px;margin:12px 0;height:22px}.bars i{flex:1;border-radius:3px;background:#888}.up{color:#20a65b}.down{color:#dc4444}.pending{color:#c58b17}.bars .up{background:#20a65b}.bars .down{background:#dc4444}.bars .pending{background:#c58b17}svg{display:block;width:100%;height:auto;margin-top:12px}.muted{opacity:.75;font-size:.85rem}a{color:inherit}
+</style>
+<header><h1 id="title">Status & Antwortzeiten</h1></header>
+<form id="form"><label for="slug">Statusseiten-Name: </label><input id="slug" required maxlength="100" pattern="[A-Za-z0-9_-]+" placeholder="z. B. familie"><button>Öffnen</button></form>
+<p id="message" role="status">Öffentliche Kuma-Statusseite auswählen.</p><p><a id="original" hidden>Original-Statusseite</a></p><main id="groups"></main>
+<script>
+"use strict";
+const el=(tag,txt,cls)=>{const n=document.createElement(tag);if(txt!==undefined)n.textContent=txt;if(cls)n.className=cls;return n};
+const $=id=>document.getElementById(id);
+const valid=s=>/^[A-Za-z0-9_-]{1,100}$/.test(s);
+let active="", generation=0, busy=false;
+const state=s=>s===1?["Online","up"]:s===0?["Offline","down"]:s===2?["Ausstehend","pending"]:s===3?["Wartung","pending"]:["Unbekannt",""];
+const ms=p=>typeof p==="number"&&Number.isFinite(p)&&p>=0?p:null;
+const format=p=>p===null?"—":p.toFixed(1)+" ms";
+async function json(url){const response=await fetch(url,{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("HTTP "+response.status);return response.json()}
+function stat(parent,label,value){const n=el("div");n.append(el("span",label),el("strong",value));parent.append(n)}
+function graph(rows){
+ const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 640 130");svg.setAttribute("role","img");svg.setAttribute("aria-label","Antwortzeitverlauf in Millisekunden");
+ const pts=rows.map(r=>ms(r.ping));const finite=pts.filter(x=>x!==null);if(!finite.length)return el("p","Keine Antwortzeitdaten vorhanden.","muted");
+ const max=Math.max(1,...finite), min=0;
+ const add=(tag,attrs,text)=>{const n=document.createElementNS(svg.namespaceURI,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));if(text!==undefined)n.textContent=text;svg.append(n);return n};
+ for(const v of [0,max/2,max]){const y=105-v/max*90;add("line",{x1:55,x2:630,y1:y,y2:y,stroke:"currentColor",opacity:".15"});add("text",{x:2,y:y+4,fill:"currentColor","font-size":"10"},Math.round(v)+" ms")}
+ let segment=[];const flush=()=>{if(segment.length>1)add("polyline",{points:segment.join(" "),fill:"none",stroke:"#20a65b","stroke-width":"2"});else if(segment.length===1){const [cx,cy]=segment[0].split(",");add("circle",{cx,cy,r:3,fill:"#20a65b"})}segment=[]};
+ pts.forEach((p,i)=>{if(p===null){flush();return}segment.push((55+i*575/Math.max(1,pts.length-1))+","+(105-p/max*90))});flush();
+ return svg;
+}
+function render(config,heartbeat){
+ const root=document.createDocumentFragment();
+ for(const group of Array.isArray(config.publicGroupList)?config.publicGroupList:[]){
+  const section=el("section");section.append(el("h2",String(group.name||"Monitore")));
+  for(const monitor of Array.isArray(group.monitorList)?group.monitorList:[]){
+   const id=String(monitor.id);const rows=(Array.isArray(heartbeat.heartbeatList?.[id])?heartbeat.heartbeatList[id]:[]).slice(-100).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+   const latest=rows.at(-1);const [status,cls]=state(latest?.status);
+   const card=el("article");const heading=el("h3",String(monitor.name||"Monitor")+" · ");heading.append(el("span",status,cls));card.append(heading);
+   const bars=el("div",undefined,"bars");for(const row of rows.slice(-50)){const [label,c]=state(row.status);const bar=el("i",undefined,c);bar.title=String(row.time||"")+" · "+label+" · "+format(ms(row.ping));bars.append(bar)}card.append(bars);
+   const stats=el("div",undefined,"stats");const values=rows.map(r=>ms(r.ping)).filter(v=>v!==null);
+   stat(stats,"Letzte Antwort",format(ms(latest?.ping)));stat(stats,"Ø sichtbarer Verlauf",format(values.length?values.reduce((a,b)=>a+b,0)/values.length:null));
+   const uptime=heartbeat.uptimeList?.[id+"_24"];stat(stats,"Verfügbarkeit 24h",typeof uptime==="number"?(uptime*100).toFixed(2)+" %":"—");card.append(stats,graph(rows));
+   card.append(el("p",latest?"Letzte Messung (Kuma): "+String(latest.time||"—")+" · "+rows.length+" Messpunkte":"Noch keine Messwerte","muted"));section.append(card);
+  }root.append(section);
+ }
+ $("groups").replaceChildren(root);$("title").textContent=String(config.config?.title||"Status")+" · Antwortzeiten";
+}
+async function refresh(){
+ if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
+ try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("message").textContent="Aktualisiert: "+new Date().toLocaleTimeString()+" · alle 60 Sekunden";}
+ catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
+ finally{busy=false;if(token!==generation)refresh()}
+}
+function select(slug){if(!valid(slug))return;generation++;active=slug;$("slug").value=slug;$("groups").replaceChildren();$("message").textContent="Lade öffentliche Statusdaten …";$("original").href="/status/"+encodeURIComponent(slug);$("original").hidden=false;history.replaceState(null,"","?slug="+encodeURIComponent(slug));refresh()}
+$("form").addEventListener("submit",e=>{e.preventDefault();select($("slug").value.trim())});
+const initial=new URLSearchParams(location.search).get("slug");if(initial&&valid(initial))select(initial);setInterval(refresh,60000);
+</script></html>
+KUMA_STATUS_HTML
+chmod 0644 "$tmp"
+mv -f "$tmp" "$page"
+python3 - "$conf" <<'PY_KUMA_STATUS_NGINX'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1])
+s=p.read_text()
+marker="# NODEZERO KUMA PUBLIC STATUS V155"
+if marker not in s:
+    anchor="    location / {\n"
+    if s.count(anchor)!=1:
+        raise SystemExit("nginx location nicht eindeutig; keine automatische Änderung.")
+    block='''    # NODEZERO KUMA PUBLIC STATUS V155
+    location = /nodezero-status/ {
+        alias /var/www/nodezero-kuma-status/index.html;
+        default_type text/html;
+        add_header Cache-Control "no-store";
+        add_header X-Content-Type-Options nosniff;
+    }
+
+'''
+    p.write_text(s.replace(anchor,block+anchor,1))
+PY_KUMA_STATUS_NGINX
+output="$(nginx -t 2>&1)"
+printf '%s\n' "$output"
+if grep -q 'conflicting server name' <<<"$output"; then rollback; exit 1; fi
+systemctl reload nginx
+curl -fkSs --max-time 10 https://127.0.0.1/nodezero-status/ | grep -F 'Status & Antwortzeiten' >/dev/null
+trap - ERR
+echo "Statusansicht installiert. Backup: $backup"
+KUMA_STATUS_INSTALL
+    echo "Öffne auf deiner bisherigen Kuma-Domain: /nodezero-status/?slug=DEIN-STATUSSEITENNAME"
+)
+
 tui_maintenance_menu_v106() {
     local result=""
-
     if (( TUI_AVAILABLE )); then
         result="$(
             whiptail \
@@ -1347,25 +1694,50 @@ tui_maintenance_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Werkzeug oder Einstellung auswählen" \
                 25 96 11 \
-                "8"  "Pi-hole Authentifizierung / Home Assistant" \
-                "10" "Pi-hole Sprache · DE / EN" \
-                "11" "Auto-Updater · Zeitplan / Status / Sofortlauf" \
-                "20" "Pushover · Empfänger / Test / Ein-Aus" \
-                "21" "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" \
-                "12" "Installations-Passwörter anzeigen" \
-                "15" "PVE Storage-Share-Helper" \
-                "17" "Setup-Profile · laden / verwalten" \
-                "19" "OpenRGB · Mainboard / RAM / USB-RGB" \
+                "1" "Pi-hole Authentifizierung / Home Assistant" \
+                "2" "Pi-hole Sprache · DE / EN" \
+                "3" "Auto-Updater · Zeitplan / Status / Sofortlauf" \
+                "4" "Pushover · Empfänger / Test / Ein-Aus" \
+                "5" "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" \
+                "6" "Installations-Passwörter anzeigen" \
+                "7" "PVE Storage-Share-Helper" \
+                "8" "Setup-Profile · laden / verwalten" \
+                "9" "OpenRGB · Mainboard / RAM / USB-RGB" \
+                "10" "Stresstest · CPU / RAM / Festplatte" \
+                "11" "Uptime Kuma · öffentliche Statusseite mit Ping" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nWARTUNG & EINSTELLUNGEN\n' >&2
+    printf '%2d  %s\n' 1 "Pi-hole Authentifizierung / Home Assistant" >&2
+    printf '%2d  %s\n' 2 "Pi-hole Sprache · DE / EN" >&2
+    printf '%2d  %s\n' 3 "Auto-Updater · Zeitplan / Status / Sofortlauf" >&2
+    printf '%2d  %s\n' 4 "Pushover · Empfänger / Test / Ein-Aus" >&2
+    printf '%2d  %s\n' 5 "Externe URLs · Domain / Reverse Proxy / Let's Encrypt" >&2
+    printf '%2d  %s\n' 6 "Installations-Passwörter anzeigen" >&2
+    printf '%2d  %s\n' 7 "PVE Storage-Share-Helper" >&2
+    printf '%2d  %s\n' 8 "Setup-Profile · laden / verwalten" >&2
+    printf '%2d  %s\n' 9 "OpenRGB · Mainboard / RAM / USB-RGB" >&2
+    printf '%2d  %s\n' 10 "Stresstest · CPU / RAM / Festplatte" >&2
+    printf '%2d  %s\n' 11 "Uptime Kuma · öffentliche Statusseite mit Ping" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nWARTUNG & EINSTELLUNGEN\n  8 Pi-hole Auth\n  10 Pi-hole Sprache\n  11 Auto-Updater\n  20 Pushover\n  21 Externe URLs\n  12 Passwörter\n  15 Storage-Share-Helper\n  17 Setup-Profile\n  19 OpenRGB\n  Z Zurück\nAuswahl: '
-    read -r result
-    [[ "${result^^}" == "Z" ]] && return 1
-    printf '%s' "$result"
+    # Lokale Menüpositionen werden ausschließlich auf die stabilen internen IDs abgebildet.
+    case "$result" in
+        1) printf '%s' '8' ;;
+        2) printf '%s' '10' ;;
+        3) printf '%s' '11' ;;
+        4) printf '%s' '20' ;;
+        5) printf '%s' '21' ;;
+        6) printf '%s' '12' ;;
+        7) printf '%s' '15' ;;
+        8) printf '%s' '17' ;;
+        9) printf '%s' '19' ;;
+        10) printf '%s' '22' ;;
+        11) printf '%s' '23' ;;
+        *) return 1 ;;
+    esac
 }
 
 tui_reset_menu_v106() {
@@ -1380,19 +1752,25 @@ tui_reset_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "ACHTUNG: Diese Funktionen können Gäste und Daten löschen." \
                 18 96 5 \
-                "7"  "KOMPLETT NEU · Auswahl + Löschbestätigung" \
-                "13" "KOMPLETT NEU · SOFORT · 5-Sekunden-Countdown" \
-                "18" "PROXMOX AUF NULL · VMs/LXC + lokale Images/Backups entfernen" \
+                "1" "KOMPLETT NEU · Auswahl + Löschbestätigung" \
+                "2" "KOMPLETT NEU · SOFORT · 5-Sekunden-Countdown" \
+                "3" "PROXMOX AUF NULL · VMs/LXC + lokale Images/Backups entfernen" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nRESET / NEUAUFBAU\n' >&2
+        printf '%2d  %s\n' 1 "KOMPLETT NEU · Auswahl + Löschbestätigung" >&2
+        printf '%2d  %s\n' 2 "KOMPLETT NEU · SOFORT · 5-Sekunden-Countdown" >&2
+        printf '%2d  %s\n' 3 "PROXMOX AUF NULL · VMs/LXC + lokale Images/Backups entfernen" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nRESET / NEUAUFBAU\n  7 Komplett neu mit Bestätigung\n  13 Komplett neu SOFORT\n  18 Proxmox auf Null\n  Z Zurück\nAuswahl: '
-    read -r result
-    [[ "${result^^}" == "Z" ]] && return 1
-    printf '%s' "$result"
+    case "$result" in
+        1) printf '%s' '7' ;;
+        2) printf '%s' '13' ;;
+        3) printf '%s' '18' ;;
+        *) return 1 ;;
+    esac
 }
 
 tui_main_menu() {
@@ -1405,7 +1783,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 154" \
+                    --title "HAUPTMENÜ · Version 155" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -7727,7 +8105,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V154",
+    "installer_version": "V155",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8201,7 +8579,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V154 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V155 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8290,7 +8668,167 @@ ensure_no_subscription_after_zero_v72
 # V116: Erst jetzt darf der Auto-Updater installiert/aktualisiert werden.
 # Zu diesem Zeitpunkt sind Enterprise/PVE-Test deaktiviert, pve-no-subscription
 # ist aktiv und ein apt-get update wurde bereits erfolgreich durchgeführt.
+install_installer_update_monitor_v155() (
+    set -Eeuo pipefail
+    local state=/var/lib/nodezero-installer-monitor
+    install -d -m 0700 "$state"
+    printf '%s\n' "$NODEZERO_SELF_PATH" > "$state/installer-path"
+    chmod 600 "$state/installer-path"
+    cat > /usr/local/sbin/nodezero-installer-monitor <<'MONITOR_V155'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+state=/var/lib/nodezero-installer-monitor
+exec 9>"$state/lock"
+flock -n 9 || exit 0
+python3 - "$state" <<'PY_MONITOR'
+import datetime, json, os, pathlib, re, subprocess, sys, tempfile, urllib.parse, urllib.request, hashlib
+state = pathlib.Path(sys.argv[1])
+url = "https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh"
+def atomic(path, content, mode=0o600):
+    fd, tmp = tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(content)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp): os.unlink(tmp)
+def version(data):
+    match = re.search(rb"(?m)^# PROXMOX MODULARER KOMPLETT-INSTALLER V([0-9]+)$", data)
+    if not match or not data.startswith(b"#!/usr/bin/env bash\n"):
+        raise ValueError("Ungültiger Installer")
+    return int(match.group(1))
+def publish(result):
+    atomic(state/"status.json", json.dumps(result))
+    for directory in (pathlib.Path("/opt/nodezero/dashboard/static"), pathlib.Path("/opt/pve-sensor-dashboard/static")):
+        if (directory/"index.html").is_file():
+            atomic(directory/"installer-update-status.json", json.dumps(result), 0o644)
+result = {"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"status":"error","local":None,"remote":None}
+try:
+    local = pathlib.Path((state/"installer-path").read_text().strip()).read_bytes()
+    result["local"] = version(local)
+    with urllib.request.urlopen(url, timeout=30) as response:
+        remote = response.read(4*1024*1024+1)
+    if len(remote)>4*1024*1024: raise ValueError("Installer zu groß")
+    result["remote"] = version(remote)
+    subprocess.run(["bash","-n"], input=remote, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=15)
+    result["status"] = "available" if result["remote"]>result["local"] else "current" if result["remote"]==result["local"] else "local_newer"
+except Exception as exc:
+    print("Installer-Prüfung fehlgeschlagen:", type(exc).__name__)
+publish(result)
+if result["status"] != "available":
+    sys.exit(0)
+# Read the existing root-owned Pushover config via bash; never publish secrets.
+conf = pathlib.Path("/root/.config/proxmox-auto-updater/pushover.env")
+if not conf.is_file(): sys.exit(0)
+if conf.stat().st_uid != 0 or conf.stat().st_mode & 0o022: sys.exit(0)
+keys = ["PUSHOVER_ENABLED","PUSHOVER_APP_TOKEN","PUSHOVER_USER_KEY","PUSHOVER_DEVICE"] + [f"PUSHOVER_{field}_{i}" for i in (1,2) for field in ("USER_KEY","DEVICE")]
+command = 'source "$1" >/dev/null; shift; for k; do printf "%s\\0" "$k"; printf "%s\\0" "${!k-}"; done'
+raw = subprocess.check_output(["bash","-c",command,"bash",str(conf),*keys], timeout=10).decode().split("\0")
+cfg = dict(zip(raw[0::2],raw[1::2]))
+if cfg.get("PUSHOVER_ENABLED")!="1" or not cfg.get("PUSHOVER_APP_TOKEN"): sys.exit(0)
+for i in (1,2):
+    user = cfg.get(f"PUSHOVER_USER_KEY_{i}") or (cfg.get("PUSHOVER_USER_KEY") if i==1 else "")
+    device = cfg.get(f"PUSHOVER_DEVICE_{i}") or (cfg.get("PUSHOVER_DEVICE") if i==1 else "")
+    if not user: continue
+    key = hashlib.sha256((user+"\0"+(device or "")).encode()).hexdigest()
+    marker = state/f"sent-{key}"
+    if marker.exists() and marker.read_text().strip()==str(result["remote"]): continue
+    data = {"token":cfg["PUSHOVER_APP_TOKEN"],"user":user,"title":f"Installer-Update V{result['remote']} verfügbar","message":f"Proxmox Master-Installer V{result['remote']} ist auf GitHub main verfügbar. Lokal: V{result['local']}. Installation beim nächsten manuellen Installerstart.","url":"https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md","url_title":"Versionshistorie"}
+    if device: data["device"]=device
+    try:
+        with urllib.request.urlopen("https://api.pushover.net/1/messages.json",data=urllib.parse.urlencode(data).encode(),timeout=20) as response:
+            if json.load(response).get("status")!=1: raise ValueError("Pushover rejected")
+        atomic(marker,str(result["remote"]))
+        print("Installer-Update-Benachrichtigung zugestellt.")
+    except Exception:
+        print("Pushover fehlgeschlagen; erneuter Versuch beim nächsten Lauf.")
+PY_MONITOR
+MONITOR_V155
+    chmod 700 /usr/local/sbin/nodezero-installer-monitor
+    cat > /etc/systemd/system/nodezero-installer-monitor.service <<'MONITOR_SERVICE'
+[Unit]
+Description=NodeZero Installer Versionsprüfung
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nodezero-installer-monitor
+TimeoutStartSec=120
+UMask=0077
+MONITOR_SERVICE
+    cat > /etc/systemd/system/nodezero-installer-monitor.timer <<'MONITOR_TIMER'
+[Unit]
+Description=NodeZero Installer Versionsprüfung alle 15 Minuten
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=30s
+[Install]
+WantedBy=timers.target
+MONITOR_TIMER
+    bash -n /usr/local/sbin/nodezero-installer-monitor
+    systemctl daemon-reload
+    systemctl enable --now nodezero-installer-monitor.timer
+)
+
+install_installer_update_dashboard_v155() (
+    local dir=/opt/nodezero/dashboard/static
+    [[ -f "$dir/index.html" ]] || return 0
+    python3 - "$dir" <<'PY_MONITOR_DASH'
+from pathlib import Path
+import sys, os, tempfile, shutil
+directory=Path(sys.argv[1])
+index=directory/"index.html"
+tag='<script defer src="/installer-update-v155.js"></script>'
+js="""(() => {
+const refresh = async () => {
+ let box = document.getElementById('nodezero-installer-update');
+ if (!box) {
+   box = document.createElement('aside'); box.id='nodezero-installer-update';
+   box.setAttribute('role','status');
+   Object.assign(box.style,{position:'fixed',bottom:'16px',right:'16px',maxWidth:'min(360px,90vw)',zIndex:'1000',padding:'12px 16px',borderRadius:'10px',background:'#182334',color:'#fff',border:'1px solid #8090aa',boxShadow:'0 4px 15px #0004',font:'14px system-ui'});
+   document.body.append(box);
+ }
+ try {
+   const response=await fetch('/installer-update-status.json',{cache:'no-store'});
+   if(!response.ok) throw Error();
+   const s=await response.json();
+   box.hidden=s.status==='current' && Date.now()-Date.parse(s.checked)<3600000;
+   box.replaceChildren();
+   const label=document.createElement('strong');
+   label.textContent=s.status==='available'?'Installer-Update verfügbar: V'+s.remote:s.status==='local_newer'?'Lokaler Installer neuer als main':'Installer-Updateprüfung nicht aktuell / fehlgeschlagen';
+   box.append(label);
+   if(s.status==='available'){
+     const detail=document.createElement('div'); detail.textContent='Lokal V'+s.local+' · GitHub V'+s.remote;box.append(detail);
+     const link=document.createElement('a');link.href='https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md';link.textContent='Versionshistorie öffnen';link.target='_blank';link.rel='noopener noreferrer';link.style.color='#8dd8ff';box.append(link);
+   }
+ } catch {box.hidden=false;box.textContent='Installer-Updateprüfung: keine Daten';}
+};
+refresh();setInterval(refresh,60000);
+})();"""
+def write(path, data, mode):
+    fd,tmp=tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd,'w') as f:f.write(data)
+        os.chmod(tmp,mode)
+        os.replace(tmp,path)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
+write(directory/"installer-update-v155.js",js,0o644)
+s=index.read_text()
+if tag not in s:
+    if "</body>" not in s:raise SystemExit("Dashboard body fehlt")
+    backup=index.with_name("index.html.pre-installer-monitor-v155")
+    if not backup.exists():shutil.copy2(index,backup)
+    write(index,s.replace("</body>",tag+"\n</body>",1),index.stat().st_mode & 0o777)
+PY_MONITOR_DASH
+)
+
 install_proxmox_auto_updater
+install_installer_update_monitor_v155 || warn "Installer-Monitor konnte nicht eingerichtet werden."
+install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige konnte nicht eingerichtet werden."
 
 ensure_tui
 
@@ -8388,6 +8926,16 @@ while true; do
             exit 0
         fi
 
+        continue
+    fi
+
+    if [[ "$INSTALL_SELECTION" == "23" ]]; then
+        install_kuma_public_status_v155 || warn "Kuma-Statusansicht konnte nicht installiert werden."
+        continue
+    fi
+
+    if [[ "$INSTALL_SELECTION" == "22" ]]; then
+        run_stress_test_v155 || warn "Stresstest beendet; Diagnosebericht prüfen."
         continue
     fi
 
@@ -12039,6 +12587,14 @@ CTV143
 install_paperless() {
     header "PAPERLESS-NGX + OLLAMA INSTALLIEREN"
 
+    local existing_id
+    for existing_id in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$existing_id" | awk '/^hostname: / {print tolower($2)}')" == "paperless" ]]; then
+            warn "Paperless bereits in CT ${existing_id} vorhanden; bestehende Installation bleibt unverändert."
+            return 0
+        fi
+    done
+
     prepare_ct_cache_dirs "paperless"
 
     local paperless_unprivileged=1
@@ -12362,7 +12918,7 @@ verify_paperless_proxy_v138() {
         return 1
     }
 
-    grep -Fxq "PAPERLESS_URL=https://${ip}" <<<"$env_out" || {
+    grep -Eq '^PAPERLESS_URL=https://[^[:space:]]+$' <<<"$env_out" || {
         warn "Paperless V138: PAPERLESS_URL fehlt/falsch."
         return 1
     }
@@ -12420,7 +12976,9 @@ print("PROXY=" + repr(settings.SECURE_PROXY_SSL_HEADER))
         return 1
     }
 
-    grep -Fq "https://${ip}" <<<"$django_out" || {
+    local configured_url
+    configured_url="$(sed -n 's/^PAPERLESS_URL=//p' <<<"$env_out")"
+    grep -Fq "$configured_url" <<<"$django_out" || {
         warn "Paperless V138: externe HTTPS-Adresse fehlt in CSRF_TRUSTED_ORIGINS."
         printf '%s\n' "$django_out" >&2
         return 1
@@ -12525,6 +13083,11 @@ wanted = {
     "PAPERLESS_CONSUMER_POLLING_INTERVAL": '"10"' if external_consume else '"0"',
 }
 
+existing_url = re.search(r"(?m)^ {6}PAPERLESS_URL:[ \t]*(.+)$", text)
+if existing_url and existing_url.group(1).strip() not in ("", '""', "''"):
+    wanted["PAPERLESS_URL"] = existing_url.group(1).strip()
+
+original = text
 for key in wanted:
     text = re.sub(
         rf"(?m)^\s{{6}}{re.escape(key)}:\s*.*\n?",
@@ -12532,11 +13095,7 @@ for key in wanted:
         text,
     )
 
-text = re.sub(
-    r"(?m)^\s{6}PAPERLESS_CSRF_TRUSTED_ORIGINS:\s*.*\n?",
-    "",
-    text,
-)
+ # Preserve explicitly configured CSRF, allowed hosts and CORS settings.
 
 anchor = re.search(
     r'(?m)^(\s{6}PAPERLESS_SECRET_KEY:\s*.*)$',
@@ -12560,7 +13119,12 @@ text = (
     + text[anchor.end():]
 )
 
-path.write_text(text, encoding="utf-8")
+if text != original:
+    from datetime import datetime
+    import shutil
+    backup = path.with_name(path.name + ".pre-v155-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+    shutil.copy2(path, backup)
+    path.write_text(text, encoding="utf-8")
 PYV138
 
     pct push \
@@ -12585,7 +13149,7 @@ PYV138
         set -Eeuo pipefail
         cd /opt/paperless
         docker compose config -q
-        docker compose up -d --force-recreate webserver
+        docker compose up -d --no-deps --pull never webserver
     '; then
         warn "Paperless V138: Webserver-Recreate fehlgeschlagen."
         return 1
@@ -14053,6 +14617,14 @@ EOF
 install_uptime_kuma() {
     header "UPTIME KUMA INSTALLIEREN"
 
+    local existing_id
+    for existing_id in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$existing_id" | awk '/^hostname: / {print tolower($2)}')" == "uptime-kuma" ]]; then
+            warn "Uptime Kuma bereits in CT ${existing_id} vorhanden; bestehende Installation bleibt unverändert."
+            return 0
+        fi
+    done
+
     prepare_persistent_data_base
 
     echo "Persistente Uptime-Kuma-Daten:"
@@ -14072,8 +14644,11 @@ services:
     image: louislam/uptime-kuma:2
     container_name: uptime-kuma
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3001"
+    # Host-Netz des dedizierten LXC, nicht des Proxmox-Hosts.
+    network_mode: host
+    environment:
+      UPTIME_KUMA_HOST: "127.0.0.1"
+      UPTIME_KUMA_PORT: "3001"
     volumes:
       - /mnt/uptime-kuma-data:/app/data
 EOF
@@ -18391,6 +18966,13 @@ print(data.get("value") or data.get("token") or "")
     echo "[OK] Token-Secret gespeichert: $TOKEN_FILE"
 fi
 
+# Root-Pfad nur lesend, ohne Vererbung; PowerMgmt bleibt am Knoten.
+if ! pveum role add UPSAudit --privs Sys.Audit; then
+    pveum role modify UPSAudit --privs Sys.Audit
+fi
+pveum acl modify / --users "$PVEUPS_USER_ID" --roles UPSAudit --propagate 0
+pveum acl modify / --tokens "$PVEUPS_TOKEN_ID" --roles UPSAudit --propagate 0
+
 echo
 echo "Token-Berechtigungen:"
 pveum user token permissions "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" || true
@@ -18913,6 +19495,17 @@ ensure_pve_ups_latest_v63() {
 
 install_pve_ups_community() {
     header "PVE-UPS INSTALLIEREN"
+
+    # Keine zweite Shutdown-Appliance anlegen oder eine vorhandene umkonfigurieren.
+    local existing_id
+    for existing_id in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$existing_id" | awk '/^hostname: / {print tolower($2)}')" == "pve-ups" ]]; then
+            warn "PVE-UPS bereits in CT ${existing_id} vorhanden; Neuinstallation übersprungen."
+            PVEUPS_SKIPPED=1
+            INSTALL_PVEUPS=0
+            return 0
+        fi
+    done
 
     if ! community_pve_ups_available; then
         if (( OPTIMAL_INSTALL )); then
@@ -19531,11 +20124,8 @@ fi
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
 
-# V138: Bei einem reinen Dashboard-Update einen bereits vorhandenen
-# Paperless-CT nachziehen. Bei Neuinstallation prüft install_paperless() selbst.
-if (( INSTALL_DASHBOARD && ! INSTALL_PAPERLESS )); then
-    run_install_step         "Paperless HTTPS / CSRF / Login-IP prüfen"         repair_existing_paperless_proxy_v138
-fi
+# V155: Dashboard-Updates verändern keine fremden Dienste.
+# Paperless-Migration wird nicht automatisch ausgeführt.
 
 (( INSTALL_PIHOLE )) && run_install_step "Pi-hole + Unbound" install_pihole
 (( INSTALL_NETALERTX )) && run_install_step "NetAlertX" install_netalertx
@@ -19681,6 +20271,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]
     fi
 
     (( INSTALL_DASHBOARD )) && install_dashboard_branding_v154
+    install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige fehlt."
 fi
 
 # V69:
