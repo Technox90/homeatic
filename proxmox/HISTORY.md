@@ -1,0 +1,674 @@
+# Proxmox Installer · Versionshistorie
+
+> **Aktueller Stand: V151 · 24.11.2026**  
+> Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
+> Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
+
+[Zur aktuellen Installer-Dokumentation](README.md)
+
+---
+
+24.11.2026 – V151 · Generisches Dashboard-Branding / Update-Schutz
+-----------------------------------------------------------------------
+- Installer-Version auf V151 angehoben.
+- Dashboard-Branding vollständig von persönlichem LT-WBH-Branding entkoppelt.
+- Persönliche Dateien `dashboard/assets/logo-lt-wbh.png` und `dashboard/assets/favicon-lt-wbh.png` aus dem aktuellen `main` entfernt.
+- Alte V150-Branding-Dateien aus `main` entfernt; neuer generischer Stand: `dashboard/branding-v151.css` und `dashboard/branding-v151.js`.
+- Generische Bildpfade: `dashboard/assets/logo.png` und `dashboard/assets/favicon.png`.
+- Repository liefert für Neuinstallationen nur vollständig transparente, neutrale PNG-Platzhalter.
+- Zielpfade auf dem Server: `/opt/nodezero/dashboard/static/assets/logo.png` und `/opt/nodezero/dashboard/static/assets/favicon.png`.
+- Normale Dashboard-Updates laden Logo/Favicon nicht aus GitHub und überschreiben, löschen oder ersetzen bestehende Bilddateien niemals.
+- Erst-/Neuinstallationen laden neutrale Platzhalter ausschließlich dann, wenn die jeweilige Bilddatei noch nicht vorhanden ist.
+- Bestehende V150-Installationen werden kompatibel migriert: vorhandene Legacy-Bilder werden nur byte-identisch auf die generischen Dateinamen kopiert, falls diese fehlen.
+- Ein normales Update übernimmt Dashboard-Name, Logo-Text, Logo-Stil und ein vorhandenes Custom-Favicon unverändert.
+- Abfragen für Dashboard-Name/Fallback-Logo-Text erfolgen nur bei Erst-/Neuinstallation; ein normales Update bleibt rückfragefrei für Branding.
+- Standardwerte sind jetzt generisch: `PVE Hardware Monitor`, Fallback-Text `NODEZERO`, Stil `neon`.
+- Ist `logo.png` leer/transparent oder nicht vorhanden, zeigt das Menü automatisch den konfigurierten Text-Fallback.
+- Ein vorhandenes über die Dashboard-Einstellungen hochgeladenes Favicon behält Vorrang; `favicon_url` wird bei Updates nicht zurückgesetzt.
+- Feste Toolbar bleibt erhalten: Menü · LIVE · USV Online · Neustart · Herunterfahren.
+- README-Struktur modernisiert: aktueller Versionsstand steht oben; vollständige Historie wird separat in `proxmox/HISTORY.md` geführt.
+
+24.11.2026 – V150 · LT-WBH Branding-Reparatur nach Live-Test
+---------------------------------------------------------------
+- Live-Test auf `dash.ltwbh.de` zeigte: Toolbar/USV-Patch aktiv, aber Seitentitel blieb `PVE Hardware Monitor`, Menü-Logo war nicht sichtbar und ein alter `favicon-custom.png`-Pfad lieferte HTTP 404.
+- Ursache behoben: Branding setzt den Titel jetzt zusätzlich über `.top .brand h1` und `document.title`, auch wenn ältere DOM-IDs fehlen.
+- Das Seitenmenü startet unterhalb der festen Toolbar, damit der Branding-Kopf nicht verdeckt wird.
+- `dashboard/assets/logo-lt-wbh.png` wurde durch den schmalen grafischen LT-WBH-PNG-Schriftzug ersetzt.
+- Für `logo_text=LT-WBH` wird dieses PNG im Menü angezeigt; andere Installationen behalten Text-/Design-Fallback.
+- Das feste LT-WBH-PNG-Favicon hat beim LT-WBH-Branding Vorrang vor einem alten Custom-Favicon.
+- Beim LT-WBH-Update wird ein alter/staler `favicon_url`-Eintrag aus `ui.json` geleert; eigene spätere Uploads bleiben weiterhin möglich.
+
+24.11.2026 – V150 · Menü-Logo als schmaler LT-WBH-Wordmark
+-------------------------------------------------------------
+- Großes LT-WBH-Badge aus dem Seitenmenü entfernt; dadurch bleibt der Menükopf kompakt.
+- Das Menü zeigt jetzt nur einen schmalen, modernen Schriftzug mit dem konfigurierten Logo-Text.
+- Standard für Tobias: `LT-WBH`.
+- Das feste PNG-Favicon bleibt aktiv; die PNG-Branding-Dateien bleiben im Repository erhalten.
+- Der Schriftzug wird automatisch in `#sideNav .navHead` eingeblendet; keine manuelle HTML-Änderung erforderlich.
+
+24.11.2026 – V150 · Dashboard Branding / feste Bedienleiste
+---------------------------------------------------------------
+- Installer-Version auf V150 angehoben.
+- Bei normaler Dashboard-Installation/-Aktualisierung werden Dashboard-Name, Logo-Text und Logo-Design abgefragt.
+- Standard für die aktuelle LT-WBH-Installation: `Dashboard LT-WBH` und Logo `LT-WBH`.
+- Logo-Designs: Neon Hex, Orbit, Pulse und Minimal.
+- Optimalmodus bleibt rückfragefrei und übernimmt vorhandene Werte bzw. Standards.
+- Obere Bedienleiste bleibt dauerhaft sichtbar und wird in fester Reihenfolge gehalten: Menü, LIVE, USV Online, Neustart, Herunterfahren.
+- Das Seitenmenü erhält ein modernes Branding-Logo mit dem gewählten Text.
+- Ohne eigenes Upload-Favicon wird clientseitig ein PNG-Favicon mit echtem transparentem Alpha-Hintergrund erzeugt; ein eigenes hochgeladenes Favicon hat Vorrang.
+- Branding wird persistent in `/etc/pve-sensor-dashboard/ui.json` gespeichert und bei späteren Farb-/HTTPS-/Favicon-Änderungen erhalten.
+- Neue modulare Assets: `dashboard/branding-v150.css` und `dashboard/branding-v150.js`.
+- Persönliche LT-WBH-Bilddateien fest im Repository ergänzt: `dashboard/assets/logo-lt-wbh.png` und `dashboard/assets/favicon-lt-wbh.png`.
+- Beide Dateien sind PNG mit echtem Alpha-Kanal/Transparenz und werden vom Installer geprüft und nach `/opt/nodezero/dashboard/static/assets/` installiert.
+- Bei `logo_text=LT-WBH` nutzt das Seitenmenü das feste PNG-Logo und der Browser das feste PNG-Favicon; andere Branding-Namen nutzen weiterhin das dynamische Design.
+- Dashboard-Modul und Master-Installer verwenden unveränderliche Commit-Pins; CI prüft V150-Marker, Modul-Pin und Branding-Assets.
+
+24.11.2026 – Uptime-Kuma-TLS erfolgreich erweitert
+-----------------------------------------------------
+- `python3-certbot-nginx` auf dem Proxmox-Host installiert.
+- Bestehendes Let's-Encrypt-Zertifikat `ltwbh-services` erfolgreich um `up.ltwbh.de` erweitert.
+- Aktuelle SANs: `dash.ltwbh.de`, `ha.ltwbh.de`, `paper.ltwbh.de`, `pdf.ltwbh.de`, `up.ltwbh.de`, `vault.ltwbh.de`.
+- Zertifikat läuft laut Certbot bis 22.02.2027.
+- `nginx -t` erfolgreich; nginx anschließend neu geladen.
+- Frühere TLS-Fehlermeldung für `up.ltwbh.de` ist damit behoben.
+- Nächster Prüfschritt bei Bedarf: Reverse-Proxy-Kette Proxmox/nginx -> CT 105 `192.168.178.105:443` -> Uptime Kuma `127.0.0.1:3001`.
+
+24.11.2026 – Dokumentation · ChatGPT-Handoff / Uptime-Kuma-TLS
+----------------------------------------------------------------
+- Neue Datei `proxmox/CHATGPT-HANDOFF.md` für die Übergabe in einen neuen Chat.
+- Dokumentiert den aktuellen produktiven nginx-/Domain-/Zertifikatsstand ohne Secrets.
+- Uptime Kuma ist für `https://up.ltwbh.de` vorgesehen.
+- Fehlerbild `curl (60) ... no alternative certificate subject name` als fehlender SAN im bestehenden Zertifikat `ltwbh-services` dokumentiert.
+- Sichere Reparatur dokumentiert: bestehende SANs automatisch übernehmen, `up.ltwbh.de` ergänzen, Zertifikat erweitern, `nginx -t`, Reload und curl-Test.
+- Wichtiger Migrationshinweis ergänzt: das Repository-Tool `nodezero-external-urls` verwendet `nodezero-external`, während die bestehende manuelle Produktivkonfiguration aktuell `ltwbh-services` nutzt; doppelte nginx-VHosts vermeiden.
+- Direkt kopierbarer Startprompt für einen neuen Chat ergänzt.
+
+24.11.2026 – V149 · Uptime Kuma externe Standard-URL
+-------------------------------------------------------
+- Uptime Kuma verwendet bei der External-URL-Konfiguration standardmäßig `up.<hauptdomain>` statt `uptime.<hauptdomain>`.
+- Für `ltwbh.de` lautet der Vorschlag damit `https://up.ltwbh.de`.
+- Backend-Erkennung und bestehende Uptime-Kuma-Installation bleiben unverändert.
+
+24.11.2026 – V148 · Stirling PDF Registry-Fallback
+---------------------------------------------------
+- Stirling PDF Neuinstallationen verwenden jetzt den offiziell dokumentierten GitHub Container Registry Pfad `ghcr.io/stirling-tools/stirling-pdf:latest`.
+- Hintergrund: `docker.stirlingpdf.com` kann temporär mit HTTP 503 ausfallen; Stirling dokumentiert GHCR ausdrücklich als alternative Registry.
+- Bestehende Stirling-Installationen werden beim nächsten Auto-Updater-Lauf einmalig von `docker.stirlingpdf.com/stirlingtools/stirling-pdf` auf GHCR migriert.
+- Vor der Migration wird die Compose-Datei als `.pre-v148-stirling-registry.bak` gesichert.
+- Nach der Änderung wird `docker compose config -q` geprüft; bei Fehler wird das Backup automatisch wiederhergestellt.
+- Andere Docker-Dienste und deren Registries bleiben unverändert.
+- Der NodeZero-Tool-Pin wurde auf den geprüften V148-Updater-Stand aktualisiert.
+
+24.11.2026 – V147 · Automatisches Installer-Self-Update
+--------------------------------------------------------
+- Beim Start per `bash proxmox.sh` prüft der Installer vor dem Hauptmenü automatisch den aktuellen Stand von GitHub `main`.
+- Verglichen wird der vollständige Dateiinhalt und nicht nur die Versionsnummer.
+- Ein Download wird nur übernommen, wenn er nicht leer ist, den erwarteten Installer-Marker enthält und `bash -n` erfolgreich ist.
+- Vor dem Ersetzen wird die aktuell ausgeführte Datei unter `/home/backups/proxmox-installer-self-update/` gesichert.
+- Nach erfolgreichem Austausch startet die neue Installer-Version automatisch mit denselben Argumenten neu.
+- `NODEZERO_SELFUPDATE_DONE` verhindert eine Neustartschleife innerhalb desselben Starts.
+- Ist GitHub nicht erreichbar oder schlägt die Prüfung fehl, läuft die vorhandene lokale Installer-Version normal weiter.
+
+24.11.2026 – V146 · Logs, Updater und externe URLs
+---------------------------------------------------
+- Pi-hole-Sprachlogs werden jetzt tatsächlich unter /home/diagnose/pihole-language/ gespeichert; die in V144 dokumentierte, aber im Code fehlende Umstellung ist damit umgesetzt.
+- Alte /root/pihole-sprache-*.txt werden beim Installer-Start einmalig in die neue Diagnose-Ablage migriert.
+- Alte /var/log/proxmox-auto-updater-Inhalte werden nach /home/diagnose/proxmox-auto-updater/ übernommen.
+- Pi-hole-Sprachlogs werden nach 60 Tagen automatisch bereinigt.
+- Die zweite, eingebettete Kopie des Proxmox-Auto-Updaters wurde aus proxmox.sh entfernt.
+- Kanonische Quelle ist nur noch proxmox/tools/proxmox-auto-updater; Master-Installer und manuelle Updates verwenden damit denselben Code.
+- Doppelte dashboard_link_upsert-Aufrufe in einzelnen App-Installationen wurden entfernt; die zentrale Abschluss-Synchronisierung bleibt bestehen.
+- Neuer Wartungspunkt 21: Externe URLs · Domain / Reverse Proxy / Let's Encrypt.
+- nodezero-external-urls erkennt installierte Webdienste und schlägt automatisch Subdomains wie dash.<domain>, ha.<domain>, paper.<domain>, vault.<domain> usw. vor.
+- Jede vorgeschlagene URL und interne Backend-URL kann einzeln bearbeitet werden; zusätzliche eigene Dienste können ergänzt werden.
+- Sensible Admin-Oberflächen wie Proxmox, Pi-hole, NPM, Prometheus und PVE-UPS sind standardmäßig nicht extern aktiviert.
+- Externe URLs werden als exakte nginx server_name-VHosts auf dem Proxmox-Host angelegt. Proxmox selbst bleibt nativ auf :8006; das lokale Dashboard behält 80/443.
+- Let's Encrypt nutzt HTTP-01 über Port 80; optional kann ein vorhandenes DynDNS-/CNAME-Ziel hinterlegt werden.
+- Konfiguration liegt unter /home/Data/proxmox-installer/external-urls/, Logs unter /home/diagnose/external-urls/, Backups unter /home/backups/external-urls/.
+- Nach Installationen wird eine vorhandene External-URL-Konfiguration automatisch erneut auf aktuelle Gast-IP-Adressen angewendet.
+- GitHub-CI prüft ab V146 zusätzlich Pi-hole-Logpfade, die entdoppelte Updater-Quelle, Python-Syntax des URL-Tools und Menüpunkt 21.
+
+17.10.2026 – V145 · NodeZero Dashboard-Ansichten
+------------------------------------------------
+- Fünf GitHub-Darstellungsprofile: Boot Sequence, Live Pulse, Telemetry Flow, Glass Motion und Status Control.
+- Neue Auswahl: Basis-Systeme -> DV Dashboard-Ansicht wählen; kein Gast-Reset oder Dashboard-Neuaufbau erforderlich.
+- Alle fünf CSS-Pakete und ein gemeinsames Animationsskript werden lokal zwischengespeichert.
+- Offline-Wechsel über /usr/local/sbin/nodezero-dashboard-views; aktiver Stil bleibt bei Dashboard-Updates erhalten.
+- Basis-HTML wird vor erstmaliger Integration gesichert; markerbasierte Integration ist wiederholbar.
+- Dashboard-Daten, Kategorien, Links, API, Power-Code und TLS bleiben unverändert.
+- Workflow prüft Bash-/JavaScript-Syntax und die fünf Pakete.
+
+29.09.2026 – V144
+-----------------
+- Installer-Verzeichnisstruktur vereinheitlicht: verwaltete Artefakte liegen künftig unter /home.
+- Neue Standardpfade:
+  * /home/downloads für Downloads und wiederverwendbare GitHub-/Tool-Artefakte,
+  * /home/backups für Konfigurations- und Reparatur-Backups,
+  * /home/diagnose für Diagnoseberichte und Installer-/Hilfstool-Logs,
+  * /home/img für Image-/Docker-/Ollama-/Template-Caches,
+  * /home/passwort für die lokale Secret-Sicherung,
+  * /root/passwort bleibt ausschließlich für aktive Passwörter/Tokens/Secrets.
+- Bestehende Verzeichnisse /root/downloads, /root/backups und /root/diagnose werden beim Start einmalig nach /home migriert und danach entfernt, sofern die Migration erfolgreich war.
+- Pi-hole-Sprachlogs landen nicht mehr direkt unter /root, sondern in /home/diagnose.
+- Auto-Updater-Logs wurden von /var/log/proxmox-auto-updater nach /home/diagnose/proxmox-auto-updater verschoben.
+- Dashboard-Modul vollständig auf /home/backups und /home/diagnose umgestellt.
+- OpenRGB-, Pulse-, PVE-UPS- und Pi-hole-Hilfswerkzeuge verwenden ebenfalls die neue /home-Struktur.
+- Modul- und Tool-Caches werden aus /home/downloads geladen.
+- Dokumentation und CI-Prüfungen auf das V144-Layout aktualisiert.
+
+27.09.2026 – V143
+-----------------
+- Paperless-NAS-Ablage grundlegend auf direkten NFS-Mount im Paperless-LXC umgestellt.
+- Bei externer NAS-Ablage wird der Paperless-CT jetzt bewusst privilegiert erstellt; lokale Paperless-Installationen bleiben unprivilegiert.
+- CT-Features bei externer Ablage: nesting=1,mount=nfs;nfs4. keyctl wird nur noch beim unprivilegierten lokalen Paperless-CT verwendet.
+- Der bisherige PVE-Host-Mount /mnt/paperless-nas und der mp4-Bind-Mount nach /mnt/paperless-storage entfallen bei Neuinstallationen vollständig.
+- Der feste Mountpunkt im Paperless-CT ist /mnt/paperless-storage.
+- nfs-common wird im Paperless-CT installiert; die Synology-Freigabe wird dort über /etc/fstab als NFSv4.1 mit systemd-Automount dauerhaft eingetragen.
+- Docker erhält RequiresMountsFor=/mnt/paperless-storage, damit der Paperless-Stack nach CT-Neustarts nicht vor dem NAS-Mount startet.
+- Installation prüft die tatsächliche NFS-Quelle/FSTYPE und einen Schreibtest als UID/GID 1000.
+- Bei fehlender NFS-Berechtigung nennt der Installer ausdrücklich die Paperless-CT-IP, die auf der Synology als NFS-Client Schreibzugriff erhalten muss.
+- Alte, vom Installer erzeugte PVE-fstab-Einträge für /mnt/paperless-nas werden nach erfolgreichem direkten CT-Mount automatisch entfernt, sofern kein anderer LXC diesen Legacy-Pfad noch verwendet.
+- Keine direkte Änderung von arch oder anderen CT-Grundfeldern; die fehlerhafte Mount-Erkennung aus dem manuellen Reparaturversuch ist damit nicht Bestandteil des Installers.
+
+25.09.2026 – V142
+-----------------
+- Navigation nach Auto-Updater/Pushover korrigiert.
+- Ursache: Menüpunkt 11 und 20 haben nach dem Beenden des jeweiligen Untermenüs im Master-Installer noch `exit 0` ausgeführt.
+- Dadurch hat "Zurück" zwar das Untermenü korrekt beendet, anschließend aber den gesamten Master-Installer geschlossen.
+- Auto-Updater-Konfiguration kehrt jetzt mit `continue` in den Master-Installer zurück.
+- Pushover-Konfiguration kehrt ebenfalls mit `continue` in den Master-Installer zurück.
+- Ein Fehler in einem der beiden Unterprogramme beendet den Master-Installer ebenfalls nicht mehr; stattdessen wird eine Warnung angezeigt.
+- CI prüft ab V142 explizit, dass die Auswahlblöcke 11 und 20 `continue` enthalten und kein `exit 0`.
+
+24.09.2026 – V141
+-----------------
+- Auto-Updater und Pushover unter Wartung & Einstellungen vollständig getrennt.
+- Menü:
+  * 11 = Auto-Updater · Zeitplan / Status / Sofortlauf
+  * 20 = Pushover · Empfänger / Test / Ein-Aus
+- Separate Werkzeuge im Repository:
+  * proxmox/tools/proxmox-auto-updater-config
+  * proxmox/tools/proxmox-pushover-config
+- Beide Werkzeuge werden versionsgebunden aus einem unveränderlichen Git-Commit nach /root/downloads/nodezero/tools/<git-ref>/ geladen.
+- Vor Installation wird jedes Werkzeug mit bash -n geprüft.
+- Auto-Updater-Menü an den Whiptail/TUI-Stil des Master-Installers angepasst.
+- Tägliche Update-Uhrzeit kann nachträglich im Format HH:MM geändert werden; Standard bleibt 05:00 Uhr.
+- Eigene Zeit wird unter /root/.config/proxmox-auto-updater/schedule.env gespeichert.
+- systemd-Drop-in: /etc/systemd/system/proxmox-auto-updater.timer.d/schedule.conf.
+- Die geänderte Uhrzeit bleibt bei späteren Master-Installer-Läufen erhalten.
+- Auto-Updater-Menü: Status/nächster Lauf, Uhrzeit ändern, Sofortlauf, letztes Log.
+- Pushover-Menü: Status/Empfänger, Zugangsdaten ändern, Testnachricht, Aktivieren, Deaktivieren.
+- Bestehender API-Token und User Keys können beim Bearbeiten durch Leerlassen beibehalten werden.
+- Zweiter Pushover-Empfänger kann beibehalten, neu eingerichtet oder entfernt werden.
+- Reset entfernt das Timer-Drop-in und das separate Pushover-Werkzeug.
+- CI prüft Master-Installer, beide separaten Tools, Dashboard-Modul und Dashboard-Python-Dateien.
+
+23.09.2026 – V140
+-----------------
+- Vollständige Dashboard-Logik aus proxmox/proxmox.sh ausgelagert.
+- Neues Modul: proxmox/modules/dashboard.sh.
+- Ausgelagert wurden rund 23.000 Zeilen, darunter:
+  * Dashboard-Installation,
+  * Service-/Link-Manager und Menüsortierung,
+  * Router-Link und flexibler Menü-Editor,
+  * Einstellungen, Farben und Theme-Migrationen,
+  * Kategorien und Kategorie-Zuordnung,
+  * Dashboard HTTP/HTTPS-Konfiguration,
+  * USV-/NAS-Karte und USV-Einstellungen,
+  * Layout-Editor,
+  * Pi-hole-Dashboard-Einstellungen,
+  * finale Dashboard-Prüfung und /usv-Shortcut.
+- Der Master-Installer lädt dashboard.sh über einen unveränderlichen Git-Commit.
+- Modul-Cache: /root/downloads/nodezero/modules/<git-ref>/dashboard.sh.
+- Vor dem source wird das heruntergeladene Modul immer mit bash -n geprüft.
+- Bereits vorhandene Moduldateien werden wiederverwendet und nicht erneut heruntergeladen.
+- Die Dashboard-Basisdateien collector.py, app.py und index.html bleiben weiterhin separat unter dashboard/.
+- V139-Dateilayout bleibt unverändert:
+  * /root/passwort für aktive Secrets,
+  * /home/passwort für die lokale Secret-Sicherung,
+  * /root/downloads für Downloads,
+  * /home/img für permanente Images/Caches,
+  * /opt/nodezero für installierten Eigen-Code.
+- OpenRGB, Paperless V138, Pi-hole, PVE-UPS und die übrigen Module bleiben im Master-Installer erhalten.
+- GitHub Actions prüft ab V140 Hauptinstaller, Dashboard-Modul und Python-Basisdateien separat.
+
+23.09.2026 – V139
+-----------------
+- Installer-Dateilayout auf feste NodeZero-Pfade umgestellt:
+  * aktive Passwörter/Tokens/Secrets: /root/passwort/
+  * lokale Secret-Sicherung: /home/passwort/
+  * normale Downloads und wiederverwendbare kleine Artefakte: /root/downloads/
+  * permanente Installations-/Image-Caches: /home/img/
+  * eigener installierter Anwendungscode: /opt/nodezero/
+- Bestehende Daten werden beim Start kompatibel übernommen:
+  * /home/Images wird, wenn eindeutig möglich, nach /home/img migriert,
+  * ein Legacy-Symlink /home/Images -> /home/img hält alte Pfade kompatibel,
+  * /home/passwd wird nach /root/passwort und /home/passwort übernommen,
+  * /opt/pve-sensor-dashboard wird nach /opt/nodezero/dashboard verschoben und per Legacy-Symlink erreichbar gehalten.
+- Der Proxmox image-cache Storage wird auf /home/img umgestellt bzw. akzeptiert während der Migration den Legacy-Symlink.
+- Docker-/Paperless-/Ollama-/HAOS-/LXC-/ISO-Caches liegen damit dauerhaft unter /home/img und bleiben bei KOMPLETT NEU erhalten.
+- Dashboard-Grundquellen aus proxmox.sh ausgelagert:
+  * dashboard/collector.py
+  * dashboard/app.py
+  * dashboard/index.html
+- Der Installer lädt diese Dateien versionsgebunden von einem unveränderlichen Git-Commit nach /root/downloads/dashboard/<asset-ref>/ und installiert sie nach /opt/nodezero/dashboard/.
+- Bereits heruntergeladene Dashboard-Dateien werden wiederverwendet; GitHub muss bei Folgeläufen nicht erneut geladen werden.
+- Die bisherigen Dashboard-Migrations-/Patchfunktionen bleiben im Installer erhalten, damit bestehende Installationen weiterhin aktualisiert werden können.
+- Durch die erste Modularisierung sinkt proxmox.sh um rund 1.450 eingebettete Dashboard-Zeilen.
+- OpenRGB, Paperless V138, Pi-hole, PVE-UPS und die übrigen Installationsmodule bleiben funktional erhalten.
+
+20.09.2026 – V138
+-----------------
+- Paperless-NAS-Inbox wird bei externer Ablage jetzt zuverlässig per Polling überwacht.
+- Ursache für liegenbleibende Dokumente:
+  * die Consume-/Inbox-Struktur liegt bei PAPERLESS_EXTERNAL_STORAGE auf /mnt/paperless-storage,
+  * dieser Pfad basiert auf NFS/Netzwerkspeicher,
+  * native Dateisystembenachrichtigungen (inotify) funktionieren auf NFS/SMB nicht zuverlässig,
+  * dadurch konnten Dateien in der Inbox liegen bleiben, obwohl Paperless selbst healthy war.
+- Neu bei Paperless:
+  * PAPERLESS_CONSUMER_POLLING_INTERVAL=10 bei externer NAS-Ablage,
+  * PAPERLESS_CONSUMER_POLLING_INTERVAL=0 bei lokaler Ablage.
+- Die Neuinstallation prüft jetzt zusätzlich:
+  * ob der Polling-Wert tatsächlich im laufenden Webserver-Container vorhanden ist,
+  * ob /usr/src/paperless/consume im laufenden Container existiert,
+  * ob die Inbox lesbar und beschreibbar ist.
+- Bestehende Paperless-Installationen werden durch repair_existing_paperless_proxy_v138 entsprechend nachgezogen.
+- Bei vorhandener /mnt/paperless-storage-Consume-Bind-Mount wird Polling=10 gesetzt, sonst 0.
+- V137 HTTPS-/CSRF-/allauth-Korrekturen bleiben unverändert aktiv.
+- Pi-hole-v6 dns.hosts, SQLite-Schutz, Dashboard-Link-Abgleich und Theme bleiben unverändert erhalten.
+
+20.09.2026 – V137
+-----------------
+- Alle bestätigten Paperless-Reverse-Proxy-/Login-Korrekturen direkt in die Neuinstallation übernommen.
+- Neue Paperless-Installationen enthalten jetzt fest:
+  * PAPERLESS_URL=https://<Paperless-IP>
+  * PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
+  * PAPERLESS_TRUSTED_PROXIES=127.0.0.1
+  * PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER=X-Real-IP
+- PAPERLESS_CSRF_TRUSTED_ORIGINS wird bei der Neuinstallation bewusst nicht zusätzlich gesetzt:
+  PAPERLESS_URL ergänzt denselben Origin bereits in Django und verhindert so den zuvor beobachteten Doppeleintrag.
+- Neue Abschlussprüfung verify_paperless_proxy_v137:
+  * docker compose config muss gültig sein,
+  * Paperless-Webserver muss healthy/running sein,
+  * tatsächlich geladene Container-Environment-Werte werden geprüft,
+  * Django CSRF_TRUSTED_ORIGINS muss https://<Paperless-IP> enthalten,
+  * SECURE_PROXY_SSL_HEADER muss aktiv sein,
+  * nginx muss X-Real-IP und X-Forwarded-Proto=https setzen.
+- Eine Paperless-Neuinstallation gilt erst nach erfolgreicher Proxy-/Login-Prüfung als abgeschlossen.
+- Bestehende Installationen können weiterhin über repair_existing_paperless_proxy_v137 nachgezogen werden.
+- Bei einem reinen Dashboard-Update wird diese Reparatur weiterhin ausgeführt; bei gleichzeitiger Paperless-Neuinstallation nicht doppelt.
+- V136-Migrationsblock vollständig neu aufgebaut.
+- Dabei einen durch die vorherige Patch-Generierung beschädigten/duplizierten Quelltextbereich entfernt; die echte Pi-hole-Funktion bleibt genau einmal erhalten.
+- Pi-hole-v6 dns.hosts, V129-SQLite-Fix, V134 Dashboard-Link-Abgleich und Dashboard-Theme bleiben unverändert erhalten.
+
+20.09.2026 – V136
+-----------------
+- Paperless-login 403 nach erfolgreichem CSRF-Fix behoben.
+- Neues Fehlerbild:
+  django.core.exceptions.PermissionDenied: Unable to determine client IP address
+- Ursache:
+  PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER war fälschlich als Django-META-Name HTTP_X_REAL_IP gesetzt.
+- Laut Paperless/allauth erwartet diese Option den echten HTTP-Headernamen.
+- Für nginx ist deshalb jetzt korrekt:
+  PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER=X-Real-IP
+- PAPERLESS_TRUSTED_PROXIES=127.0.0.1 bleibt bestehen.
+- nginx setzt bereits:
+  proxy_set_header X-Real-IP $remote_addr;
+- Bestehende Paperless-Installationen werden mit repair_existing_paperless_proxy_v136 migriert.
+- Die Migration:
+  * ersetzt den falschen Headernamen,
+  * entfernt einen ggf. zusätzlich gesetzten identischen PAPERLESS_CSRF_TRUSTED_ORIGINS-Eintrag, weil PAPERLESS_URL den Origin bereits selbst ergänzt,
+  * validiert docker compose,
+  * recreatet den Paperless-Webserver mit --force-recreate,
+  * prüft die geladenen Environment-Werte.
+- HTTPS bleibt der vorgesehene Standard; ein Wechsel auf HTTP ist für diesen Fehler nicht erforderlich.
+- V135 CSRF-/PAPERLESS_URL-Fix bleibt erhalten.
+- V134 Dashboard-Link-Abgleich, Theme, Pi-hole-v6 dns.hosts und SQLite-Schutz bleiben unverändert.
+
+20.09.2026 – V135
+-----------------
+- Paperless-ngx HTTPS-/CSRF-Fehler hinter dem lokalen nginx-Reverse-Proxy behoben.
+- Fehlerbild:
+  * Aufruf über https://<paperless-ip>/ funktioniert,
+  * beim Login erscheint HTTP 403 mit „CSRF-Verifizierung fehlgeschlagen. Anfrage abgebrochen.“
+- Ursache:
+  * Paperless lief intern auf HTTP Port 8000,
+  * nginx terminierte TLS und setzte X-Forwarded-Proto=https,
+  * im Paperless-Container fehlten jedoch die offiziellen Reverse-Proxy-/Origin-Einstellungen.
+- Neue Paperless-Compose-Werte:
+  * PAPERLESS_URL=https://<paperless-ip>
+  * PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
+  * PAPERLESS_TRUSTED_PROXIES=127.0.0.1
+  * PAPERLESS_ALLAUTH_TRUSTED_CLIENT_IP_HEADER=HTTP_X_REAL_IP
+- PAPERLESS_URL setzt bei Paperless-ngx zugleich die externe Basis-URL und ergänzt u. a. Allowed Hosts, CORS und CSRF Trusted Origins.
+- Für bereits vorhandene Paperless-LXC wurde repair_existing_paperless_https_v135 ergänzt.
+- Die Migration:
+  * erkennt den vorhandenen LXC anhand hostname=paperless,
+  * ermittelt seine private IPv4,
+  * ergänzt/ersetzt ausschließlich die vier von V135 verwalteten Reverse-Proxy-Werte,
+  * validiert docker compose,
+  * recreatet nur den Paperless-Webserver,
+  * prüft anschließend die tatsächlich gesetzten Container-Environment-Werte.
+- Die Migration läuft auch bei einem reinen Dashboard-Update, damit ein bestehendes Paperless ohne Neuinstallation repariert werden kann.
+- Paperless-Daten, Datenbank, Media, Consume, Export, Redis, Postgres und Ollama werden dabei nicht gelöscht.
+- V134 Dashboard-Link-Abgleich, Theme-Funktionen, Pi-hole-v6 dns.hosts und SQLite-Schutz bleiben unverändert erhalten.
+
+20.09.2026 – V134
+-----------------
+- Dashboard-Menüfooter korrigiert.
+- Ursache für die nach oben gewanderten Einstellungen:
+  * V133 setzte #dashboardSettingsHubButton absichtlich auf margin-top:0, damit der zuvor außerhalb des sichtbaren Bereichs liegende Button sofort sichtbar wurde.
+  * Dadurch stand „⚙ Einstellungen“ direkt nach dem dynamischen Dienstebereich statt am unteren Rand des Seitenmenüs.
+- V134 verwendet jetzt den Trenner #navSettingsDivider als Flex-Auto-Margin-Anker.
+- Ergebnis:
+  * Trenner + „⚙ Einstellungen“ + GitHub bilden wieder den unteren Menüabschluss.
+  * Bei wenigen Diensten bleibt der Block unten.
+  * Bei vielen Diensten bleibt das Seitenmenü vertikal scrollbar.
+- Fehlende Links bereits vorhandener CTs beim reinen Dashboard-Update behoben.
+- Ursache:
+  * Zusatzdienste wurden bisher nur über INSTALL_* Bedingungen mit dashboard_link_upsert eingetragen.
+  * Bei „Server-Dashboard installieren / aktualisieren“ waren die INSTALL_* Flags bereits vorhandener Dienste nicht gesetzt.
+  * Deshalb erschienen nur bereits gespeicherte bzw. die Basislinks, nicht aber vorhandene Zusatz-CTs.
+- Neuer Abgleich:
+  dashboard_reconcile_existing_guests_v134
+- Der Abgleich scannt vorhandene LXC über pct, ermittelt Hostname und private IPv4 und erkennt bekannte Installer-Webdienste.
+- Automatisch erkannt werden u. a.:
+  * Paperless, Pi-hole, NetAlertX
+  * Uptime Kuma, Vaultwarden, Caddy, Stirling PDF, ntfy
+  * Forgejo, Syncthing, Speedtest Tracker, Scrutiny, Mealie
+  * Proxmox Backup Server, Pulse, PVE-UPS
+  * Semaphore, Pocket ID, Prometheus, PVE Exporter, Grafana
+  * Pangolin, Gatus, Homepage, Nginx Proxy Manager, EMQX
+- Newt und CrowdSec werden bewusst nicht als Weblink ergänzt.
+- Sicherheitsregel:
+  * bestehende Links werden nicht gelöscht,
+  * bestehende URLs werden nicht überschrieben,
+  * manuelle Links bleiben unverändert,
+  * nur tatsächlich fehlende bekannte Dienste werden ergänzt.
+- Der Abgleich läuft vor der Standardkategorie-Zuordnung, sodass neu erkannte Dienste automatisch in Basics/Extras einsortiert werden können.
+- Pi-hole-v6 dns.hosts, CNAME-Sync, V129-SQLite-Fix und Dashboard-Theme-Migration bleiben unverändert erhalten.
+
+20.09.2026 – V133
+-----------------
+- Updatepfad für bereits vorhandene Dashboard-Installationen repariert.
+- Ursache: V132 enthielt die Theme-Funktionen zwar für Neuinstallationen, übersprang sie bei bestehenden V131/V132-Dashboards durch zu grobe Idempotenz-Prüfungen:
+  * vorhandenes settingsModal verhinderte das Einfügen der neuen Farbwähler,
+  * vorhandenes applyUiSettings() verhinderte das Einfügen der Theme-JavaScript-Funktionen,
+  * vorhandene /api/ui-settings-Route verhinderte das Erweitern der bestehenden API um Theme-Felder.
+- V133 migriert deshalb bestehende Installationen explizit:
+  * ui.json wird um fehlende/ungültige Theme-Werte ergänzt,
+  * read_ui_settings()-Defaults werden erweitert,
+  * helper_payload der Settings-API erhält alle Theme-Felder,
+  * Farbwähler werden in einen bestehenden Settings-Dialog nachgerüstet,
+  * Theme-JavaScript wird in bestehende Frontends nachgerüstet,
+  * Laden, Live-Vorschau und Speichern der Farben werden ergänzt.
+- Menü-Sichtbarkeit korrigiert:
+  * der sichtbare Trenner vor „⚙ Einstellungen“ war bereits vorhanden,
+  * .navManage verwendete jedoch margin-top:auto und drückte den Einstellungsbutton ans Ende des Sidebars,
+  * #dashboardSettingsHubButton wird jetzt direkt unter dem Trenner angezeigt,
+  * GitHub-Link bleibt direkt darunter,
+  * Sidebar ist vertikal scrollbar.
+- Beim Schließen des gemeinsamen Einstellungsfensters wird eine nicht gespeicherte Farb-Vorschau wieder auf die gespeicherten Werte zurückgesetzt.
+- Fehler im temporären Settings-Patchpfad korrigiert:
+  /tmp/pve-dashboard-settings-v4.$ statt /tmp/pve-dashboard-settings-v4.$
+- Finale Dashboard-Prüfung erweitert um:
+  * dashboardGithubLink
+  * PVE_SETTINGS_MENU_VISIBILITY_V133
+  * themeBg
+  * Theme-API theme_bg
+- Pi-hole-v6 dns.hosts, CNAME-Sync und die V129-SQLite-Korrektur bleiben unverändert erhalten.
+
+20.09.2026 – V132
+-----------------
+- Dashboard-Farbschema direkt in „⚙ Einstellungen“ integriert.
+- Persistente Theme-Farben werden zusammen mit den übrigen UI-Einstellungen in /etc/pve-sensor-dashboard/ui.json gespeichert.
+- Einstellbar sind:
+  * Hintergrund
+  * Panel dunkel
+  * Panel hell
+  * Linien / Rahmen
+  * Text
+  * Sekundärtext
+  * Akzent
+  * Akzent 2
+  * OK
+  * Warnung
+  * Fehler
+- HTML-Farbwähler zeigen Änderungen sofort als Live-Vorschau im Dashboard.
+- „Standardfarben“ setzt alle Farbwähler auf die bisherigen NodeZero-Standardwerte zurück.
+- Schließen ohne Speichern stellt das zuletzt gespeicherte Farbschema wieder her.
+- Bestehende V131-ui.json-Dateien bleiben kompatibel; fehlende Theme-Werte werden automatisch mit den Standardfarben ergänzt.
+- Das Frontend wendet die gespeicherten Farben beim Laden über die vorhandenen CSS-Variablen an.
+- Karten, Dialoge, Navigation, Buttons, aktive Zeitbereiche und Statusfarben reagieren auf das gewählte Farbschema.
+- Dashboard-Settings-Patch von V3 auf V4 angehoben.
+- Installer-Version auf V132 aktualisiert; Pi-hole-v6-dns.hosts-Sync aus V131 bleibt unverändert erhalten.
+
+20.09.2026 – V131
+-----------------
+- Pi-hole-v6 Local-DNS-Verwaltung auf den offiziellen Konfigurationsschlüssel "dns.hosts" umgestellt.
+- Ursache für die leere WebUI-Tabelle behoben:
+  * V130 schrieb die automatisch ermittelten IP-/Host-Zuordnungen direkt nach /etc/pihole/custom.list.
+  * Pi-hole v6 verwaltet die WebUI-Liste "Lokale DNS-Einträge" über dns.hosts.
+- Die initialen GitHub-DNS-Einträge werden jetzt mit:
+  pihole-FTL --config dns.hosts [...]
+  gesetzt.
+- Der automatische Proxmox-/Dashboard-Sync schreibt ebenfalls direkt nach dns.hosts.
+- Pi-hole FTL erzeugt daraus selbst seine interne custom.list; Datei, DNS-Auflösung und WebUI bleiben damit konsistent.
+- Bereits manuell in Pi-hole gepflegte dns.hosts-Einträge bleiben erhalten.
+- Der Sync speichert nur die von NodeZero verwalteten Hostnamen in:
+  /var/lib/pve-pihole-dns-sync/managed-hosts.json
+  und ersetzt bei Folgeläufen ausschließlich diese Hostnamen.
+- Priorität bleibt:
+  1. Proxmox Host/VM/LXC
+  2. private Dashboard-IP
+  3. GitHub-Fallback
+- Dashboard-Watcher und 10-Minuten-Fallback-Timer bleiben bestehen.
+- Nach dem Sync werden pve.lan und pihole.lan weiterhin mit echten DNS-Abfragen geprüft.
+
+20.09.2026 – V130
+-----------------
+- Automatischen Pi-hole Local-DNS-Sync ergänzt.
+- Neue Host-Hilfe: /usr/local/sbin/pve-pihole-dns-sync
+- Priorität der Quellen:
+  1. tatsächlich erkannte Proxmox VM/LXC-IP
+  2. private IPv4 aus Dashboard-Links
+  3. pihole/dns/custom.list aus GitHub als Fallback
+- Proxmox-Host wird automatisch als pve.lan mit seiner aktuellen primären IPv4 eingetragen.
+- LXC: laufende IP über "hostname -I", sonst statische ip=... aus der Proxmox-Konfiguration.
+- QEMU/VM: Laufzeit-IP über den QEMU Guest Agent, wenn verfügbar; sonst Dashboard/GitHub-Fallback.
+- Dashboard-Links werden nur übernommen, wenn die URL eine private RFC1918-IPv4 enthält. Öffentliche Ziele wie GitHub werden nicht übernommen.
+- Bekannte Dienste behalten kurze Namen wie homeassistant.lan, paperless.lan, pihole.lan, netalert.lan, uptime.lan, pdf.lan und ups.lan.
+- Weitere private Dashboard-Dienste erhalten automatisch einen normalisierten <name>.lan-Eintrag.
+- Die custom.list erhält einen klar markierten NODEZERO-MANAGED-Bereich; manuelle Einträge außerhalb bleiben erhalten.
+- Bei identischem Hostnamen gewinnt die automatisch ermittelte aktuelle IP, damit keine widersprüchlichen DNS-Dubletten entstehen.
+- Pi-hole wird nur neu gestartet, wenn sich die erzeugte custom.list tatsächlich ändert.
+- Automatik:
+  * systemd Path-Watcher auf /var/lib/pve-sensor-dashboard-web/links.json
+  * zusätzlicher 10-Minuten-Timer als Fallback
+- Reset/Cleanup entfernt Helper, State-Verzeichnis und systemd-Units wieder vollständig.
+
+20.09.2026 – V129
+-----------------
+- Pi-hole SQLite-Aufrufe korrigiert.
+- Fehlerbild bei der Reparatur/Kontrolle: "sqlite3: Error: unknown option: -ni".
+- Ursache: "-ni" ist keine gültige Option der im aktuellen Pi-hole-Image verwendeten SQLite-CLI.
+- Alle vier betroffenen Aufrufe im Pi-hole-Standardlisten-Code wurden korrigiert:
+  * Schema-Prüfung
+  * SQL-Import über STDIN
+  * 4/4-Listenverifikation
+  * tabellarische Kontrollausgabe
+- SQL-Import bleibt weiterhin über "docker exec -i" interaktiv an STDIN angebunden; nur die ungültige SQLite-Option wurde entfernt.
+- Tabellenanzeige verwendet jetzt ausschließlich "-header -column".
+
+20.09.2026 – V128
+-----------------
+- Dashboard-Seitenmenü um einen GitHub-Verweis ergänzt.
+- Position: direkt unterhalb von "⚙ Einstellungen", damit der Projektlink sichtbar bleibt, aber nicht mit den eigentlichen Dashboard-Funktionen konkurriert.
+- Anzeige:
+  * GitHub
+  * Technox90 / homeatic
+- Ziel: https://github.com/Technox90/homeatic
+- Der Link öffnet in einem neuen Tab und verwendet "noopener noreferrer".
+- Eigene dezente Seitenmenü-Darstellung mit kleinem GH-Symbol, Haupttext und Repository-Unterzeile.
+- Installation ist idempotent: ein bereits vorhandener GitHub-Link wird nicht doppelt eingefügt.
+- Der Dashboard-Installationscheck prüft den Link und die Zieladresse nach dem Patch.
+
+20.09.2026 – V127
+-----------------
+- CNAME-Verifikation nach dem Pi-hole-Import auf die kanonische dig-Syntax korrigiert:
+  * "dig @127.0.0.1 <Alias> CNAME"
+- Keine Änderung an den eigentlichen DNS-/CNAME-Daten; nur der abschließende Funktionstest wurde präzisiert.
+
+20.09.2026 – V126
+-----------------
+- Pi-hole Standardlisten-Import repariert.
+- Ursache: Das SQL wurde mit "docker exec" ohne "-i" an SQLite übergeben. Dadurch konnte der SQLite-Prozess erfolgreich starten, obwohl die SQL-INSERTs nicht über STDIN ankamen.
+- Der Import verwendet jetzt "docker exec -i" und hält STDIN für das SQL offen.
+- Nach dem Import wird zwingend geprüft, ob alle vier vorgesehenen Abonnements tatsächlich in gravity.db vorhanden sind:
+  * BLOCK · HaGeZi Pro
+  * BLOCK · HaGeZi TIF
+  * ALLOW · Technox90 Homeatic Allowlist
+  * ALLOW · HaGeZi Referral Native
+- Erst nach erfolgreicher 4/4-Prüfung wird "pihole -g" ausgeführt.
+- Lokale Pi-hole-DNS-Einträge werden jetzt aus "pihole/dns/custom.list" im Repository übernommen.
+- Lokale CNAME-Einträge werden aus "pihole/cname/cname.txt" übernommen und über die Pi-hole-v6-Konfiguration "dns.cnameRecords" gesetzt.
+- Pi-hole wird nach dem lokalen DNS-/CNAME-Import neu gestartet.
+- DNS- und CNAME-Auflösung werden anschließend mit echten DNS-Abfragen gegen 127.0.0.1 geprüft.
+- Im Optimalmodus führen fehlgeschlagene Standardlisten oder lokale DNS-/CNAME-Einträge jetzt zu einem kontrollierten Abbruch statt zu einer bloßen Warnung.
+
+20.09.2026 – V125
+-----------------
+- PVE-UPS-Proxmox-API-Berechtigungen auf den gewünschten Standard umgestellt:
+  * Benutzer: pve-ups@pve
+  * Token: pve-ups
+  * Token-ID: pve-ups@pve!pve-ups
+  * Rolle: UPSPower
+  * Rechte: Sys.Audit Sys.PowerMgmt
+  * ACL-Pfad: /nodes/<lokaler-node>
+  * Token mit Privilege Separation (-privsep 1)
+- Benutzerkommentar enthält Token-ID; nach Erzeugung zusätzlich den root-only Speicherpfad des Secrets.
+- Das Token-Secret wird NICHT als Klartext in den Proxmox-Kommentar geschrieben, sondern weiterhin unter /home/passwd/pve-ups-proxmox-api-token-pw-<datum>.txt mit 0600 gespeichert.
+- Bestehende PVE-UPS-Konfiguration mit alter Token-ID wird auf pve-ups@pve!pve-ups migriert; falls das Secret dafür nicht verfügbar ist, wird der Standard-Token neu erzeugt und direkt in PVE-UPS übernommen.
+- PVE-UPS-Standardwerte an die bereitgestellte PDF-Konfiguration angepasst:
+  * USV-Anzeigename: USV
+  * NUT-Server: 192.168.178.20:3493
+  * NUT-USV-Name: ups
+  * Timeout: 3 s
+  * Akkubetrieb: 600 s
+  * Restlaufzeit: 10 min
+  * Ladestand: 30 %
+  * battery low/depleted: aktiv
+  * Polling Netz/Akku: 30 s / 8 s
+  * nicht erreichbar nach 3 Polls
+  * Shutdown-Timeout: 60 s
+  * Wieder scharf nach Netzrückkehr: 5 min
+  * Kommunikationsverlust-Shutdown: aus
+  * Shutdown bei Verbindungsverlust im Akkubetrieb fortsetzen: aktiv
+  * Host-Reihenfolge: 0
+  * TLS-Prüfung: aus
+  * lokaler Host: aktiv und als "Dieser Host" markiert
+  * Selbsttest: täglich um 09:00, erfolgreiche Tests ins Eventlog
+  * Zeitzone: Europe/Berlin
+- Vorhandene Webhook-Zugangsdaten werden erhalten; ein in Screenshots/PDF sichtbarer Webhook wird nicht als Secret in das öffentliche Repository eingebettet.
+
+20.09.2026 – V124
+-----------------
+- Dashboard systemd-NAMESPACE-Fehler behoben.
+- Fehlerbild: pve-sensor-web.service startete in einer Restart-Schleife mit "status=226/NAMESPACE".
+- Ursache: Das systemd-Drop-in erlaubte Schreibzugriff auf "/var/lib/pve-sensor-dashboard-web", der Ordner existierte beim Basis-Dashboard-Start jedoch noch nicht.
+- systemd konnte dadurch die Mount-Namespace nicht aufbauen und startete Gunicorn überhaupt nicht.
+- "/var/lib/pve-sensor-dashboard-web" wird jetzt bereits in install_dashboard() vor dem ersten Start des Webdienstes angelegt.
+- Besitzer/Rechte werden direkt auf "pve-monitor:pve-monitor" und 0700 gesetzt.
+- install_dashboard_settings_write_paths() legt denselben Pfad nun ebenfalls selbst an und korrigiert Besitzer/Rechte.
+- Der V123-Readiness-Test bleibt bestehen und erkennt zusätzliche Startprobleme weiterhin automatisch.
+
+20.09.2026 – V123
+-----------------
+- Dashboard-Startprüfung gehärtet.
+- Der bisherige feste "sleep 2" wurde durch einen Readiness-Test mit bis zu 30 Sekunden Wartezeit ersetzt.
+- Für den Starttest wird jetzt "/api/info" verwendet; dieser Endpoint ist unabhängig von der Messdatenbank und trennt einen echten Webdienst-/Gunicorn-Fehler von noch fehlenden Messwerten.
+- "/api/current" wird anschließend separat als Messdaten-Test geprüft.
+- Wenn Port 9105 nach 30 Sekunden nicht erreichbar ist, zeigt der Installer automatisch:
+  * systemctl status pve-sensor-web.service
+  * die letzten 80 Journal-Zeilen des Dienstes
+  * den Listener-Status für Port 9105
+- Bei einem echten Webdienst-Startfehler bricht die Dashboard-Installation nun kontrolliert ab, statt nur mit einer Warnung weiterzulaufen.
+- Hintergrund: Bei einem Testlauf trat direkt nach dem Start "curl: (7) Failed to connect to 127.0.0.1 port 9105" auf.
+
+20.09.2026 – V122
+-----------------
+- Pi-hole Exporter Startfehler behoben: OCI runtime konnte "/app/pihole-exporter" nicht finden.
+- Ursache: Das Image "ekofr/pihole-exporter:v1.2.0" verwendet WORKDIR "/root/" und startet intern per CMD "./pihole-exporter"; der Installer überschrieb dies fälschlich mit dem nicht vorhandenen absoluten Pfad "/app/pihole-exporter".
+- Die Compose-Konfiguration überschreibt weder entrypoint noch command des Images mehr.
+- Exporter-Konfiguration erfolgt jetzt ausschließlich über die vom Projekt unterstützten Environment-Variablen:
+  * PIHOLE_PROTOCOL
+  * PIHOLE_HOSTNAME
+  * PIHOLE_PORT
+  * PIHOLE_PASSWORD
+  * BIND_ADDR
+  * PORT
+- Der Exporter wird weiterhin auf die Pi-hole-IP und Port 9617 gebunden.
+- Dadurch bleibt die Konfiguration robuster gegenüber Änderungen am internen WORKDIR/Binärpfad des Docker-Images.
+
+20.09.2026 – V121
+-----------------
+- Bestätigung für "KOMPLETT NEU" verkürzt: Statt "KOMPLETT NEU" muss nur noch "NEU" eingegeben werden.
+- Bestätigung für "PROXMOX AUF NULL" verkürzt: Statt "PROXMOX AUF NULL" muss nur noch "NULL" eingegeben werden.
+- Menübezeichnungen und Funktionsnamen bleiben unverändert; geändert wurde ausschließlich die erforderliche Texteingabe zur Bestätigung.
+
+20.09.2026 – V120
+-----------------
+- Einzelne Löschbestätigungen für VMs/LXC vereinfacht.
+- In "VM / LXC verwalten" muss zum Löschen nur noch die numerische VM-/CT-ID eingegeben werden, z. B. "105".
+- Bei einem ID-Konflikt während einer Installation gilt dieselbe Bestätigung: nur die betroffene ID eingeben.
+- Die zusätzliche Eingabe "LOESCHEN <ID>" wurde entfernt.
+- Sicherheitsbestätigungen für globale/destruktive Funktionen wie "KOMPLETT NEU" und "PROXMOX AUF NULL" bleiben unverändert erhalten.
+
+20.09.2026 – V119
+-----------------
+- Fehler behoben: "proxmox.sh: line 11669: $4: unbound variable" beim Docker-Setup des Paperless-LXC.
+- Ursache: Der äußere Aufruf "bash -lc '...'" wurde durch einfache Quotes innerhalb von awk/sed/printf vorzeitig beendet.
+  Dadurch wertete der Haupt-Installer unter "set -u" unter anderem das awk-Feld "$4" als eigenes, nicht gesetztes Script-Argument aus.
+- install_docker_in_ct() übergibt das Container-Script jetzt als literales Heredoc "NODEZERO_DOCKER_CT_V119" an "bash -lc".
+- Das eingebettete Script /usr/local/sbin/docker-cache-pull verwendet wieder ein normales literales <<'EOS'-Heredoc.
+- Dadurch bleiben awk-, sed-, tr- und printf-Ausdrücke vollständig im LXC-Kontext und werden nicht vom äußeren Proxmox-Installer interpretiert.
+- Installer-Version von V118 auf V119 aktualisiert:
+  * Hauptheader
+  * TUI_TITLE / TUI_BACKTITLE
+  * Hauptmenü-Versionsanzeige
+  * Setup-Profil installer_version
+  * Secret-Index
+- Der zuvor bereits erfolgreich erstellte LXC war nicht die Ursache; der Abbruch erfolgte erst beim Docker-Bootstrap im Container.
+
+19.09.2026 – V118
+-----------------
+- Versionsanzeige im Hauptmenü ergänzt.
+- Installer-Version zentral auf V118 angehoben.
+
+19.09.2026 – V117
+-----------------
+- PVE-UPS-Preflight vor die Optimal-Stack-Prüfung verschoben, damit die Funktion auf frischen Proxmox-Installationen bereits definiert ist.
+- Docker-LXC-Bootstrap gegen versehentliche Shell-Expansion in verschachtelten awk/sed/printf-Ausdrücken gehärtet.
+- Fresh-Install-Abläufe rund um PVE-UPS und Docker mehrfach korrigiert und stabilisiert.
+
+19.09.2026 – V116
+-----------------
+- Startreihenfolge auf frischen Proxmox-Systemen korrigiert.
+- Repository-Normalisierung auf pve-no-subscription und APT-Preflight laufen vor dem Auto-Updater.
+- Dadurch schlagen neue Installationen nicht mehr frühzeitig an aktiven Enterprise-Repositories mit HTTP 401 fehl.
+
+19.09.2026 – V115
+-----------------
+- Pi-hole-Standardlisten fest in den Installer integriert.
+- Standard-Blocklisten: HaGeZi Pro und HaGeZi TIF.
+- Standard-Allowlisten: Repository-Allowlist und HaGeZi Referral Native.
+
+19.09.2026 – V114
+-----------------
+- Pi-hole-GitHub-Quellen auf das Repository `Technox90/homeatic` umgestellt.
+
+19.09.2026 – V113
+-----------------
+- Erster im aktuellen GitHub-Verlauf nachvollziehbarer Stand des Proxmox Master-Installers V113.
+- Frühere Versionsstände V1–V112 sind im heutigen Repository nicht als vollständige, belastbare History dokumentiert und werden deshalb nicht nachträglich erfunden.
+
