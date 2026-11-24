@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V157 · 24.11.2026**
+**Installationskandidat: V158 · 24.11.2026**
 
 ## Installation
 
@@ -305,6 +305,12 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V158
+
+- Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
+- Die lokale Installer-Version ersetzt dort den Hostnamen; die Versionsangabe wird aus dem vorhandenen Update-Status gelesen.
+- Copyright © Technox1990 mit GitHub-Link; bestehende Logos, Themes und Einstellungen bleiben unverändert.
+
 ### V157
 
 - Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
@@ -339,16 +345,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 - Kein permanenter Button-Hintergrund mehr.
 - Klickfläche und Menü-Toggle bleiben unverändert funktionsfähig.
 - Responsive Größen ebenfalls angepasst.
-
-### V153
-
-- Toolbar-Layout neu strukturiert.
-- Links: kombinierter Menübutton aus Hamburger + `logo.png` bzw. Text-Fallback.
-- Mitte: `LIVE` und `USV Online`.
-- Rechts: `Neustart` und `Herunterfahren`.
-- Der Logo-/Hamburger-Button öffnet und schließt das Seitenmenü.
-- Der alte separate „Menü“-Button und der sichtbare Seitenmenü-Kopf entfallen.
-- Das Logo bleibt in der festen Toolbar immer sichtbar.
-- Bestehende `logo.png` / `favicon.png` bleiben weiterhin updategeschützt.
 
 **[Vollständige Versionshistorie](HISTORY.md)**
