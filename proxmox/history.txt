@@ -1,6 +1,20 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V150 · Dashboard Branding / feste Bedienleiste
+---------------------------------------------------------------
+- Installer-Version auf V150 angehoben.
+- Bei normaler Dashboard-Installation/-Aktualisierung werden Dashboard-Name, Logo-Text und Logo-Design abgefragt.
+- Standard für die aktuelle LT-WBH-Installation: `Dashboard LT-WBH` und Logo `LT-WBH`.
+- Logo-Designs: Neon Hex, Orbit, Pulse und Minimal.
+- Optimalmodus bleibt rückfragefrei und übernimmt vorhandene Werte bzw. Standards.
+- Obere Bedienleiste bleibt dauerhaft sichtbar und wird in fester Reihenfolge gehalten: Menü, LIVE, USV Online, Neustart, Herunterfahren.
+- Das Seitenmenü erhält ein modernes Branding-Logo mit dem gewählten Text.
+- Ohne eigenes Upload-Favicon wird clientseitig ein PNG-Favicon mit echtem transparentem Alpha-Hintergrund erzeugt; ein eigenes hochgeladenes Favicon hat Vorrang.
+- Branding wird persistent in `/etc/pve-sensor-dashboard/ui.json` gespeichert und bei späteren Farb-/HTTPS-/Favicon-Änderungen erhalten.
+- Neue modulare Assets: `dashboard/branding-v150.css` und `dashboard/branding-v150.js`.
+- Dashboard-Modul und Master-Installer verwenden unveränderliche Commit-Pins; CI prüft V150-Marker, Modul-Pin und Branding-Assets.
+
 24.11.2026 – Uptime-Kuma-TLS erfolgreich erweitert
 -----------------------------------------------------
 - `python3-certbot-nginx` auf dem Proxmox-Host installiert.
