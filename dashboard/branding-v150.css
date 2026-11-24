@@ -3,7 +3,7 @@
 #dashboardFixedToolbarV150 .toolbar{width:min(1600px,100%);margin:0 auto;padding:10px 22px;min-height:58px}
 body.dashboardToolbarFixedV150{padding-top:58px}
 body.dashboardToolbarFixedV150 .wrap{padding-top:22px}
-.brandLogoV150{--brand-a:var(--accent);--brand-b:var(--accent2);display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
+.brandLogoV150{--brand-a:var(--accent);--brand-b:var(--accent2);display:flex;align-items:center;min-width:0;margin-right:auto;padding:4px 2px}
 .brandLogoIconV150{position:relative;width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;color:var(--text);font-size:10px;font-weight:900;letter-spacing:.03em;text-shadow:0 0 11px var(--brand-a);isolation:isolate}
 .brandLogoIconV150::before,.brandLogoIconV150::after{content:"";position:absolute;inset:3px;z-index:-1;border:1px solid var(--brand-a);filter:drop-shadow(0 0 7px var(--brand-a))}
 .brandLogoV150[data-style="neon"] .brandLogoIconV150::before{clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
@@ -14,7 +14,7 @@ body.dashboardToolbarFixedV150 .wrap{padding-top:22px}
 .brandLogoV150[data-style="pulse"] .brandLogoIconV150::after{inset:19px 5px auto;height:2px;border:0;background:linear-gradient(90deg,transparent,var(--brand-a) 20%,var(--brand-b) 50%,var(--brand-a) 80%,transparent);box-shadow:0 0 9px var(--brand-a)}
 .brandLogoV150[data-style="minimal"] .brandLogoIconV150::before{border-radius:12px}
 .brandLogoV150[data-style="minimal"] .brandLogoIconV150::after{display:none}
-.brandLogoImageV150{display:none;width:66px;height:66px;object-fit:contain;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--accent) 55%,transparent));flex:0 0 66px}.brandLogoV150.assetLogoV150 .brandLogoImageV150{display:block}.brandLogoV150.assetLogoV150 .brandLogoIconV150{display:none}.brandLogoTextV150{min-width:0;font-size:14px;font-weight:850;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brandLogoImageV150,.brandLogoIconV150{display:none!important}.brandLogoTextV150{position:relative;display:inline-block;min-width:0;font-size:18px;font-weight:900;line-height:1;letter-spacing:.16em;white-space:nowrap;background:linear-gradient(90deg,#f7fbff 0%,var(--accent) 48%,var(--accent2) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 7px color-mix(in srgb,var(--accent) 28%,transparent));padding:4px 0 7px}.brandLogoTextV150::after{content:"";position:absolute;left:0;right:.16em;bottom:0;height:2px;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.9;box-shadow:0 0 7px color-mix(in srgb,var(--accent) 45%,transparent)}
 #sideNav .navHead{gap:9px}
 #sideNav .navHead>strong{display:none}
 @media(max-width:760px){#dashboardFixedToolbarV150 .toolbar{padding:9px 12px;gap:7px}#dashboardFixedToolbarV150 .toolbar button,#dashboardFixedToolbarV150 .toolbar .live,#dashboardFixedToolbarV150 .toolbar .upsTopState{padding:8px 9px;font-size:12px}body.dashboardToolbarFixedV150{padding-top:106px}}
