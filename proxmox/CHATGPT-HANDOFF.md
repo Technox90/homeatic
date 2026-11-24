@@ -218,6 +218,12 @@ nodezero-external-urls --reapply
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
 
+## Dashboard · V159
+
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
+
 ## Dashboard · V154 Feinschliff
 
 - Linker Hamburger-/Logo-Menübutton bleibt funktional identisch zu V153.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V154
+# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V159
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
@@ -23194,9 +23194,9 @@ PYV151READ
 }
 
 install_dashboard_branding_v154() {
-    header "DASHBOARD · TOOLBAR / BRANDING V154"
+    header "DASHBOARD · TOOLBAR / BRANDING"
 
-    local ref="3449e880adc2d89ce3d45297c95213fa4c3f9798"
+    local ref="94a151d3c64cac5c2c99632ab99394b78cc14a2e"
     local index="/opt/nodezero/dashboard/static/index.html"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"
@@ -23383,13 +23383,13 @@ html = html[:style_end] + css_block + "\n" + html[style_end:]
 
 # Always use a dedicated inline script. External scripts ignore inline content.
 # Remove empty blocks left by earlier branding injections and deduplicate the monitor.
-html = re.sub(r'<script\b[^>]*\bid="nodezero-branding(?:-v154)?"[^>]*>\s*</script\s*>', '', html, flags=re.I)
+html = re.sub(r'<script\b[^>]*\bid="nodezero-branding-v154"[^>]*>\s*</script\s*>', '', html, flags=re.I)
 monitor_pattern = r'<script\s+defer\s+src="/installer-update-v155\.js"\s*>\s*</script\s*>'
 monitor_present = bool(re.search(monitor_pattern, html, re.I))
 html = re.sub(monitor_pattern, '', html, flags=re.I)
 if len(re.findall(r'</body\s*>', html, re.I)) != 1:
     raise SystemExit("FEHLER: Dashboard body nicht eindeutig.")
-branding_tag = '<script id="nodezero-branding">\n' + js_block + '\n</script>\n'
+branding_tag = '<script id="nodezero-branding-v154">\n' + js_block + '\n</script>\n'
 if monitor_present:
     branding_tag += '<script defer src="/installer-update-v155.js"></script>\n'
 html = re.sub(r'</body\s*>', lambda m: branding_tag + m.group(), html, count=1, flags=re.I)
@@ -23399,6 +23399,7 @@ for marker in (
     "PVE_DASHBOARD_BRANDING_V154",
     "dashboardFixedToolbar",
     "brandMenuToggle",
+    'id="randMenuLogo"',
     "/assets/logo.png",
     "/assets/favicon.png",
     "USV Online",
@@ -23428,7 +23429,7 @@ PYV154
     nginx -t
     systemctl reload nginx
 
-    ok "Dashboard Toolbar/Branding V154 aktiv: $website_name"
+    ok "Dashboard Toolbar/Branding aktiv: $website_name"
     info "Toolbar: links ☰+Logo · mittig LIVE/USV · rechts Neustart/Herunterfahren"
     info "Eigene Bilder: $logo_target und $favicon_target"
     info "Updates überschreiben diese beiden Dateien niemals."

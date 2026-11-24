@@ -8,12 +8,11 @@
 
 ---
 
-24.11.2026 – V159 · Dauerhafte Dashboard-Selektoren und mobile Toolbar
----------------------------------------------------------------------
-- Dauerhafte Namen für Branding-CSS-Klassen, HTML-IDs und JavaScript-Funktionen statt Versionssuffixen.
-- Desktop-Logo bis 350 × 60 px, responsive Skalierung auf kleineren Bildschirmen.
-- Mobile Neustart- und Herunterfahren-Schaltflächen mit Icons und barrierefreien Beschriftungen; Sicherheitsabfragen bleiben erhalten.
-- Installer und Auto-Updater migrieren das Branding; alte interne Kompatibilitätsmarker bleiben erhalten.
+24.11.2026 – V159 · Versionsneutrales Dashboard-Branding und mittiger Titel
+-------------------------------------------------------------------------
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
 
 24.11.2026 – V158 · Dashboard-Fußzeile und Versionsanzeige
 ----------------------------------------------------------

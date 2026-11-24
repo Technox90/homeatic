@@ -7,11 +7,7 @@ on:
       - "proxmox/proxmox.sh"
       - ".github/workflows/dashboard-views.yml"
   pull_request:
-    paths:
-      - "dashboard/views/**"
-      - "proxmox/tools/nodezero-dashboard-views"
-      - "proxmox/proxmox.sh"
-      - ".github/workflows/dashboard-views.yml"
+    branches: [main]
 jobs:
   validate:
     runs-on: ubuntu-latest

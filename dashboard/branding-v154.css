@@ -37,7 +37,7 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
 .brandMenuHamburger{
   flex:0 0 auto;font-size:20px;line-height:1;color:var(--accent);font-weight:900
 }
-.brandMenuLogo{
+.randMenuLogo{
   display:none;max-width:350px;max-height:60px;width:auto;height:auto;object-fit:contain;object-position:left center
 }
 .brandMenuText{
@@ -46,7 +46,7 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
   background:linear-gradient(90deg,#f7fbff,var(--accent) 55%,var(--accent2));
   -webkit-background-clip:text;background-clip:text;color:transparent
 }
-.brandMenuToggle.hasImage .brandMenuLogo{display:block}
+.brandMenuToggle.hasImage .randMenuLogo{display:block}
 .brandMenuToggle.hasImage .brandMenuText{display:none}
 
 #sideNav.sideNav{
@@ -67,7 +67,7 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
     gap:8px;padding:8px 10px
   }
   .brandMenuToggle{max-width:280px}
-  .brandMenuLogo{max-width:250px;max-height:48px}.brandMenuText{max-width:170px}
+  .randMenuLogo{max-width:250px;max-height:48px}.brandMenuText{max-width:170px}
   .toolbarCenter{gap:6px}
   .toolbarRight{gap:6px}
 }
@@ -84,7 +84,7 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
   body.dashboardToolbarFixed{padding-top:96px}
   #sideNav.sideNav,#navShade.navShade{top:96px!important}
   .brandMenuToggle{height:42px;max-width:210px;padding:2px 4px!important}
-  .brandMenuLogo{height:31px;max-width:155px}
+  .randMenuLogo{height:31px;max-width:155px}
   .brandMenuText{max-width:145px;font-size:13px}
   #dashboardFixedToolbar .toolbar button,
   #dashboardFixedToolbar .toolbar .live,
@@ -116,5 +116,11 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
   }
   #dashboardFixedToolbar .toolbarRight button.reboot{color:#81bfff}
   #dashboardFixedToolbar .toolbarRight button.danger{color:#f07885}
-  .brandMenuLogo{max-width:min(180px,42vw);height:auto;max-height:38px}
+  .randMenuLogo{max-width:min(180px,42vw);height:auto;max-height:38px}
 }
+
+/* Center the configurable page title independently of the fixed toolbar. */
+body.dashboardToolbarFixed .top .brand{
+  flex:1 1 100%;width:100%;min-width:0;margin:0!important;text-align:center!important
+}
+body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-wrap:anywhere}

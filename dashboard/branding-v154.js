@@ -44,13 +44,13 @@ function configureBrandMenu(button,settings){
   button.setAttribute('aria-label','Menü öffnen oder schließen');
   button.innerHTML=
     '<span class="brandMenuHamburger" aria-hidden="true">☰</span>'
-    +'<img class="brandMenuLogo" id="brandMenuLogo" alt="">'
+    +'<img class="randMenuLogo" id="randMenuLogo" alt="">'
     +'<span class="brandMenuText" id="brandMenuText"></span>';
 
   const label=document.getElementById('brandMenuText');
   if(label)label.textContent=text;
 
-  const img=document.getElementById('brandMenuLogo');
+  const img=document.getElementById('randMenuLogo');
   if(!img)return;
 
   button.classList.remove('hasImage');
@@ -165,7 +165,8 @@ if(typeof applyUiSettings==='function'){
   const previousApplyUiSettings=applyUiSettings;
   applyUiSettings=function(settings){
     const result=previousApplyUiSettings(settings);
-    applyDashboardBranding(settings||{});
+    window.__nodezeroUiSettings=settings||{};
+    applyDashboardBranding(window.__nodezeroUiSettings);
     return result;
   };
 }

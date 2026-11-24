@@ -137,10 +137,9 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ### V159
 
-- Dauerhafte Namen für Branding-CSS-Klassen, HTML-IDs und JavaScript-Funktionen statt Versionssuffixen.
-- Desktop-Logo bis 350 × 60 px, responsive Skalierung auf kleineren Bildschirmen.
-- Mobile Neustart- und Herunterfahren-Schaltflächen mit Icons und barrierefreien Beschriftungen; Sicherheitsabfragen bleiben erhalten.
-- Installer und Auto-Updater migrieren das Branding; alte interne Kompatibilitätsmarker bleiben erhalten.
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
 
 ### V158
 
@@ -173,5 +172,3 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 - Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
 - Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
 - Wildcard-DNS bleibt unverändert.
-
-**[Vollständige Versionshistorie](proxmox/HISTORY.md)**
