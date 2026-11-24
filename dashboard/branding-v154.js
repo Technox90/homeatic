@@ -1,5 +1,7 @@
-/* NodeZero Dashboard Toolbar V154 */
-function imageHasVisiblePixelsV154(img){
+/* Legacy updater compatibility signature: NodeZero Dashboard Toolbar V154; brandMenuToggleV154 */
+(()=>{
+/* NodeZero Dashboard Toolbar */
+function brandImageHasVisiblePixels(img){
   try{
     const max=64;
     const ratio=Math.min(max/img.naturalWidth,max/img.naturalHeight,1);
@@ -21,7 +23,7 @@ function imageHasVisiblePixelsV154(img){
   return false;
 }
 
-function toggleNavV154(){
+function toggleBrandMenu(){
   const nav=document.getElementById('sideNav');
   if(!nav)return;
   if(nav.classList.contains('show')){
@@ -31,90 +33,104 @@ function toggleNavV154(){
   }
 }
 
-function configureBrandMenuV154(button,settings){
+function configureBrandMenu(button,settings){
   if(!button)return;
   const text=String(settings?.logo_text||'NODEZERO').trim()||'NODEZERO';
 
-  button.id='brandMenuToggleV154';
-  button.classList.add('brandMenuToggleV154');
+  button.id='brandMenuToggle';
+  button.classList.add('brandMenuToggle');
   button.removeAttribute('onclick');
-  button.onclick=toggleNavV154;
+  button.onclick=toggleBrandMenu;
   button.setAttribute('aria-label','Menü öffnen oder schließen');
   button.innerHTML=
-    '<span class="brandMenuHamburgerV154" aria-hidden="true">☰</span>'
-    +'<img class="brandMenuLogoV154" id="brandMenuLogoV154" alt="">'
-    +'<span class="brandMenuTextV154" id="brandMenuTextV154"></span>';
+    '<span class="brandMenuHamburger" aria-hidden="true">☰</span>'
+    +'<img class="brandMenuLogo" id="brandMenuLogo" alt="">'
+    +'<span class="brandMenuText" id="brandMenuText"></span>';
 
-  const label=document.getElementById('brandMenuTextV154');
+  const label=document.getElementById('brandMenuText');
   if(label)label.textContent=text;
 
-  const img=document.getElementById('brandMenuLogoV154');
+  const img=document.getElementById('brandMenuLogo');
   if(!img)return;
 
-  button.classList.remove('hasImageV154');
+  button.classList.remove('hasImage');
   img.onload=()=>{
-    const visible=imageHasVisiblePixelsV154(img);
-    button.classList.toggle('hasImageV154',visible);
+    const visible=brandImageHasVisiblePixels(img);
+    button.classList.toggle('hasImage',visible);
     img.alt=visible?text+' Logo':'';
   };
   img.onerror=()=>{
-    button.classList.remove('hasImageV154');
+    button.classList.remove('hasImage');
     img.alt='';
   };
   img.src='/assets/logo.png?ts='+Date.now();
 }
 
-function ensureToolbarLayoutV154(settings={}){
+function preparePowerButton(button,label,symbol){
+  if(button.querySelector('.brandPowerIcon'))return;
+  const icon=document.createElement('span');
+  icon.className='brandPowerIcon';
+  icon.setAttribute('aria-hidden','true');
+  icon.textContent=symbol;
+  const text=document.createElement('span');
+  text.className='brandPowerLabel';
+  text.textContent=label;
+  button.setAttribute('aria-label',label);
+  button.title=label;
+  button.replaceChildren(icon,text);
+}
+
+function ensureBrandToolbarLayout(settings={}){
   const bar=document.querySelector('.toolbar');
   if(!bar)return;
 
-  let shell=document.getElementById('dashboardFixedToolbarV154');
+  let shell=document.getElementById('dashboardFixedToolbar');
   if(!shell){
     shell=document.createElement('div');
-    shell.id='dashboardFixedToolbarV154';
+    shell.id='dashboardFixedToolbar';
     document.body.prepend(shell);
   }
   if(bar.parentElement!==shell)shell.appendChild(bar);
 
-  document.body.classList.add('dashboardToolbarFixedV154');
-  document.body.classList.remove('dashboardToolbarFixedV151');
+  document.body.classList.add('dashboardToolbarFixed');
+  document.body.classList.remove('dashboardToolbarFixed'+'V151');
 
-  let left=document.getElementById('toolbarLeftV154');
-  let center=document.getElementById('toolbarCenterV154');
-  let right=document.getElementById('toolbarRightV154');
+  let left=document.getElementById('toolbarLeft');
+  let center=document.getElementById('toolbarCenter');
+  let right=document.getElementById('toolbarRight');
 
   if(!left){
     left=document.createElement('div');
-    left.id='toolbarLeftV154';
-    left.className='toolbarLeftV154';
+    left.id='toolbarLeft';
+    left.className='toolbarLeft';
   }
   if(!center){
     center=document.createElement('div');
-    center.id='toolbarCenterV154';
-    center.className='toolbarCenterV154';
+    center.id='toolbarCenter';
+    center.className='toolbarCenter';
   }
   if(!right){
     right=document.createElement('div');
-    right.id='toolbarRightV154';
-    right.className='toolbarRightV154';
+    right.id='toolbarRight';
+    right.className='toolbarRight';
   }
 
-  const menu=bar.querySelector('.menuBtn')||document.getElementById('brandMenuToggleV154');
+  const menu=bar.querySelector('.menuBtn')||document.getElementById('brandMenuToggle');
   const live=document.getElementById('state')?.closest('.live');
   const ups=document.getElementById('upsTopState');
   const reboot=bar.querySelector('.reboot');
   const shutdown=bar.querySelector('.danger');
 
-  if(menu){configureBrandMenuV154(menu,settings);left.appendChild(menu)}
+  if(menu){configureBrandMenu(menu,settings);left.appendChild(menu)}
   if(live)center.appendChild(live);
   if(ups)center.appendChild(ups);
-  if(reboot)right.appendChild(reboot);
-  if(shutdown)right.appendChild(shutdown);
+  if(reboot){preparePowerButton(reboot,'Neustart','↻');right.appendChild(reboot);}
+  if(shutdown){preparePowerButton(shutdown,'Herunterfahren','⏻');right.appendChild(shutdown);}
 
   [left,center,right].forEach(el=>bar.appendChild(el));
 }
 
-function faviconV154(settings){
+function applyBrandFavicon(settings){
   if(typeof ensureFaviconLink!=='function')return;
   const link=ensureFaviconLink();
   if(settings?.favicon_url){
@@ -126,7 +142,7 @@ function faviconV154(settings){
   link.href='/assets/favicon.png?ts='+Date.now();
 }
 
-function applyBrandingV154(settings){
+function applyDashboardBranding(settings){
   settings=settings||{};
   const website=String(settings.website_name||'PVE Hardware Monitor').trim()||'PVE Hardware Monitor';
   document.title=website;
@@ -141,23 +157,23 @@ function applyBrandingV154(settings){
     h1.textContent=website;
   }
 
-  faviconV154(settings);
-  ensureToolbarLayoutV154(settings);
+  applyBrandFavicon(settings);
+  ensureBrandToolbarLayout(settings);
 }
 
 if(typeof applyUiSettings==='function'){
-  const previousApplyUiSettingsV154=applyUiSettings;
+  const previousApplyUiSettings=applyUiSettings;
   applyUiSettings=function(settings){
-    const result=previousApplyUiSettingsV154(settings);
-    applyBrandingV154(settings||{});
+    const result=previousApplyUiSettings(settings);
+    applyDashboardBranding(settings||{});
     return result;
   };
 }
 
 if(typeof setUpsTopState==='function'){
-  const previousSetUpsTopStateV154=setUpsTopState;
+  const previousSetUpsTopState=setUpsTopState;
   setUpsTopState=function(data){
-    const result=previousSetUpsTopStateV154(data);
+    const result=previousSetUpsTopState(data);
     const text=document.getElementById('upsTopStateText');
     if(
       text&&data&&data.ok&&data.reachable
@@ -165,7 +181,7 @@ if(typeof setUpsTopState==='function'){
     ){
       text.textContent='USV Online';
     }
-    ensureToolbarLayoutV154(window.__nodezeroUiSettingsV154||{});
+    ensureBrandToolbarLayout(window.__nodezeroUiSettings||{});
     return result;
   };
 }
@@ -175,21 +191,21 @@ setTimeout(async()=>{
   try{
     settings=await getJSON('/api/ui-settings');
   }catch(e){}
-  window.__nodezeroUiSettingsV154=settings||{};
-  applyBrandingV154(settings||{});
+  window.__nodezeroUiSettings=settings||{};
+  applyDashboardBranding(settings||{});
 },0);
 
 
-// V158: System details belong at the bottom, not under the dashboard title.
-function installSystemFooterV158(){
+// System details belong at the bottom, not under the dashboard title.
+function installSystemFooter(){
   const source=document.getElementById('hostinfo');
-  if(!source || document.getElementById('nodezeroSystemFooterV158'))return;
+  if(!source || document.getElementById('nodezeroSystemFooter'))return;
   const footer=document.createElement('footer');
-  footer.id='nodezeroSystemFooterV158';
+  footer.id='nodezeroSystemFooter';
   const details=document.createElement('div');
-  details.className='nodezeroFooterDetailsV158';
+  details.className='nodezeroFooterDetails';
   const credit=document.createElement('div');
-  credit.className='nodezeroFooterCreditV158';
+  credit.className='nodezeroFooterCredit';
   credit.append(document.createTextNode('Copyright © Technox1990 · '));
   const link=document.createElement('a');
   link.href='https://github.com/Technox90/homeatic';
@@ -199,7 +215,7 @@ function installSystemFooterV158(){
   credit.append(link);
   footer.append(details,credit);
   document.body.append(footer);
-  source.classList.add('nodezeroHostInfoHiddenV158');
+  source.classList.add('nodezeroHostInfoHidden');
   let version='Version unbekannt';
   const render=()=>{
     const parts=source.textContent.trim().split(/\s+·\s+/);
@@ -224,7 +240,9 @@ function installSystemFooterV158(){
   window.setInterval(refresh,60000);
 }
 if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',installSystemFooterV158,{once:true});
+  document.addEventListener('DOMContentLoaded',installSystemFooter,{once:true});
 }else{
-  installSystemFooterV158();
+  installSystemFooter();
 }
+
+})();
