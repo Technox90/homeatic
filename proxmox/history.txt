@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V149 · Uptime Kuma externe Standard-URL
+-------------------------------------------------------
+- Uptime Kuma verwendet bei der External-URL-Konfiguration standardmäßig `up.<hauptdomain>` statt `uptime.<hauptdomain>`.
+- Für `ltwbh.de` lautet der Vorschlag damit `https://up.ltwbh.de`.
+- Backend-Erkennung und bestehende Uptime-Kuma-Installation bleiben unverändert.
+
 24.11.2026 – V148 · Stirling PDF Registry-Fallback
 ---------------------------------------------------
 - Stirling PDF Neuinstallationen verwenden jetzt den offiziell dokumentierten GitHub Container Registry Pfad `ghcr.io/stirling-tools/stirling-pdf:latest`.
