@@ -23148,6 +23148,10 @@ except Exception:
 if not isinstance(data,dict):
     data={}
 data.update({"website_name":name,"logo_text":logo,"logo_style":style})
+# LT-WBH nutzt das versionierte Repository-Favicon. Ein alter/staler
+# Custom-Favicon-Pfad darf dieses Branding nicht mehr überschreiben.
+if logo.upper() == "LT-WBH":
+    data["favicon_url"] = ""
 settings_path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 
 helper=helper_path.read_text(encoding="utf-8")
