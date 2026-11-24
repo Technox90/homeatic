@@ -2,6 +2,7 @@ name: Validate Proxmox Installer
 
 on:
   pull_request:
+    branches: [main]
   push:
     branches:
       - main
@@ -64,12 +65,12 @@ jobs:
           assert "<img src='/assets/logo.png'>" in result
           assert m.dashboard_payload(result, css, js) == result
           assert result.count('<script defer src="/installer-update-v155.js"></script>') == 1
-          assert '<script id="nodezero-branding-v154">\n' + begin in result
+          assert '<script id="nodezero-branding">\n' + begin in result
           assert '<script defer src="/installer-update-v155.js">' + begin not in result
           module = Path("proxmox/modules/dashboard.sh").read_text()
           fn = module.split("install_dashboard_branding_v154() {", 1)[1].split("\n}\n", 1)[0]
           assert 'html.rfind("</script>")' not in fn
-          assert '<script id="nodezero-branding-v154">' in fn
+          assert '<script id="nodezero-branding">' in fn
           runtime = Path("dashboard/views/runtime.js").read_text()
           assert 'badge.remove()' in runtime
           assert 'container.append(badge)' not in runtime
@@ -153,7 +154,7 @@ jobs:
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
           grep -q 'border:0!important' dashboard/branding-v154.css
           grep -q 'background:transparent!important' dashboard/branding-v154.css
-          grep -q 'max-width:230px;height:38px' dashboard/branding-v154.css
+          grep -q 'max-width:350px;max-height:60px' dashboard/branding-v154.css
           grep -q 'brandMenuToggle' dashboard/branding-v154.js
           grep -q 'install_dashboard_branding_v154() {' proxmox/modules/dashboard.sh
           grep -q 'PVE_DASHBOARD_BRANDING_V154' proxmox/modules/dashboard.sh
@@ -164,7 +165,7 @@ jobs:
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
           grep -q 'grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr)' dashboard/branding-v154.css
           grep -q 'brandMenuToggle' dashboard/branding-v154.js
-          grep -q 'toggleNav' dashboard/branding-v154.js
+          grep -q 'toggleBrandMenu' dashboard/branding-v154.js
           grep -q 'toolbarCenter' dashboard/branding-v154.js
           grep -q 'toolbarRight' dashboard/branding-v154.js
           grep -q '#sideNav .navHead{display:none!important}' dashboard/branding-v154.css
@@ -180,7 +181,7 @@ jobs:
           assert "center.appendChild(ups)" in js
           assert "right.appendChild(reboot)" in js
           assert "right.appendChild(shutdown)" in js
-          assert "button.onclick=toggleNav" in js
+          assert "button.onclick=toggleBrandMenu" in js
           assert "z-index:130" in css
           PY
 
@@ -421,7 +422,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="22a0e71b2c2426f55741f55daa50fce79c163cd3"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="4372ca664c59c0a113f2645b867c0549b097a8ee"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
@@ -464,6 +465,7 @@ jobs:
           from pathlib import Path
           js = Path('dashboard/branding-v154.js').read_text()
           css = Path('dashboard/branding-v154.css').read_text()
+          assert "preparePowerButton" in js and "brandPowerLabel" in css
           assert 'id="randMenuLogo"' in js and '.randMenuLogo{' in css
           assert "getElementById('randMenuLogo')" in js
           assert 'brandMenuLogoV154' not in js + css

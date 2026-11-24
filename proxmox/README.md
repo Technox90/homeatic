@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V159 · 24.11.2026**
+**Installationskandidat: V160 · 24.11.2026**
 
 ## Installation
 
@@ -305,6 +305,13 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V160
+
+- Zusammenführung der parallelen V159-Änderungen: `randMenuLogo`, mittiger Titel, Logo bis 350 × 60 px sowie zugängliche mobile Power-Icons.
+- Branding-Script erhält eine stabile ID; alte Update-Marker bleiben kompatibel.
+- Beide verpflichtenden CI-Prüfungen laufen bei jedem Pull Request auf main, auch bei reinen Dokumentationsänderungen.
+- Lokale Logo- und Favicon-Dateien bleiben unverändert.
+
 ### V159
 
 - Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
@@ -333,13 +340,4 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 - Update-Ergebnisse erscheinen im vorhandenen Auto-Updater-Bericht und in Pushover, sofern aktiviert.
 - Menü: Wartung → Auto-Updater → 5; dort die gewünschten Komponenten einschalten.
 
-### V155
-
-- Einheitliche Nummerierung der sieben Haupt-Untermenüs; interne IDs bleiben stabil.
-- Dashboard-Updates starten keine automatische Paperless-Migration mehr; vorhandene Paperless-, Kuma- und PVE-UPS-Container werden bei erneuter Installation übersprungen.
-- Neue Kuma-Installationen verwenden das LXC-Hostnetz mit Bindung an 127.0.0.1:3001; IPv6 setzt funktionierendes LXC-IPv6 voraus.
-- PVE-UPS erhält zusätzlich nicht vererbtes Sys.Audit auf /; PowerMgmt bleibt am Knoten.
-- Wartung → 10: CPU-, RAM- und dateibasierter Festplattentest, 1–120 Minuten, Temperaturgrenze 60–99 °C (Standard 95 °C), Live-Messung und Bericht unter `/home/diagnose/stresstest/`.
-- Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
-- Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
-- Wildcard-DNS bleibt unverändert.
+**[Vollständige Versionshistorie](HISTORY.md)**

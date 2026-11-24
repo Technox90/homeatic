@@ -1,6 +1,7 @@
-/* NodeZero Dashboard Toolbar V154 */
-/* Legacy updater signature: brandMenuToggleV154 */
-function imageHasVisiblePixels(img){
+/* Legacy updater compatibility signature: NodeZero Dashboard Toolbar V154; brandMenuToggleV154 */
+(()=>{
+/* NodeZero Dashboard Toolbar */
+function brandImageHasVisiblePixels(img){
   try{
     const max=64;
     const ratio=Math.min(max/img.naturalWidth,max/img.naturalHeight,1);
@@ -22,7 +23,7 @@ function imageHasVisiblePixels(img){
   return false;
 }
 
-function toggleNav(){
+function toggleBrandMenu(){
   const nav=document.getElementById('sideNav');
   if(!nav)return;
   if(nav.classList.contains('show')){
@@ -39,7 +40,7 @@ function configureBrandMenu(button,settings){
   button.id='brandMenuToggle';
   button.classList.add('brandMenuToggle');
   button.removeAttribute('onclick');
-  button.onclick=toggleNav;
+  button.onclick=toggleBrandMenu;
   button.setAttribute('aria-label','Menü öffnen oder schließen');
   button.innerHTML=
     '<span class="brandMenuHamburger" aria-hidden="true">☰</span>'
@@ -54,7 +55,7 @@ function configureBrandMenu(button,settings){
 
   button.classList.remove('hasImage');
   img.onload=()=>{
-    const visible=imageHasVisiblePixels(img);
+    const visible=brandImageHasVisiblePixels(img);
     button.classList.toggle('hasImage',visible);
     img.alt=visible?text+' Logo':'';
   };
@@ -65,7 +66,21 @@ function configureBrandMenu(button,settings){
   img.src='/assets/logo.png?ts='+Date.now();
 }
 
-function ensureToolbarLayout(settings={}){
+function preparePowerButton(button,label,symbol){
+  if(button.querySelector('.brandPowerIcon'))return;
+  const icon=document.createElement('span');
+  icon.className='brandPowerIcon';
+  icon.setAttribute('aria-hidden','true');
+  icon.textContent=symbol;
+  const text=document.createElement('span');
+  text.className='brandPowerLabel';
+  text.textContent=label;
+  button.setAttribute('aria-label',label);
+  button.title=label;
+  button.replaceChildren(icon,text);
+}
+
+function ensureBrandToolbarLayout(settings={}){
   const bar=document.querySelector('.toolbar');
   if(!bar)return;
 
@@ -78,7 +93,7 @@ function ensureToolbarLayout(settings={}){
   if(bar.parentElement!==shell)shell.appendChild(bar);
 
   document.body.classList.add('dashboardToolbarFixed');
-  document.body.classList.remove('dashboardToolbarFixedV151');
+  document.body.classList.remove('dashboardToolbarFixed'+'V151');
 
   let left=document.getElementById('toolbarLeft');
   let center=document.getElementById('toolbarCenter');
@@ -109,13 +124,13 @@ function ensureToolbarLayout(settings={}){
   if(menu){configureBrandMenu(menu,settings);left.appendChild(menu)}
   if(live)center.appendChild(live);
   if(ups)center.appendChild(ups);
-  if(reboot)right.appendChild(reboot);
-  if(shutdown)right.appendChild(shutdown);
+  if(reboot){preparePowerButton(reboot,'Neustart','↻');right.appendChild(reboot);}
+  if(shutdown){preparePowerButton(shutdown,'Herunterfahren','⏻');right.appendChild(shutdown);}
 
   [left,center,right].forEach(el=>bar.appendChild(el));
 }
 
-function favicon(settings){
+function applyBrandFavicon(settings){
   if(typeof ensureFaviconLink!=='function')return;
   const link=ensureFaviconLink();
   if(settings?.favicon_url){
@@ -127,7 +142,7 @@ function favicon(settings){
   link.href='/assets/favicon.png?ts='+Date.now();
 }
 
-function applyBranding(settings){
+function applyDashboardBranding(settings){
   settings=settings||{};
   const website=String(settings.website_name||'PVE Hardware Monitor').trim()||'PVE Hardware Monitor';
   document.title=website;
@@ -142,15 +157,16 @@ function applyBranding(settings){
     h1.textContent=website;
   }
 
-  favicon(settings);
-  ensureToolbarLayout(settings);
+  applyBrandFavicon(settings);
+  ensureBrandToolbarLayout(settings);
 }
 
 if(typeof applyUiSettings==='function'){
   const previousApplyUiSettings=applyUiSettings;
   applyUiSettings=function(settings){
     const result=previousApplyUiSettings(settings);
-    applyBranding(settings||{});
+    window.__nodezeroUiSettings=settings||{};
+    applyDashboardBranding(window.__nodezeroUiSettings);
     return result;
   };
 }
@@ -166,7 +182,7 @@ if(typeof setUpsTopState==='function'){
     ){
       text.textContent='USV Online';
     }
-    ensureToolbarLayout(window.__nodezeroUiSettings||{});
+    ensureBrandToolbarLayout(window.__nodezeroUiSettings||{});
     return result;
   };
 }
@@ -177,11 +193,11 @@ setTimeout(async()=>{
     settings=await getJSON('/api/ui-settings');
   }catch(e){}
   window.__nodezeroUiSettings=settings||{};
-  applyBranding(settings||{});
+  applyDashboardBranding(settings||{});
 },0);
 
 
-// V158: System details belong at the bottom, not under the dashboard title.
+// System details belong at the bottom, not under the dashboard title.
 function installSystemFooter(){
   const source=document.getElementById('hostinfo');
   if(!source || document.getElementById('nodezeroSystemFooter'))return;
@@ -229,3 +245,5 @@ if(document.readyState==='loading'){
 }else{
   installSystemFooter();
 }
+
+})();
