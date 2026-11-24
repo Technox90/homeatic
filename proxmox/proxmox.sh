@@ -12040,6 +12040,14 @@ CTV143
 install_paperless() {
     header "PAPERLESS-NGX + OLLAMA INSTALLIEREN"
 
+    local existing_id
+    for existing_id in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$existing_id" | awk '/^hostname: / {print tolower($2)}')" == "paperless" ]]; then
+            warn "Paperless bereits in CT ${existing_id} vorhanden; bestehende Installation bleibt unverändert."
+            return 0
+        fi
+    done
+
     prepare_ct_cache_dirs "paperless"
 
     local paperless_unprivileged=1
@@ -14062,6 +14070,14 @@ EOF
 install_uptime_kuma() {
     header "UPTIME KUMA INSTALLIEREN"
 
+    local existing_id
+    for existing_id in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$existing_id" | awk '/^hostname: / {print tolower($2)}')" == "uptime-kuma" ]]; then
+            warn "Uptime Kuma bereits in CT ${existing_id} vorhanden; bestehende Installation bleibt unverändert."
+            return 0
+        fi
+    done
+
     prepare_persistent_data_base
 
     echo "Persistente Uptime-Kuma-Daten:"
@@ -14081,8 +14097,11 @@ services:
     image: louislam/uptime-kuma:2
     container_name: uptime-kuma
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3001"
+    # Host-Netz des dedizierten LXC, nicht des Proxmox-Hosts.
+    network_mode: host
+    environment:
+      UPTIME_KUMA_HOST: "127.0.0.1"
+      UPTIME_KUMA_PORT: "3001"
     volumes:
       - /mnt/uptime-kuma-data:/app/data
 EOF
@@ -18400,6 +18419,13 @@ print(data.get("value") or data.get("token") or "")
     echo "[OK] Token-Secret gespeichert: $TOKEN_FILE"
 fi
 
+# Root-Pfad nur lesend, ohne Vererbung; PowerMgmt bleibt am Knoten.
+if ! pveum role add UPSAudit --privs Sys.Audit; then
+    pveum role modify UPSAudit --privs Sys.Audit
+fi
+pveum acl modify / --users "$PVEUPS_USER_ID" --roles UPSAudit --propagate 0
+pveum acl modify / --tokens "$PVEUPS_TOKEN_ID" --roles UPSAudit --propagate 0
+
 echo
 echo "Token-Berechtigungen:"
 pveum user token permissions "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" || true
@@ -18922,6 +18948,17 @@ ensure_pve_ups_latest_v63() {
 
 install_pve_ups_community() {
     header "PVE-UPS INSTALLIEREN"
+
+    # Keine zweite Shutdown-Appliance anlegen oder eine vorhandene umkonfigurieren.
+    local existing_id
+    for existing_id in $(pct list | awk 'NR>1 {print $1}'); do
+        if [[ "$(pct config "$existing_id" | awk '/^hostname: / {print tolower($2)}')" == "pve-ups" ]]; then
+            warn "PVE-UPS bereits in CT ${existing_id} vorhanden; Neuinstallation übersprungen."
+            PVEUPS_SKIPPED=1
+            INSTALL_PVEUPS=0
+            return 0
+        fi
+    done
 
     if ! community_pve_ups_available; then
         if (( OPTIMAL_INSTALL )); then
@@ -19540,11 +19577,8 @@ fi
 (( INSTALL_HA )) && run_install_step "Home Assistant OS" install_home_assistant
 (( INSTALL_PAPERLESS )) && run_install_step "Paperless-ngx + Ollama" install_paperless
 
-# V138: Bei einem reinen Dashboard-Update einen bereits vorhandenen
-# Paperless-CT nachziehen. Bei Neuinstallation prüft install_paperless() selbst.
-if (( INSTALL_DASHBOARD && ! INSTALL_PAPERLESS )); then
-    run_install_step         "Paperless HTTPS / CSRF / Login-IP prüfen"         repair_existing_paperless_proxy_v138
-fi
+# V155: Dashboard-Updates verändern keine fremden Dienste.
+# Paperless-Migration wird nicht automatisch ausgeführt.
 
 (( INSTALL_PIHOLE )) && run_install_step "Pi-hole + Unbound" install_pihole
 (( INSTALL_NETALERTX )) && run_install_step "NetAlertX" install_netalertx
