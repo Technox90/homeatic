@@ -1,12 +1,20 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V156 · 24.11.2026**  
+> **Aktueller Stand: V157 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V157 · Dashboard-Branding und Theme-Anzeige
+--------------------------------------------------------
+- Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
+- Doppelte Einbindung der Installer-Updateanzeige wird entfernt; bestehende Logos, Favicons und Einstellungen bleiben erhalten.
+- Sichtbare Theme-Namen entfallen in allen fünf Ansichten; Animationen und Auswahl bleiben erhalten.
+- Auto-Updater repariert auch bestehende falsch platzierte Branding-Blöcke; Theme-Cache wird erneuert.
+- Regressionstest für externe Script-Tags und wiederholbare Dashboard-Aktualisierung.
 
 24.11.2026 – V156 · Automatische NodeZero-Komponentenupdates
 ------------------------------------------------------------

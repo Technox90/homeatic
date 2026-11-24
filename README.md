@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V156 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V157 · Proxmox Master Installer · 24.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -135,6 +135,14 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V157
+
+- Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
+- Doppelte Einbindung der Installer-Updateanzeige wird entfernt; bestehende Logos, Favicons und Einstellungen bleiben erhalten.
+- Sichtbare Theme-Namen entfallen in allen fünf Ansichten; Animationen und Auswahl bleiben erhalten.
+- Auto-Updater repariert auch bestehende falsch platzierte Branding-Blöcke; Theme-Cache wird erneuert.
+- Regressionstest für externe Script-Tags und wiederholbare Dashboard-Aktualisierung.
+
 ### V156
 
 - Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
@@ -165,12 +173,5 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 - Das eigene Logo wird zusammen mit dem Hamburger-Symbol als ein gemeinsamer Menü-Toggle verwendet.
 - Derselbe Logo-Button öffnet und schließt das Seitenmenü.
 - Der Seitenmenü-Kopf mit zusätzlichem Logo/X wird ausgeblendet; das Logo bleibt dauerhaft oben in der Toolbar sichtbar.
-
-### V152
-- Normale Dashboard-Updates arbeiten jetzt **in-place**.
-- Ein bereits aktuelles Dashboard wird nicht mehr auf die alte V139-Basis zurückgesetzt.
-- Historische UI-Migrationen V42 bis V81 werden auf einem aktuellen Dashboard übersprungen.
-- Nur alte/unvollständige Installationen oder bewusste Neuaufbauten verwenden einmalig den Kompatibilitäts-Bootstrap.
-- Eigene Logo-/Favicon-Dateien bleiben weiterhin geschützt.
 
 **[Vollständige Versionshistorie](proxmox/HISTORY.md)**

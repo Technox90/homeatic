@@ -97,8 +97,22 @@ def dashboard_payload(index, css, js):
     if not all(x in css for x in ("NodeZero Dashboard Toolbar V154","dashboardFixedToolbarV154")) or "brandMenuToggleV154" not in js:
         raise ValueError("Branding-Quellprüfung fehlgeschlagen")
     if "</style" in css.lower() or "</script" in js.lower(): raise ValueError("Ungültiger HTML-Inhalt")
-    payloads=iter((css,js))
-    return re.sub(pattern,lambda _: "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */\n"+next(payloads)+"\n/* PVE_DASHBOARD_BRANDING_V154_END */",index,flags=re.S)
+    # Remove only managed branding blocks; then place them in their own proper contexts.
+    clean=re.sub(pattern+r"\n?","",index,flags=re.S)
+    clean=re.sub(r'<script\b[^>]*\bid="nodezero-branding-v154"[^>]*>\s*</script\s*>\n?',"",clean,flags=re.I)
+    monitor=r'<script\s+defer\s+src="/installer-update-v155\.js"\s*>\s*</script\s*>\n?'
+    had_monitor=bool(re.search(monitor,clean,re.I))
+    clean=re.sub(monitor,"",clean,flags=re.I)
+    def block(value):
+        return "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */\n"+value+"\n/* PVE_DASHBOARD_BRANDING_V154_END */"
+    if "</style>" not in clean or len(re.findall(r"</body\s*>",clean,re.I))!=1:
+        raise ValueError("Dashboard-Struktur nicht eindeutig")
+    clean=clean.replace("</style>",block(css)+"\n</style>",1)
+    tag='<script id="nodezero-branding-v154">\n'+block(js)+'\n</script>\n'
+    if had_monitor:
+        tag+='<script defer src="/installer-update-v155.js"></script>\n'
+    return re.sub(r"</body\s*>",lambda m:tag+m.group(),clean,count=1,flags=re.I)
+
 
 def dashboard_update(master,download):
     index=DASH/"index.html"
@@ -112,7 +126,7 @@ def dashboard_update(master,download):
     safe_file(index)
     safe_file(overlay)
     text=index.read_text()
-    if '<script defer src="/installer-update-v155.js"></script>' not in text:
+    if '<script defer src="/installer-update-v155.js">' not in text:
         report("MANUAL","Dashboard: Updateanzeige nicht eingebunden")
         return
     css=download("dashboard/branding-v154.css").decode()
@@ -122,7 +136,13 @@ def dashboard_update(master,download):
     new_overlay="(() => {\n"+new_overlay+"})();"
     if "nodezero-installer-update" not in new_overlay:
         raise ValueError("Updateanzeige ungültig")
-    if replace_files([(index,new_index.encode()),(overlay,new_overlay.encode())],"dashboard"):
+    pairs=[(index,new_index.encode()),(overlay,new_overlay.encode())]
+    runtime=download("dashboard/views/runtime.js")
+    if b"nz-view-badge" not in runtime or b'createElement("span")' not in runtime or b"badge.remove()" not in runtime:
+        raise ValueError("Theme-Runtime ungültig")
+    for target in (DASH/"nodezero-views/runtime.js",pathlib.Path("/home/downloads/nodezero/dashboard-views/v1/runtime.js"),pathlib.Path("/home/downloads/nodezero/dashboard-views/v2/runtime.js")):
+        if target.is_file(): pairs.append((target,runtime))
+    if replace_files(pairs,"dashboard"):
         report("UPDATED","Dashboard: verwaltete Toolbar und Installer-Updateanzeige")
     else:
         report("INFO","Dashboard-Oberfläche aktuell")

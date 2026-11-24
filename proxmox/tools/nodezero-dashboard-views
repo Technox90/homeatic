@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 022
 
 REMOTE="https://raw.githubusercontent.com/Technox90/homeatic/main/dashboard/views"
-CACHE="/home/downloads/nodezero/dashboard-views/v1"
+CACHE="/home/downloads/nodezero/dashboard-views/v2"
 STATIC="/opt/nodezero/dashboard/static"
 TARGET="$STATIC/nodezero-views"
 INDEX="$STATIC/index.html"

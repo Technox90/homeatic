@@ -2,50 +2,14 @@
 (() => {
   "use strict";
   const id = window.NODEZERO_DASHBOARD_VIEW || "boot";
-  const views = {
-    boot:"Boot Sequence",live:"Live Pulse",telemetry:"Telemetry Flow",
-    glass:"Glass Motion",status:"Status Control"
-  };
-  const name = views[id] || views.boot;
   const reduce = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.documentElement.classList.add("nz-has-view","nz-view-"+id);
 
   function onReady() {
     const state = document.getElementById("state");
-    const container = document.querySelector(".actions,.top,.topbar,header");
-    if (container && !document.querySelector(".nz-view-badge")) {
-      const badge = document.createElement("span");
-      badge.className = "nz-view-badge";
-      badge.title = "Dashboard-Ansicht: "+name;
-      const dot = document.createElement("i");
-      dot.className = "nz-view-dot";
-      dot.setAttribute("aria-hidden","true");
-      const title = document.createElement("span");
-      title.textContent = name;
-      badge.append(dot,title);
-      if (id==="live") {
-        const ticker = document.createElement("span");
-        ticker.className="nz-refresh-ticker";
-        ticker.title="Intervallanzeige der Messwertaktualisierung";
-        const bar = document.createElement("i");
-        ticker.append(bar);
-        badge.append(ticker);
-      }
-      container.append(badge);
-      function updateState() {
-        const raw=(state && state.textContent || "").trim().toUpperCase();
-        dot.classList.toggle("nz-offline",raw==="OFFLINE" || raw==="ERROR");
-        badge.title=raw==="OFFLINE" ? "Serverdaten derzeit nicht erreichbar" :
-          "Dashboard-Ansicht: "+name;
-      }
-      if (state && window.MutationObserver) {
-        new MutationObserver(updateState).observe(state,{
-          subtree:true,characterData:true,childList:true
-        });
-        updateState();
-      }
-    }
+    // Theme selection belongs in the installer, not in the dashboard header.
+    document.querySelectorAll(".nz-view-badge").forEach(badge => badge.remove());
 
     const cards = [...document.querySelectorAll(
       ".card,.chart,.serviceCard,.linkCard,.statCard"
