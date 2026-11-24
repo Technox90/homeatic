@@ -6,6 +6,15 @@ Modularer Komplett-Installer für Proxmox VE.
 
 **Installationskandidat: V151 · 24.11.2026**
 
+### Neu in V152
+
+- Aktuelle Dashboard-Installationen werden **in-place** aktualisiert.
+- `app.py`, `index.html` und `collector.py` werden bei einem aktuellen Dashboard nicht mehr durch die alte V139-Basis ersetzt.
+- Historische Migrationsschritte V42–V81 werden bei einem bereits vollständigen aktuellen Dashboard übersprungen.
+- Alte/unvollständige Installationen werden automatisch erkannt und erhalten einmalig den Kompatibilitäts-Bootstrap.
+- Reset/Neuaufbau nutzt weiterhin den vollständigen Bootstrap.
+- Logo/Favicon bleiben unverändert geschützt.
+
 ### Neu in V151
 
 - Dashboard-Branding vollständig generisch.
@@ -70,6 +79,11 @@ Dashboard-Ansicht wechseln:
 ```
 
 ## Dashboard
+
+### Update-Modus V152
+
+Der Installer prüft vor dem Update, ob der vollständige aktuelle Dashboard-Stand vorhanden ist. Ist er vollständig, läuft ein schnelles In-place-Update ohne Rücksetzen auf V139 und ohne erneutes Durchlaufen der historischen UI-Migrationen. Fehlen Pflichtmarker oder wurde Reset/Neuaufbau gewählt, wird einmalig der Kompatibilitäts-Bootstrap ausgeführt.
+
 
 Installationspfad:
 
