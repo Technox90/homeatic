@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V154
+# PROXMOX MODULARER KOMPLETT-INSTALLER V155
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -62,6 +62,7 @@ set -Eeuo pipefail
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
 #   V148: Stirling PDF verwendet offiziellen GHCR-Pfad; bestehende Compose-Installationen werden beim Updater sicher migriert
+#   V155: Paperless-Reparatur erhält öffentliche URL, CSRF, Hosts und CORS; kein erzwungener Recreate
 #   V154: Logo-Menü vergrößert; sichtbarer Rahmen/Button-Hintergrund entfernt, Klickfläche bleibt erhalten
 #   V153: Toolbar neu aufgebaut: links Hamburger+Logo als Menü-Toggle, LIVE/USV mittig, Neustart/Herunterfahren rechts
 #   V152: Dashboard-Updates bleiben in-place; kein Rücksetzen auf V139 und keine Legacy-Migrationen auf aktuellem Stand
@@ -1001,8 +1002,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V154"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V154"
+TUI_TITLE="PROXMOX INSTALLER V155"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V155"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1405,7 +1406,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 154" \
+                    --title "HAUPTMENÜ · Version 155" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -7727,7 +7728,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V154",
+    "installer_version": "V155",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8201,7 +8202,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V154 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V155 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -12362,7 +12363,7 @@ verify_paperless_proxy_v138() {
         return 1
     }
 
-    grep -Fxq "PAPERLESS_URL=https://${ip}" <<<"$env_out" || {
+    grep -Eq '^PAPERLESS_URL=https://[^[:space:]]+$' <<<"$env_out" || {
         warn "Paperless V138: PAPERLESS_URL fehlt/falsch."
         return 1
     }
@@ -12420,7 +12421,9 @@ print("PROXY=" + repr(settings.SECURE_PROXY_SSL_HEADER))
         return 1
     }
 
-    grep -Fq "https://${ip}" <<<"$django_out" || {
+    local configured_url
+    configured_url="$(sed -n 's/^PAPERLESS_URL=//p' <<<"$env_out")"
+    grep -Fq "$configured_url" <<<"$django_out" || {
         warn "Paperless V138: externe HTTPS-Adresse fehlt in CSRF_TRUSTED_ORIGINS."
         printf '%s\n' "$django_out" >&2
         return 1
@@ -12525,6 +12528,11 @@ wanted = {
     "PAPERLESS_CONSUMER_POLLING_INTERVAL": '"10"' if external_consume else '"0"',
 }
 
+existing_url = re.search(r"(?m)^ {6}PAPERLESS_URL:[ \t]*(.+)$", text)
+if existing_url and existing_url.group(1).strip() not in ("", '""', "''"):
+    wanted["PAPERLESS_URL"] = existing_url.group(1).strip()
+
+original = text
 for key in wanted:
     text = re.sub(
         rf"(?m)^\s{{6}}{re.escape(key)}:\s*.*\n?",
@@ -12532,11 +12540,7 @@ for key in wanted:
         text,
     )
 
-text = re.sub(
-    r"(?m)^\s{6}PAPERLESS_CSRF_TRUSTED_ORIGINS:\s*.*\n?",
-    "",
-    text,
-)
+ # Preserve explicitly configured CSRF, allowed hosts and CORS settings.
 
 anchor = re.search(
     r'(?m)^(\s{6}PAPERLESS_SECRET_KEY:\s*.*)$',
@@ -12560,7 +12564,12 @@ text = (
     + text[anchor.end():]
 )
 
-path.write_text(text, encoding="utf-8")
+if text != original:
+    from datetime import datetime
+    import shutil
+    backup = path.with_name(path.name + ".pre-v155-" + datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
+    shutil.copy2(path, backup)
+    path.write_text(text, encoding="utf-8")
 PYV138
 
     pct push \
@@ -12585,7 +12594,7 @@ PYV138
         set -Eeuo pipefail
         cd /opt/paperless
         docker compose config -q
-        docker compose up -d --force-recreate webserver
+        docker compose up -d --no-deps --pull never webserver
     '; then
         warn "Paperless V138: Webserver-Recreate fehlgeschlagen."
         return 1
