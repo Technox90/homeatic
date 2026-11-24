@@ -19521,6 +19521,7 @@ if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX ||
         prepare_lxc_template
 fi
 
+(( INSTALL_DASHBOARD )) && prepare_dashboard_update_mode_v152
 (( INSTALL_DASHBOARD )) && prepare_dashboard_branding_v151
 (( INSTALL_DASHBOARD )) && run_install_step "Server-Dashboard" install_dashboard
 (( INSTALL_OS )) && run_install_step "Betriebssystem · ${OS_LABEL}" install_operating_system_v61
@@ -19574,21 +19575,21 @@ if (( INSTALL_DASHBOARD )); then
     ui_progress_step "Dashboard integrieren · Links · Kategorien · Einstellungen"
 fi
 
-(( INSTALL_DASHBOARD )) && install_dashboard_extras
-(( INSTALL_DASHBOARD )) && install_dashboard_menu_sorting
-(( INSTALL_DASHBOARD )) && install_dashboard_router_domain_fix
-(( INSTALL_DASHBOARD )) && install_dashboard_router_top_link
-(( INSTALL_DASHBOARD )) && install_dashboard_menu_editor_v4
-(( INSTALL_DASHBOARD )) && install_dashboard_settings_v4
-(( INSTALL_DASHBOARD )) && install_dashboard_settings_write_paths
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_extras
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_menu_sorting
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_router_domain_fix
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_router_top_link
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_menu_editor_v4
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_settings_v4
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_settings_write_paths
 # V69: TLS erst nach allen modernen Dashboard-Patches.
 # Dadurch bleibt das Menü selbst bei einem TLS-Fehler auf dem aktuellen Stand.
 
 # V42: ein Einstellungsfenster + Kategorien, ohne das Messdaten-Backend zu ersetzen.
-(( INSTALL_DASHBOARD )) && install_dashboard_settings_hub_v42
-(( INSTALL_DASHBOARD )) && install_dashboard_categories_v42
-(( INSTALL_DASHBOARD )) && install_dashboard_category_assignment_v42
-(( INSTALL_DASHBOARD )) && install_dashboard_menu_cleanup_v42
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_settings_hub_v42
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_categories_v42
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_category_assignment_v42
+(( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) && install_dashboard_menu_cleanup_v42
 
 # Neue Zusatzdienste nach Installation/Update des Link-Managers sicher eintragen.
 (( INSTALL_UPTIME )) && dashboard_link_upsert "Uptime Kuma" "https://${UPTIME_IP}/"
@@ -19649,26 +19650,34 @@ fi
 # Erst jetzt sind Basis- und optionale Webseiten vollständig bekannt.
 # Bei einem bereits installierten Dashboard Kategorien auch dann aktualisieren,
 # wenn in diesem Lauf nur PBS/Pulse/PVE-UPS ergänzt wurden.
-if (( INSTALL_DASHBOARD )) || {
+if (( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) || {
+    (( ! INSTALL_DASHBOARD )) &&
     [[ -f /opt/nodezero/dashboard/static/index.html ]] &&
     [[ -f /var/lib/pve-sensor-dashboard-web/categories.json ]];
 }; then
     install_dashboard_default_categories_v42
+elif (( INSTALL_DASHBOARD && DASHBOARD_FAST_UPDATE_V152 )); then
+    info "Dashboard V152: vorhandene Kategorien unverändert übernommen."
 fi
 
 # V53: Mainboard-Karte durch USV/NAS ersetzen.
 # Bei frisch installiertem PVE-UPS dessen tatsächlich gewählte IP verwenden.
 # Bei bestehender Installation Standardquelle 192.168.178.111 verwenden.
 if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]; then
-    install_dashboard_ups_card_v53
-    install_dashboard_ups_settings_v55
-    install_dashboard_ups_ui_fix_v56
-    install_dashboard_settings_remember_v57
-    install_dashboard_layout_editor_v71
-    install_dashboard_pihole_settings_v78
-    install_dashboard_pihole_menu_fix_v80
-    install_dashboard_settings_panels_host_v81
-    install_dashboard_branding_v151
+    if (( ! INSTALL_DASHBOARD || ! DASHBOARD_FAST_UPDATE_V152 )); then
+        install_dashboard_ups_card_v53
+        install_dashboard_ups_settings_v55
+        install_dashboard_ups_ui_fix_v56
+        install_dashboard_settings_remember_v57
+        install_dashboard_layout_editor_v71
+        install_dashboard_pihole_settings_v78
+        install_dashboard_pihole_menu_fix_v80
+        install_dashboard_settings_panels_host_v81
+    else
+        ok "Dashboard V152: historische UI-Migrationen V53–V81 übersprungen."
+    fi
+
+    (( INSTALL_DASHBOARD )) && install_dashboard_branding_v151
 fi
 
 # V69:
