@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V149
+- Aktueller Installationskandidat: V150
 - External-URL-Tool: `proxmox/tools/nodezero-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -218,26 +218,44 @@ nodezero-external-urls --reapply
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
 
-## Dashboard
+## Dashboard · V150 umgesetzt
 
-Gewünschter Name:
+Persönlicher Standard:
 
 ```text
-Dashboard LT-WBH
+Dashboard-Name: Dashboard LT-WBH
+Logo-Text:      LT-WBH
+Logo-Design:    Neon Hex
 ```
 
-Obere Menüzeile soll dauerhaft/sticky oben bleiben:
+V150 fragt bei einer normalen Dashboard-Installation/-Aktualisierung nach Dashboard-Name, Logo-Text und Logo-Design. Verfügbare Designs: `neon`, `orbit`, `pulse`, `minimal`. Im Optimalmodus erfolgen keine Rückfragen; vorhandene Werte bzw. Standards bleiben erhalten.
+
+Die obere Bedienleiste ist fest/sticky und bleibt beim Scrollen sichtbar, in dieser Reihenfolge:
+
 - Menü
-- Live
+- LIVE
 - USV Online
 - Neustart
 - Herunterfahren
 
-Zusätzlich gewünscht:
-- futuristisches Logo
-- futuristisches Favicon
-- bestehende Dashboard-Funktionen und Messdaten erhalten
-- produktive Namen/Pfade nicht unnötig verändern
+Das Seitenmenü zeigt das gewählte Branding-Logo. Ohne eigenes hochgeladenes Favicon erzeugt das Frontend ein PNG-Favicon mit echtem transparentem Alpha-Hintergrund. Ein eigenes Favicon aus den Dashboard-Einstellungen hat Vorrang.
+
+Persistenz:
+
+```text
+/etc/pve-sensor-dashboard/ui.json
+```
+
+Dort werden neben den bisherigen UI-Werten auch `website_name`, `logo_text` und `logo_style` erhalten.
+
+Modulare Assets:
+
+```text
+dashboard/branding-v150.css
+dashboard/branding-v150.js
+```
+
+Bestehende Dashboard-Funktionen, Messdaten, Menü-Editor, Einstellungen, USV-, Pi-hole- und Layout-Funktionen bleiben erhalten.
 
 Dashboard-Ansichten:
 - Boot Sequence
@@ -277,7 +295,8 @@ Wichtig:
 - Aktuelle Hauptdomain ist ltwbh.de.
 - Uptime Kuma soll extern über https://up.ltwbh.de erreichbar sein.
 - Das produktive Sammelzertifikat heißt derzeit ltwbh-services.
-- Dashboard soll "Dashboard LT-WBH" heißen und die obere Menüleiste sticky behalten.
+- Dashboard V150 verwendet für diese Installation standardmäßig "Dashboard LT-WBH" und "LT-WBH"; Name, Logo-Text und Logo-Stil sind bei normaler Installation auswählbar.
+- Die obere Leiste bleibt sticky: Menü · LIVE · USV Online · Neustart · Herunterfahren.
 
 Setze die Arbeit auf Basis des aktuellen GitHub-Stands fort.
 ```
