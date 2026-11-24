@@ -35,6 +35,7 @@ jobs:
           bash -n proxmox/tools/proxmox-auto-updater
           bash -n proxmox/tools/proxmox-auto-updater-config
           bash -n proxmox/tools/proxmox-pushover-config
+          python3 -m py_compile proxmox/tools/nodezero-external-urls
           bash -n proxmox/tests/test-auto-updater.sh
 
       - name: Updater isolated regression tests
@@ -57,7 +58,7 @@ jobs:
 
       - name: Paperless direct NFS checks
         run: |
-          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V144' proxmox/proxmox.sh
+          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V146' proxmox/proxmox.sh
           grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
           grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
           grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
@@ -101,6 +102,35 @@ jobs:
           grep -q '"/root/diagnose:$DIAGNOSE_ROOT"' proxmox/proxmox.sh
           grep -q '"/root/downloads:$NODEZERO_DOWNLOAD_DIR"' proxmox/proxmox.sh
 
+      - name: V146 logging, updater dedupe and external URL checks
+        run: |
+          grep -q 'LOG_DIR="/home/diagnose/pihole-language"' proxmox/proxmox.sh
+          if grep -q '/root/pihole-sprache-' proxmox/proxmox.sh; then
+            echo "Pi-hole language helper still writes logs below /root"
+            exit 1
+          fi
+          grep -q 'install_nodezero_tool_v141 "proxmox-auto-updater"' proxmox/proxmox.sh
+          if grep -q "cat > /usr/local/sbin/proxmox-auto-updater <<'__UPDATER__'" proxmox/proxmox.sh; then
+            echo "Auto-Updater is still duplicated inside the master installer"
+            exit 1
+          fi
+          grep -q '"21" "Externe URLs · Domain / Reverse Proxy / Let'"'"'s Encrypt"' proxmox/proxmox.sh
+          grep -q 'install_nodezero_tool_v141 "nodezero-external-urls"' proxmox/proxmox.sh
+          grep -q 'CONFIG_DIR = Path("/home/Data/proxmox-installer/external-urls")' proxmox/tools/nodezero-external-urls
+          grep -q 'DIAG_DIR = Path("/home/diagnose/external-urls")' proxmox/tools/nodezero-external-urls
+          grep -q 'backend = f"https://{hip}:8006"' proxmox/tools/nodezero-external-urls
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
+          marker = 'if [[ "$INSTALL_SELECTION" == "21" ]]; then'
+          start = text.index(marker)
+          end = text.index("\n    fi", start) + len("\n    fi")
+          section = text[start:end]
+          assert "nodezero-external-urls" in section
+          assert "continue" in section
+          assert "exit 0" not in section
+          PY
+
       - name: V141 installer checks
         run: |
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
@@ -122,7 +152,7 @@ jobs:
           test -s dashboard/app.py
           test -s dashboard/index.html
           grep -q '"20" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
-          grep -q 'TOOLS_REF="a573f593f3134fc0f0feff7cc550cad6c5913175"' proxmox/proxmox.sh
+          grep -q 'TOOLS_REF="378f411d6c00ad2bd02a5687a934244d031002e2"' proxmox/proxmox.sh
           grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
           grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
           grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
