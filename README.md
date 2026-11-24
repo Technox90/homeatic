@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Proxmox Master Installer: V151 · 24.11.2026**
+**Aktueller Stand: V151 · Proxmox Master Installer · 24.11.2026**
 
 Neu in V151:
 - Dashboard-Branding ist vollständig generisch und für andere Installationen nutzbar.
