@@ -86,7 +86,7 @@ jobs:
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
           grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
-          grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/proxmox.sh
+          grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/tools/proxmox-auto-updater
           grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/tools/proxmox-auto-updater-config
           grep -q '/home/backups' proxmox/modules/dashboard.sh
           grep -q '/home/diagnose' proxmox/modules/dashboard.sh
@@ -105,10 +105,11 @@ jobs:
       - name: V146 logging, updater dedupe and external URL checks
         run: |
           grep -q 'LOG_DIR="/home/diagnose/pihole-language"' proxmox/proxmox.sh
-          if grep -q '/root/pihole-sprache-' proxmox/proxmox.sh; then
-            echo "Pi-hole language helper still writes logs below /root"
+          if grep -q 'LOGFILE="/root/pihole-sprache-' proxmox/proxmox.sh; then
+            echo "Pi-hole language helper still writes new logs below /root"
             exit 1
           fi
+          grep -q "find /root -maxdepth 1 -type f -name 'pihole-sprache-\*.txt'" proxmox/proxmox.sh
           grep -q 'install_nodezero_tool_v141 "proxmox-auto-updater"' proxmox/proxmox.sh
           if grep -q "cat > /usr/local/sbin/proxmox-auto-updater <<'__UPDATER__'" proxmox/proxmox.sh; then
             echo "Auto-Updater is still duplicated inside the master installer"
