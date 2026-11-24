@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V158 · Dashboard-Fußzeile und Versionsanzeige
+----------------------------------------------------------
+- Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
+- Die lokale Installer-Version ersetzt dort den Hostnamen; die Versionsangabe wird aus dem vorhandenen Update-Status gelesen.
+- Copyright © Technox1990 mit GitHub-Link; bestehende Logos, Themes und Einstellungen bleiben unverändert.
+
 24.11.2026 – V157 · Dashboard-Branding und Theme-Anzeige
 --------------------------------------------------------
 - Dashboard-Branding erhält einen eigenen Inline-Script-Block statt Einfügen in das letzte Script-Element.
