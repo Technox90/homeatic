@@ -1183,25 +1183,40 @@ tui_basis_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Basis-System oder Basis-Paket auswählen" \
                 21 88 9 \
-                "6" "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" \
-                "1" "Server-Dashboard installieren / aktualisieren" \
-                "DV" "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" \
-                "2" "Home Assistant OS" \
-                "3" "Paperless-ngx + Ollama" \
-                "4" "Pi-hole + Unbound" \
-                "5" "NetAlertX" \
-                "9" "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
+                "1" "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" \
+                "2" "Server-Dashboard installieren / aktualisieren" \
+                "3" "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" \
+                "4" "Home Assistant OS" \
+                "5" "Paperless-ngx + Ollama" \
+                "6" "Pi-hole + Unbound" \
+                "7" "NetAlertX" \
+                "8" "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nBASIS-SYSTEME\n' >&2
+        printf '%2d  %s\n' 1 "★ Basis-Paket · Dashboard + HA + Paperless + Pi-hole + NetAlertX + PVE-UPS" >&2
+        printf '%2d  %s\n' 2 "Server-Dashboard installieren / aktualisieren" >&2
+        printf '%2d  %s\n' 3 "Dashboard-Ansicht wählen · 5 GitHub-Designs / Offline-Cache" >&2
+        printf '%2d  %s\n' 4 "Home Assistant OS" >&2
+        printf '%2d  %s\n' 5 "Paperless-ngx + Ollama" >&2
+        printf '%2d  %s\n' 6 "Pi-hole + Unbound" >&2
+        printf '%2d  %s\n' 7 "NetAlertX" >&2
+        printf '%2d  %s\n' 8 "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nBASIS-SYSTEME\n  6 Basis-Paket (empfohlen)\n  1 Dashboard\n  DV Dashboard-Ansichten auswählen\n  2 Home Assistant\n  3 Paperless\n  4 Pi-hole\n  5 NetAlertX\n  9 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [6]: '
-    read -r result
-    result="${result:-6}"
-    [[ "${result^^}" == "Z" ]] && return 1
-    printf '%s' "$result"
+    case "$result" in
+        1) printf '%s' '6' ;;
+        2) printf '%s' '1' ;;
+        3) printf '%s' 'DV' ;;
+        4) printf '%s' '2' ;;
+        5) printf '%s' '3' ;;
+        6) printf '%s' '4' ;;
+        7) printf '%s' '5' ;;
+        8) printf '%s' '9' ;;
+        *) return 1 ;;
+    esac
 }
 
 tui_apps_menu_v106() {
@@ -1216,24 +1231,26 @@ tui_apps_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Wie möchtest du Apps auswählen?" \
                 17 86 5 \
-                "APPS_REC" "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" \
-                "APPS"     "Apps einzeln auswählen · Checkliste" \
-                "APPS_ALL" "Alle Apps & Dienste auswählen" \
-                "9"        "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
+                "1" "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" \
+                "2" "Apps einzeln auswählen · Checkliste" \
+                "3" "Alle Apps & Dienste auswählen" \
+                "4" "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nAPPS & DIENSTE\n' >&2
+        printf '%2d  %s\n' 1 "★ Empfohlene Apps · Uptime + Caddy + Stirling + Speedtest + Scrutiny" >&2
+        printf '%2d  %s\n' 2 "Apps einzeln auswählen · Checkliste" >&2
+        printf '%2d  %s\n' 3 "Alle Apps & Dienste auswählen" >&2
+        printf '%2d  %s\n' 4 "Freie Gesamtauswahl · Basis + Apps + Betriebssystem" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nAPPS & DIENSTE\n  1 Empfohlene Apps\n  2 Apps auswählen\n  3 Alle Apps\n  4 Freie Gesamtauswahl\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf 'APPS_REC' ;;
-        2) printf 'APPS' ;;
-        3) printf 'APPS_ALL' ;;
-        4) printf '9' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' 'APPS_REC' ;;
+        2) printf '%s' 'APPS' ;;
+        3) printf '%s' 'APPS_ALL' ;;
+        4) printf '%s' '9' ;;
         *) return 1 ;;
     esac
 }
@@ -1250,24 +1267,26 @@ tui_monitoring_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Monitoring-/Infrastruktur-Paket auswählen" \
                 17 92 5 \
-                "MON_REC" "★ Empfohlen · Pulse + PVE-UPS + Prometheus + PVE Exporter + Grafana + EMQX" \
-                "MON"     "Dienste einzeln auswählen · Checkliste" \
-                "MON_ALL" "Alle Monitoring-/Infrastruktur-Dienste auswählen" \
-                "14"      "Alte komplette Community-Auswahl öffnen" \
+                "1" "★ Empfohlen · Pulse + PVE-UPS + Prometheus + PVE Exporter + Grafana + EMQX" \
+                "2" "Dienste einzeln auswählen · Checkliste" \
+                "3" "Alle Monitoring-/Infrastruktur-Dienste auswählen" \
+                "4" "Alte komplette Community-Auswahl öffnen" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nMONITORING & INFRASTRUKTUR\n' >&2
+        printf '%2d  %s\n' 1 "★ Empfohlen · Pulse + PVE-UPS + Prometheus + PVE Exporter + Grafana + EMQX" >&2
+        printf '%2d  %s\n' 2 "Dienste einzeln auswählen · Checkliste" >&2
+        printf '%2d  %s\n' 3 "Alle Monitoring-/Infrastruktur-Dienste auswählen" >&2
+        printf '%2d  %s\n' 4 "Alte komplette Community-Auswahl öffnen" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nMONITORING & INFRASTRUKTUR\n  1 Empfohlen\n  2 Einzeln auswählen\n  3 Alle\n  4 Komplette Community-Auswahl\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf 'MON_REC' ;;
-        2) printf 'MON' ;;
-        3) printf 'MON_ALL' ;;
-        4) printf '14' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' 'MON_REC' ;;
+        2) printf '%s' 'MON' ;;
+        3) printf '%s' 'MON_ALL' ;;
+        4) printf '%s' '14' ;;
         *) return 1 ;;
     esac
 }
@@ -1284,24 +1303,26 @@ tui_automation_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "Automation-/Security-Dienste auswählen" \
                 16 88 4 \
-                "AUTOSEC" "Semaphore / Pocket ID / CrowdSec / Pangolin / Newt auswählen" \
-                "SEMAPHORE" "Nur Semaphore installieren" \
-                "REMOTE" "Remote-Stack · Pangolin + Newt" \
-                "14" "Alte komplette Community-Auswahl öffnen" \
+                "1" "Semaphore / Pocket ID / CrowdSec / Pangolin / Newt auswählen" \
+                "2" "Nur Semaphore installieren" \
+                "3" "Remote-Stack · Pangolin + Newt" \
+                "4" "Alte komplette Community-Auswahl öffnen" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nAUTOMATION & SECURITY\n' >&2
+        printf '%2d  %s\n' 1 "Semaphore / Pocket ID / CrowdSec / Pangolin / Newt auswählen" >&2
+        printf '%2d  %s\n' 2 "Nur Semaphore installieren" >&2
+        printf '%2d  %s\n' 3 "Remote-Stack · Pangolin + Newt" >&2
+        printf '%2d  %s\n' 4 "Alte komplette Community-Auswahl öffnen" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nAUTOMATION & SECURITY\n  1 Auswahl öffnen\n  2 Nur Semaphore\n  3 Pangolin + Newt\n  4 Komplette Community-Auswahl\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf 'AUTOSEC' ;;
-        2) printf 'SEMAPHORE' ;;
-        3) printf 'REMOTE' ;;
-        4) printf '14' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' 'AUTOSEC' ;;
+        2) printf '%s' 'SEMAPHORE' ;;
+        3) printf '%s' 'REMOTE' ;;
+        4) printf '%s' '14' ;;
         *) return 1 ;;
     esac
 }
@@ -1318,20 +1339,20 @@ tui_vm_os_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "VM/LXC-Verwaltung oder Betriebssystem-Installation" \
                 15 84 4 \
-                "0"  "VM / LXC verwalten" \
-                "16" "Betriebssystem installieren · Windows / Debian / Ubuntu / Mint" \
+                "1" "VM / LXC verwalten" \
+                "2" "Betriebssystem installieren · Windows / Debian / Ubuntu / Mint" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nVMs / BETRIEBSSYSTEME\n' >&2
+        printf '%2d  %s\n' 1 "VM / LXC verwalten" >&2
+        printf '%2d  %s\n' 2 "Betriebssystem installieren · Windows / Debian / Ubuntu / Mint" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nVMs / BETRIEBSSYSTEME\n  1 VM/LXC verwalten\n  2 Betriebssystem installieren\n  Z Zurück\nAuswahl [1]: '
-    read -r result
-    case "${result:-1}" in
-        1) printf '0' ;;
-        2) printf '16' ;;
-        [Zz]) return 1 ;;
+    case "$result" in
+        1) printf '%s' '0' ;;
+        2) printf '%s' '16' ;;
         *) return 1 ;;
     esac
 }
@@ -1731,19 +1752,25 @@ tui_reset_menu_v106() {
                 --cancel-button "Zurück" \
                 --menu "ACHTUNG: Diese Funktionen können Gäste und Daten löschen." \
                 18 96 5 \
-                "7"  "KOMPLETT NEU · Auswahl + Löschbestätigung" \
-                "13" "KOMPLETT NEU · SOFORT · 5-Sekunden-Countdown" \
-                "18" "PROXMOX AUF NULL · VMs/LXC + lokale Images/Backups entfernen" \
+                "1" "KOMPLETT NEU · Auswahl + Löschbestätigung" \
+                "2" "KOMPLETT NEU · SOFORT · 5-Sekunden-Countdown" \
+                "3" "PROXMOX AUF NULL · VMs/LXC + lokale Images/Backups entfernen" \
                 3>&1 1>&2 2>&3
         )" || return 1
-        printf '%s' "$result"
-        return 0
+    else
+        printf '\nRESET / NEUAUFBAU\n' >&2
+        printf '%2d  %s\n' 1 "KOMPLETT NEU · Auswahl + Löschbestätigung" >&2
+        printf '%2d  %s\n' 2 "KOMPLETT NEU · SOFORT · 5-Sekunden-Countdown" >&2
+        printf '%2d  %s\n' 3 "PROXMOX AUF NULL · VMs/LXC + lokale Images/Backups entfernen" >&2
+        printf ' Z  Zurück\nAuswahl: ' >&2
+        read -r result || return 1
     fi
-
-    printf >&2 '\nRESET / NEUAUFBAU\n  7 Komplett neu mit Bestätigung\n  13 Komplett neu SOFORT\n  18 Proxmox auf Null\n  Z Zurück\nAuswahl: '
-    read -r result
-    [[ "${result^^}" == "Z" ]] && return 1
-    printf '%s' "$result"
+    case "$result" in
+        1) printf '%s' '7' ;;
+        2) printf '%s' '13' ;;
+        3) printf '%s' '18' ;;
+        *) return 1 ;;
+    esac
 }
 
 tui_main_menu() {
