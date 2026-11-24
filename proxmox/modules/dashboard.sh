@@ -23381,11 +23381,18 @@ if style_end < 0:
 
 html = html[:style_end] + css_block + "\n" + html[style_end:]
 
-script_end = html.rfind("</script>")
-if script_end < 0:
-    raise SystemExit("FEHLER: </script> für Branding fehlt.")
-
-html = html[:script_end] + js_block + "\n" + html[script_end:]
+# Always use a dedicated inline script. External scripts ignore inline content.
+# Remove empty blocks left by earlier branding injections and deduplicate the monitor.
+html = re.sub(r'<script\b[^>]*\bid="nodezero-branding-v154"[^>]*>\s*</script\s*>', '', html, flags=re.I)
+monitor_pattern = r'<script\s+defer\s+src="/installer-update-v155\.js"\s*>\s*</script\s*>'
+monitor_present = bool(re.search(monitor_pattern, html, re.I))
+html = re.sub(monitor_pattern, '', html, flags=re.I)
+if len(re.findall(r'</body\s*>', html, re.I)) != 1:
+    raise SystemExit("FEHLER: Dashboard body nicht eindeutig.")
+branding_tag = '<script id="nodezero-branding-v154">\n' + js_block + '\n</script>\n'
+if monitor_present:
+    branding_tag += '<script defer src="/installer-update-v155.js"></script>\n'
+html = re.sub(r'</body\s*>', lambda m: branding_tag + m.group(), html, count=1, flags=re.I)
 index_path.write_text(html, encoding="utf-8")
 
 for marker in (
