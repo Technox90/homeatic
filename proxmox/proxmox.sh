@@ -5664,7 +5664,10 @@ if ! command -v jq >/dev/null 2>&1 || \
         xz-utils
 fi
 
-# V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.\n# Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.\n\nTOOLS_REF="165f20b00119f3370bfb9a285c77580c083260bd"
+# V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
+# Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
+
+TOOLS_REF="165f20b00119f3370bfb9a285c77580c083260bd"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -5697,13 +5700,11 @@ install_nodezero_tool_v141() {
 
     case "$(head -n1 "$cached" 2>/dev/null || true)" in
         *python*)
-            PYTHONPYCACHEPREFIX="/tmp/nodezero-pycache-$" \
-                python3 -m py_compile "$cached" || {
-                    rm -rf "/tmp/nodezero-pycache-$"
-                    echo "FEHLER: Python-Syntaxprüfung fehlgeschlagen: ${cached}" >&2
-                    exit 1
-                }
-            rm -rf "/tmp/nodezero-pycache-$"
+            python3 -m py_compile "$cached" || {
+                echo "FEHLER: Python-Syntaxprüfung fehlgeschlagen: ${cached}" >&2
+                exit 1
+            }
+            rm -rf "$(dirname "$cached")/__pycache__"
             ;;
         *)
             bash -n "$cached" || {
