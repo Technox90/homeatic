@@ -1,6 +1,13 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V159 · Dauerhafte Dashboard-Selektoren und mobile Toolbar
+---------------------------------------------------------------------
+- Dauerhafte Namen für Branding-CSS-Klassen, HTML-IDs und JavaScript-Funktionen statt Versionssuffixen.
+- Desktop-Logo bis 350 × 60 px, responsive Skalierung auf kleineren Bildschirmen.
+- Mobile Neustart- und Herunterfahren-Schaltflächen mit Icons und barrierefreien Beschriftungen; Sicherheitsabfragen bleiben erhalten.
+- Installer und Auto-Updater migrieren das Branding; alte interne Kompatibilitätsmarker bleiben erhalten.
+
 24.11.2026 – V158 · Dashboard-Fußzeile und Versionsanzeige
 ----------------------------------------------------------
 - Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
