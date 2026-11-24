@@ -253,7 +253,11 @@ Modulare Assets:
 ```text
 dashboard/branding-v150.css
 dashboard/branding-v150.js
+dashboard/assets/logo-lt-wbh.png
+dashboard/assets/favicon-lt-wbh.png
 ```
+
+Für Tobias' Standard-Branding `LT-WBH` sind Logo und Favicon damit echte, versionierte PNG-Dateien im Repository. Beide haben echte Alpha-Transparenz. Der Installer lädt sie aus einem unveränderlichen Commit-Ref und installiert sie nach `/opt/nodezero/dashboard/static/assets/`.
 
 Bestehende Dashboard-Funktionen, Messdaten, Menü-Editor, Einstellungen, USV-, Pi-hole- und Layout-Funktionen bleiben erhalten.
 
