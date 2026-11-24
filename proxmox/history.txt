@@ -1,6 +1,14 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V150 · Menü-Logo als schmaler LT-WBH-Wordmark
+-------------------------------------------------------------
+- Großes LT-WBH-Badge aus dem Seitenmenü entfernt; dadurch bleibt der Menükopf kompakt.
+- Das Menü zeigt jetzt nur einen schmalen, modernen Schriftzug mit dem konfigurierten Logo-Text.
+- Standard für Tobias: `LT-WBH`.
+- Das feste PNG-Favicon bleibt aktiv; die PNG-Branding-Dateien bleiben im Repository erhalten.
+- Der Schriftzug wird automatisch in `#sideNav .navHead` eingeblendet; keine manuelle HTML-Änderung erforderlich.
+
 24.11.2026 – V150 · Dashboard Branding / feste Bedienleiste
 ---------------------------------------------------------------
 - Installer-Version auf V150 angehoben.
