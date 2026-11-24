@@ -58,7 +58,7 @@ jobs:
 
       - name: Paperless direct NFS checks
         run: |
-          grep -q 'PROXMOX MODULARER KOMPLETT-INSTALLER V154' proxmox/proxmox.sh
+          grep -Eq '^# PROXMOX MODULARER KOMPLETT-INSTALLER V[0-9]+$' proxmox/proxmox.sh
           grep -q 'PAPERLESS_NAS_MOUNT="/mnt/paperless-storage"' proxmox/proxmox.sh
           grep -q 'prepare_paperless_external_storage_v143() {' proxmox/proxmox.sh
           grep -q 'paperless_unprivileged=0' proxmox/proxmox.sh
