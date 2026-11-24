@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V151
+# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V152
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
