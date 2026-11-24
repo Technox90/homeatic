@@ -89,3 +89,15 @@ body.dashboardToolbarFixedV154 .wrap{padding-top:22px}
   #dashboardFixedToolbarV154 .toolbar .live,
   #dashboardFixedToolbarV154 .toolbar .upsTopState{padding:7px 8px;font-size:12px}
 }
+
+/* V158 system footer */
+.nodezeroHostInfoHiddenV158{display:none!important}
+#nodezeroSystemFooterV158{
+  margin:28px auto 0;padding:16px 20px 22px;
+  border-top:1px solid var(--line,rgba(128,128,128,.25));
+  text-align:center;font-size:11px;line-height:1.6;
+  color:var(--muted,#8d9caf);overflow-wrap:anywhere;
+}
+#nodezeroSystemFooterV158 .nodezeroFooterCreditV158{margin-top:4px}
+#nodezeroSystemFooterV158 a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+@media(max-width:760px){#nodezeroSystemFooterV158{padding:14px 12px 20px}}
