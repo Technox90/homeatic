@@ -57,7 +57,7 @@ DEFAULTS = [
     ("paper", "Paperless", "paper", True, False),
     ("pihole", "Pi-hole", "pihole", False, True),
     ("netalertx", "NetAlertX", "net", False, True),
-    ("uptime", "Uptime Kuma", "uptime", True, False),
+    ("uptime", "Uptime Kuma", "up", True, False),
     ("vault", "Vaultwarden", "vault", True, False),
     ("caddy", "Caddy", "caddy", False, True),
     ("pdf", "Stirling PDF", "pdf", True, False),
