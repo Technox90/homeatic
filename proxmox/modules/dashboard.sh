@@ -23196,7 +23196,7 @@ PYV151READ
 install_dashboard_branding_v154() {
     header "DASHBOARD · TOOLBAR / BRANDING V154"
 
-    local ref="e0dd2ba30d01fc99133d78a8537d0810e8b1edf3"
+    local ref="621ceae761ae5c0f957822a2245eb2d60f290ac7"
     local index="/opt/nodezero/dashboard/static/index.html"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"
