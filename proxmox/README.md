@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V148**
+Installationskandidat: **V149**
 
 Geplante Hauptdatei:
 
@@ -287,3 +287,14 @@ ghcr.io/stirling-tools/stirling-pdf:latest
 Der bisherige Pfad `docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest` bleibt zwar offiziell, kann aber zeitweise nicht erreichbar sein. Stirling nennt Docker Hub und GitHub Container Registry ausdrücklich als alternative Registries.
 
 Bestehende NodeZero-Stirling-Container werden beim Auto-Updater einmalig migriert. Vor der Änderung wird die aktive Compose-Datei gesichert und anschließend mit `docker compose config -q` validiert. Bei einem Fehler wird automatisch das Backup wiederhergestellt.
+
+
+## Uptime Kuma URL · V149
+
+Für Uptime Kuma lautet der Standardvorschlag der External-URL-Verwaltung jetzt:
+
+```text
+up.<hauptdomain>
+```
+
+Bei der Hauptdomain `ltwbh.de` wird damit `https://up.ltwbh.de` vorgeschlagen. Die URL kann weiterhin wie jede andere externe URL im Menü einzeln bearbeitet werden.
