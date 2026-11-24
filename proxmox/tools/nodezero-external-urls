@@ -519,7 +519,7 @@ def ensure_certificate(cfg):
         args += ["--email", cfg["email"]]
     else:
         args += ["--register-unsafely-without-email"]
-    if existing:
+    if existing and not wanted.issubset(existing):
         args += ["--expand"]
     for domain in domains:
         args += ["-d", domain]
@@ -600,8 +600,13 @@ if not p.exists(): raise SystemExit(2)
 s=p.read_text(encoding="utf-8")
 key=os.environ["NZ_KEY"]; value=os.environ["NZ_VALUE"]
 pat=re.compile(r"^(\s*"+re.escape(key)+r":\s*).*$", re.M)
-if not pat.search(s): raise SystemExit(3)
-s=pat.sub(lambda m: m.group(1)+'"'+value+'"', s, count=1)
+if pat.search(s):
+    s=pat.sub(lambda m: m.group(1)+'"'+value+'"', s, count=1)
+else:
+    env=re.search(r"^(\\s*)environment:\\s*$", s, re.M)
+    if not env: raise SystemExit(3)
+    line=env.group(1)+'  '+key+': "'+value+'"'
+    s=s[:env.end()]+'\\n'+line+s[env.end():]
 p.write_text(s, encoding="utf-8")
 """
     cp = run(["pct", "exec", ctid, "--", "env", f"NZ_FILE={file}", f"NZ_KEY={key}", f"NZ_VALUE={value}", "python3", "-c", code])
@@ -614,6 +619,7 @@ def apply_app_urls(cfg):
         url = f"https://{host}"
         mapping = {
             "paper": ("paperless", "/opt/paperless/docker-compose.yml", "PAPERLESS_URL", url, "/opt/paperless"),
+            "vault": ("vaultwarden", "/opt/vaultwarden/docker-compose.yml", "DOMAIN", url, "/opt/vaultwarden"),
             "ntfy": ("ntfy", "/opt/ntfy/docker-compose.yml", "NTFY_BASE_URL", url, "/opt/ntfy"),
             "forgejo": ("forgejo", "/opt/forgejo/docker-compose.yml", "FORGEJO__server__ROOT_URL", url + "/", "/opt/forgejo"),
             "speedtest": ("speedtest-tracker", "/opt/speedtest-tracker/docker-compose.yml", "APP_URL", url, "/opt/speedtest-tracker"),
