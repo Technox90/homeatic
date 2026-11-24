@@ -34,7 +34,8 @@ jobs:
               assert "nz-highlight" in css, name
               assert "prefers-reduced-motion" in css, name
           main = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
-          assert '"DV" "Dashboard-Ansicht wählen' in main
+          assert '"3" "Dashboard-Ansicht wählen' in main
+assert "3) printf '%s' 'DV' ;;" in main
           assert "nodezero-dashboard-views --install" in main
           manager = Path("proxmox/tools/nodezero-dashboard-views").read_text(encoding="utf-8")
           assert "NODEZERO-VIEWS-START" in manager
