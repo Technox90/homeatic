@@ -315,12 +315,16 @@ Persistente Branding-Werte liegen zusammen mit den vorhandenen UI-Einstellungen 
 /etc/pve-sensor-dashboard/ui.json
 ```
 
-Modulare Frontend-Assets:
+Modulare Frontend-Assets und persönliche LT-WBH-PNGs:
 
 ```text
 dashboard/branding-v150.css
 dashboard/branding-v150.js
+dashboard/assets/logo-lt-wbh.png
+dashboard/assets/favicon-lt-wbh.png
 ```
+
+Für `LT-WBH` werden die echten PNG-Dateien verwendet. Beide besitzen echte Alpha-Transparenz. Für andere Installationen bleiben Logo-Text und Design auswählbar; ein eigenes hochgeladenes Favicon hat Vorrang.
 
 ## Uptime Kuma URL · V149
 
