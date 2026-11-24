@@ -112,6 +112,10 @@ jobs:
           grep -q 'USV Online' dashboard/branding-v150.js
           grep -q "toDataURL('image/png')" dashboard/branding-v150.js
           grep -q 'dashboardFixedToolbarV150' dashboard/branding-v150.css
+          grep -Fq "document.querySelector('.top .brand h1')" dashboard/branding-v150.js
+          grep -Fq "logo-lt-wbh.png?v=150" dashboard/branding-v150.js
+          grep -Fq "favicon-lt-wbh.png?v=150" dashboard/branding-v150.js
+          grep -Fq 'V150_FIXED_NAV_OFFSET' dashboard/branding-v150.css
           grep -q 'PVE_DASHBOARD_BRANDING_V150' proxmox/modules/dashboard.sh
           test -s dashboard/assets/logo-lt-wbh.png
           test -s dashboard/assets/favicon-lt-wbh.png
@@ -201,7 +205,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="0abc44cbf19b258c25a5c6288fee1825e98c3545"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="15ea65f95bcdec977975c02e297e655720d5582e"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
