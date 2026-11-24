@@ -157,9 +157,12 @@ function toggleBrandMenu(){
   }
 }
 
-function configureBrandMenu(button,settings){
+const brandMenuConfigured=new WeakMap();
+function configureBrandMenu(button,settings,force=false){
   if(!button)return;
   const text=String(settings?.logo_text||'NODEZERO').trim()||'NODEZERO';
+  if(!force&&brandMenuConfigured.get(button)===text&&button.querySelector('#randMenuLogo'))return;
+  brandMenuConfigured.set(button,text);
 
   button.id='brandMenuToggle';
   button.classList.add('brandMenuToggle');
@@ -204,7 +207,7 @@ function preparePowerButton(button,label,symbol){
   button.replaceChildren(icon,text);
 }
 
-function ensureBrandToolbarLayout(settings={}){
+function ensureBrandToolbarLayout(settings={},refreshLogo=false){
   const bar=document.querySelector('.toolbar');
   if(!bar)return;
 
@@ -245,7 +248,7 @@ function ensureBrandToolbarLayout(settings={}){
   const reboot=bar.querySelector('.reboot');
   const shutdown=bar.querySelector('.danger');
 
-  if(menu){configureBrandMenu(menu,settings);left.appendChild(menu)}
+  if(menu){configureBrandMenu(menu,settings,refreshLogo);left.appendChild(menu)}
   if(live)center.appendChild(live);
   if(ups)center.appendChild(ups);
   if(reboot){preparePowerButton(reboot,'Neustart','↻');right.appendChild(reboot);}
@@ -283,7 +286,7 @@ function applyDashboardBranding(settings){
   }
 
   applyBrandFavicon(settings);
-  ensureBrandToolbarLayout(settings);
+  ensureBrandToolbarLayout(settings,true);
 }
 
 if(typeof applyUiSettings==='function'){
