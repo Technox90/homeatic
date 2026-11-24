@@ -1336,7 +1336,7 @@ tui_vm_os_menu_v106() {
     esac
 }
 
-run_stress_test_v155() {
+run_stress_test_v155() (
     local minutes="" answer="" workers="" logfile=""
     if (( TUI_AVAILABLE )); then
         minutes="$(whiptail --title "CPU-STRESSTEST" --inputbox "Dauer in Minuten (1-120)" 10 65 10 3>&1 1>&2 2>&3)" || return 0
@@ -1355,12 +1355,20 @@ run_stress_test_v155() {
     echo "Produktive VMs und LXC können langsamer werden. Abbruch mit Strg+C."
     read -rp "Test starten? [j/N]: " answer || return 0
     [[ "$answer" =~ ^[jJyY]$ ]] || return 0
+    local stress_lock_fd
+    exec {stress_lock_fd}>/run/lock/proxmox-master-stresstest.lock || return 1
+    if ! flock -n "$stress_lock_fd"; then
+        exec {stress_lock_fd}>&-
+        warn "Ein Stresstest läuft bereits."
+        return 0
+    fi
     if ! command -v stress-ng >/dev/null 2>&1; then
         echo "Installiere stress-ng (kein Systemupgrade)."
         apt-get install -y stress-ng || return 1
     fi
     install -d -m 0750 /home/diagnose/stresstest || return 1
-    logfile="$(mktemp /home/diagnose/stresstest/test$(date +%Y%m%d-%H%M%S)-XXXXXX.txt)" || return 1
+    logfile="/home/diagnose/stresstest/test$(date +%Y%m%d-%H%M%S).txt"
+    (umask 077; set -o noclobber; : > "$logfile") || return 1
     python3 - "$minutes" "$workers" "$logfile" <<'PY_STRESS_V155'
 import datetime, glob, os, signal, subprocess, sys, time
 
@@ -1454,7 +1462,7 @@ with open(path, "a", buffering=1) as log:
         emit(f"Bericht: {path}")
 sys.exit(0 if status == "OK" else 1)
 PY_STRESS_V155
-}
+)
 
 tui_maintenance_menu_v106() {
     local result=""
