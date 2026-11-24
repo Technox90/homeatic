@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V155 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V156 · Proxmox Master Installer · 24.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -135,6 +135,14 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V156
+
+- Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
+- Abruf aus veröffentlichtem `main`-Commit; Installer-Syntaxprüfung, keine Downgrades, Backups und atomarer Dateiaustausch.
+- Keine Neuinstallation, kein Reset, keine Änderung an nginx, Zertifikaten, Logos/Favicons oder Datenbanken. Dashboard-Backend-Migrationen bleiben manuell.
+- Update-Ergebnisse erscheinen im vorhandenen Auto-Updater-Bericht und in Pushover, sofern aktiviert.
+- Menü: Wartung → Auto-Updater → 5; dort die gewünschten Komponenten einschalten.
+
 ### V155
 - Einheitliche Nummerierung der sieben Haupt-Untermenüs; interne IDs bleiben stabil.
 - Dashboard-Updates starten keine automatische Paperless-Migration mehr; vorhandene Paperless-, Kuma- und PVE-UPS-Container werden bei erneuter Installation übersprungen.
@@ -164,13 +172,5 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 - Historische UI-Migrationen V42 bis V81 werden auf einem aktuellen Dashboard übersprungen.
 - Nur alte/unvollständige Installationen oder bewusste Neuaufbauten verwenden einmalig den Kompatibilitäts-Bootstrap.
 - Eigene Logo-/Favicon-Dateien bleiben weiterhin geschützt.
-
-### V151
-- Dashboard-Branding ist vollständig generisch und für andere Installationen nutzbar.
-- Eigene Logo-/Favicon-Dateien werden bei Dashboard-Updates **niemals überschrieben**.
-- Neutrale transparente Platzhalter werden nur bei Erst-/Neuinstallation und nur bei fehlenden Dateien angelegt.
-- Persönliche LT-WBH-Bilder sind nicht mehr Bestandteil des aktuellen Repository-Standes.
-- Dashboard-Logo und Favicon heißen generisch `logo.png` und `favicon.png`.
-- Die vollständige Versionshistorie wird separat gepflegt.
 
 **[Vollständige Versionshistorie](proxmox/HISTORY.md)**

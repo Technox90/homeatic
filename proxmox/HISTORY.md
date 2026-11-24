@@ -1,12 +1,20 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V155 · 24.11.2026**  
+> **Aktueller Stand: V156 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V156 · Automatische NodeZero-Komponentenupdates
+------------------------------------------------------------
+- Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
+- Abruf aus veröffentlichtem `main`-Commit; Installer-Syntaxprüfung, keine Downgrades, Backups und atomarer Dateiaustausch.
+- Keine Neuinstallation, kein Reset, keine Änderung an nginx, Zertifikaten, Logos/Favicons oder Datenbanken. Dashboard-Backend-Migrationen bleiben manuell.
+- Update-Ergebnisse erscheinen im vorhandenen Auto-Updater-Bericht und in Pushover, sofern aktiviert.
+- Menü: Wartung → Auto-Updater → 5; dort die gewünschten Komponenten einschalten.
 
 24.11.2026 – V155 · Wartung, Stresstest und Dienstschutz
 --------------------------------------------------------

@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+"""Opt-in updates of existing NodeZero-managed files. No guest creation or reset."""
+import datetime
+import json
+import os
+import pathlib
+import re
+import shutil
+import stat
+import subprocess
+import tempfile
+import urllib.request
+
+CONF = pathlib.Path("/root/.config/proxmox-auto-updater/nodezero-updates.json")
+STATE = pathlib.Path("/var/lib/nodezero-installer-monitor")
+BACKUPS = pathlib.Path("/home/backups/nodezero-managed-updates")
+DASH = pathlib.Path("/opt/nodezero/dashboard/static")
+API = "https://api.github.com/repos/Technox90/homeatic/commits/main"
+RAW = "https://raw.githubusercontent.com/Technox90/homeatic/"
+KEYS = ("installer", "dashboard", "kuma")
+
+def report(kind, message):
+    print(kind + "|" + message, flush=True)
+
+def request(url):
+    req = urllib.request.Request(url, headers={"User-Agent":"NodeZero-Proxmox-Updater"})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        data = response.read(4*1024*1024+1)
+    if len(data)>4*1024*1024:
+        raise ValueError("Download zu groß")
+    return data
+
+def version(data):
+    m = re.search(rb"(?m)^# PROXMOX MODULARER KOMPLETT-INSTALLER V([0-9]+)$", data)
+    if not m or not data.startswith(b"#!/usr/bin/env bash\n"):
+        raise ValueError("Ungültiger Installer")
+    return int(m.group(1))
+
+def run(args, **kw):
+    return subprocess.run(args, check=True, timeout=60, **kw)
+
+def safe_file(path):
+    st=path.lstat()
+    if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_mode & 0o022:
+        raise ValueError("Datei nicht regulär/root-geschützt: "+str(path))
+    if path.resolve()!=path:
+        raise ValueError("Symlink-Pfad: "+str(path))
+    return st
+
+def replace_files(pairs, label):
+    changed=[]
+    for path, data in pairs:
+        st=safe_file(path)
+        if path.read_bytes()!=data:
+            changed.append((path,data,st))
+    if not changed:
+        return False
+    BACKUPS.mkdir(mode=0o700,parents=True,exist_ok=True)
+    backup=pathlib.Path(tempfile.mkdtemp(prefix=label+"-",dir=BACKUPS))
+    for i,(path,_,_) in enumerate(changed):
+        shutil.copy2(path,backup/str(i))
+    (backup/"paths.json").write_text(json.dumps([str(x[0]) for x in changed]))
+    done=[]
+    def write(path,data,st):
+        fd,tmp=tempfile.mkstemp(prefix=".nodezero-update-",dir=path.parent)
+        try:
+            with os.fdopen(fd,"wb") as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+            os.chown(tmp,st.st_uid,st.st_gid)
+            os.chmod(tmp,stat.S_IMODE(st.st_mode))
+            os.replace(tmp,path)
+        finally:
+            if os.path.exists(tmp): os.unlink(tmp)
+    try:
+        for i,(path,data,st) in enumerate(changed):
+            write(path,data,st)
+            done.append((i,path,st))
+    except Exception:
+        for i,path,st in reversed(done):
+            write(path,(backup/str(i)).read_bytes(),st)
+        raise
+    report("INFO","Backup: "+str(backup))
+    return True
+
+def extract(text, begin, end):
+    if text.count(begin)!=1: raise ValueError("Quellmarker nicht eindeutig")
+    tail=text.split(begin,1)[1]
+    if end not in tail: raise ValueError("Quellmarker fehlt")
+    return tail.split(end,1)[0]
+
+def dashboard_payload(index, css, js):
+    pattern=r"/\* PVE_DASHBOARD_BRANDING_V154_BEGIN \*/.*?/\* PVE_DASHBOARD_BRANDING_V154_END \*/"
+    matches=list(re.finditer(pattern,index,re.S))
+    if len(matches)!=2: raise ValueError("Dashboard-Branding nicht eindeutig; manuelles Update nötig")
+    if not all(x in css for x in ("NodeZero Dashboard Toolbar V154","dashboardFixedToolbarV154")) or "brandMenuToggleV154" not in js:
+        raise ValueError("Branding-Quellprüfung fehlgeschlagen")
+    if "</style" in css.lower() or "</script" in js.lower(): raise ValueError("Ungültiger HTML-Inhalt")
+    payloads=iter((css,js))
+    return re.sub(pattern,lambda _: "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */\n"+next(payloads)+"\n/* PVE_DASHBOARD_BRANDING_V154_END */",index,flags=re.S)
+
+def dashboard_update(master,download):
+    index=DASH/"index.html"
+    overlay=DASH/"installer-update-v155.js"
+    if not index.is_file():
+        report("INFO","Dashboard nicht installiert; übersprungen")
+        return
+    if not overlay.is_file():
+        report("MANUAL","Dashboard: V155-Updateanzeige fehlt; einmal manuell aktualisieren")
+        return
+    safe_file(index)
+    safe_file(overlay)
+    text=index.read_text()
+    if '<script defer src="/installer-update-v155.js"></script>' not in text:
+        report("MANUAL","Dashboard: Updateanzeige nicht eingebunden")
+        return
+    css=download("dashboard/branding-v154.css").decode()
+    js=download("dashboard/branding-v154.js").decode()
+    new_index=dashboard_payload(text,css,js)
+    new_overlay=extract(master,'js="""(() => {\n','})();"""')
+    new_overlay="(() => {\n"+new_overlay+"})();"
+    if "nodezero-installer-update" not in new_overlay:
+        raise ValueError("Updateanzeige ungültig")
+    if replace_files([(index,new_index.encode()),(overlay,new_overlay.encode())],"dashboard"):
+        report("UPDATED","Dashboard: verwaltete Toolbar und Installer-Updateanzeige")
+    else:
+        report("INFO","Dashboard-Oberfläche aktuell")
+
+def kuma_update(master):
+    listing=run(["pct","list"],capture_output=True,text=True).stdout
+    ids=[]
+    for line in listing.splitlines()[1:]:
+        parts=line.split()
+        if not parts or not parts[0].isdigit(): continue
+        config=run(["pct","config",parts[0]],capture_output=True,text=True).stdout
+        if re.search(r"(?m)^hostname: uptime-kuma$",config,re.I): ids.append(parts[0])
+    if not ids:
+        report("INFO","Uptime Kuma nicht installiert; übersprungen")
+        return
+    if len(ids)!=1:
+        report("MANUAL","Mehrere Kuma-LXC; keine Änderung")
+        return
+    ct=ids[0]
+    if "status: running" not in run(["pct","status",ct],capture_output=True,text=True).stdout:
+        report("INFO","Kuma gestoppt; übersprungen")
+        return
+    page=extract(master,"cat > \"$tmp\" <<'KUMA_STATUS_HTML'\n","\nKUMA_STATUS_HTML\n")+"\n"
+    if not page.startswith("<!doctype html>") or "/api/status-page/heartbeat/" not in page:
+        raise ValueError("Ungültige Kuma-Statusseite")
+    # Existing extension only. No nginx, Docker or database changes.
+    shell=r"""set -eu
+p=/var/www/nodezero-kuma-status/index.html
+[ -f "$p" ] && [ ! -L "$p" ] || { echo missing; exit 0; }
+grep -Fq 'NODEZERO KUMA PUBLIC STATUS V155' /etc/nginx/conf.d/pve-master-standard-web.conf || { echo missing; exit 0; }
+t=$(mktemp /var/www/nodezero-kuma-status/.update.XXXXXX)
+trap 'rm -f "$t"' EXIT
+cat > "$t"
+if cmp -s "$p" "$t"; then echo current; exit 0; fi
+b=$(mktemp -d /root/kuma-status-update.XXXXXX)
+cp -a "$p" "$b/index.html"
+chmod 644 "$t"
+mv -f "$t" "$p"
+echo updated
+"""
+    result=run(["pct","exec",ct,"--","bash","-c",shell],input=page,text=True,capture_output=True).stdout.strip()
+    if result=="updated": report("UPDATED","Kuma: öffentliche Statusseite aktualisiert")
+    elif result=="missing": report("INFO","Kuma-Status-Erweiterung nicht installiert; übersprungen")
+    elif result=="current": report("INFO","Kuma-Status-Erweiterung aktuell")
+    else: raise ValueError("Unerwartete Kuma-Rückmeldung")
+
+def installer_update(remote, download):
+    path=pathlib.Path((STATE/"installer-path").read_text().strip())
+    if path not in (pathlib.Path("/root/proxmox.sh"),pathlib.Path("/usr/local/sbin/proxmox.sh")):
+        raise ValueError("Nicht unterstützter Installer-Pfad; manuelles Update nötig")
+    safe_file(path)
+    old=version(path.read_bytes())
+    new=version(remote)
+    if new<old:
+        report("MANUAL","Lokaler Installer neuer; kein Downgrade")
+        return
+    if new==old:
+        report("INFO",f"Installer V{old} aktuell")
+        return
+    run(["bash","-n"],input=remote,capture_output=True)
+    # Install tools from exactly the pinned source used by the new installer.
+    m=re.search(rb'(?m)^TOOLS_REF="([0-9a-f]{40})"$',remote)
+    if not m: raise ValueError("Tools-Referenz fehlt")
+    ref=m.group(1).decode()
+    pairs=[]
+    for name in ("proxmox-auto-updater","proxmox-auto-updater-config","nodezero-managed-updates"):
+        target=pathlib.Path("/usr/local/sbin")/name
+        if not target.is_file(): raise ValueError("Updater-Tool fehlt: "+name)
+        data=request(RAW+ref+"/proxmox/tools/"+name)
+        if name=="nodezero-managed-updates":
+            compile(data,name,"exec")
+        else:
+            if not data.startswith(b"#!/usr/bin/env bash\n"): raise ValueError("Ungültiges Tool")
+            run(["bash","-n"],input=data,capture_output=True)
+        pairs.append((target,data))
+    pairs.append((path,remote))
+    if replace_files(pairs,"installer"):
+        report("UPDATED",f"Master-Installer V{old} → V{new} inkl. Updater-Werkzeuge")
+
+def main():
+    if not CONF.exists(): return 0
+    safe_file(CONF)
+    cfg=json.loads(CONF.read_text())
+    if not isinstance(cfg,dict) or any(type(cfg.get(k,False)) is not bool for k in KEYS):
+        raise ValueError("Ungültige Update-Konfiguration")
+    if not any(cfg.get(k,False) for k in KEYS): return 0
+    sha=json.loads(request(API))["sha"]
+    if not re.fullmatch(r"[0-9a-f]{40}",sha): raise ValueError("Ungültiger GitHub-Commit")
+    def download(path): return request(RAW+sha+"/"+path)
+    remote=download("proxmox/proxmox.sh")
+    version(remote)
+    run(["bash","-n"],input=remote,capture_output=True)
+    master=remote.decode()
+    failed=False
+    for key,fn in (("installer",lambda:installer_update(remote,download)),("dashboard",lambda:dashboard_update(master,download)),("kuma",lambda:kuma_update(master))):
+        if not cfg.get(key,False): continue
+        try: fn()
+        except Exception as exc:
+            report("FAILED",key+": "+type(exc).__name__+" – "+str(exc).splitlines()[0][:200])
+            failed=True
+    return int(failed)
+
+if __name__=="__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        report("FAILED","NodeZero-Updateprüfung: "+type(exc).__name__)
+        raise SystemExit(1)

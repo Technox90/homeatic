@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V155 · 24.11.2026**
+**Installationskandidat: V156 · 24.11.2026**
 
 ## Installation
 
@@ -305,6 +305,14 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V156
+
+- Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
+- Abruf aus veröffentlichtem `main`-Commit; Installer-Syntaxprüfung, keine Downgrades, Backups und atomarer Dateiaustausch.
+- Keine Neuinstallation, kein Reset, keine Änderung an nginx, Zertifikaten, Logos/Favicons oder Datenbanken. Dashboard-Backend-Migrationen bleiben manuell.
+- Update-Ergebnisse erscheinen im vorhandenen Auto-Updater-Bericht und in Pushover, sofern aktiviert.
+- Menü: Wartung → Auto-Updater → 5; dort die gewünschten Komponenten einschalten.
+
 ### V155
 
 - Einheitliche Nummerierung der sieben Haupt-Untermenüs; interne IDs bleiben stabil.
@@ -343,19 +351,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 - Alte/unvollständige Installationen werden automatisch erkannt und erhalten einmalig den Kompatibilitäts-Bootstrap.
 - Reset/Neuaufbau nutzt weiterhin den vollständigen Bootstrap.
 - Logo/Favicon bleiben unverändert geschützt.
-
-### V151
-
-- Dashboard-Branding vollständig generisch.
-- Persönliche LT-WBH-Logo-/Favicon-Dateien aus dem aktuellen Repository entfernt.
-- Neue neutrale Bildnamen:
-  - `dashboard/assets/logo.png`
-  - `dashboard/assets/favicon.png`
-- Beide Repository-Bilder sind vollständig transparente PNG-Platzhalter.
-- Bei einem **normalen Dashboard-Update werden Logo und Favicon niemals verändert**.
-- Erst-/Neuinstallationen legen die Platzhalter nur an, wenn die jeweilige Datei fehlt.
-- Bestehende ältere Branding-Dateien werden bei Bedarf nur byte-identisch auf die generischen Namen übernommen.
-- Dashboard-Name und Branding-Metadaten bleiben bei normalen Updates erhalten.
-- Die vollständige History steht separat in **[HISTORY.md](HISTORY.md)**.
 
 **[Vollständige Versionshistorie](HISTORY.md)**

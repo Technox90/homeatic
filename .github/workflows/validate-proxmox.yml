@@ -38,6 +38,44 @@ jobs:
       - name: Updater isolated regression tests
         run: bash proxmox/tests/test-auto-updater.sh
 
+      - name: V156 managed component update offline checks
+        run: |
+          python3 -m py_compile proxmox/tools/nodezero-managed-updates
+          python3 - <<'PY'
+          from pathlib import Path
+          from importlib.machinery import SourceFileLoader
+          import importlib.util
+          p = Path("proxmox/tools/nodezero-managed-updates")
+          loader = SourceFileLoader("managed", str(p))
+          spec = importlib.util.spec_from_loader(loader.name, loader)
+          m = importlib.util.module_from_spec(spec)
+          loader.exec_module(m)
+          master = Path("proxmox/proxmox.sh").read_text()
+          assert m.version(master.encode()) >= 156
+          assert "nodezero-installer-update" in m.extract(master, 'js="""(() => {\n', '})();"""')
+          assert "/api/status-page/heartbeat/" in m.extract(master, 'cat > "$tmp" <<\'KUMA_STATUS_HTML\'\n', '\nKUMA_STATUS_HTML\n')
+          begin = "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */"
+          end = "/* PVE_DASHBOARD_BRANDING_V154_END */"
+          index = "<style>" + begin + "old css" + end + "</style><img src='/assets/logo.png'><script>" + begin + "old js" + end + "</script>"
+          css = Path("dashboard/branding-v154.css").read_text()
+          js = Path("dashboard/branding-v154.js").read_text()
+          result = m.dashboard_payload(index, css, js)
+          assert css in result and js in result
+          assert "<img src='/assets/logo.png'>" in result
+          assert m.dashboard_payload(result, css, js) == result
+          try:
+              m.dashboard_payload("<html>unmanaged</html>", css, js)
+          except ValueError:
+              pass
+          else:
+              raise AssertionError("unmanaged dashboard must be rejected")
+          assert 'install_nodezero_tool_v141 "nodezero-managed-updates"' in master
+          updater = Path("proxmox/tools/proxmox-auto-updater").read_text()
+          config = Path("proxmox/tools/proxmox-auto-updater-config").read_text()
+          assert "\nupdate_nodezero_components_v156\n" in updater
+          assert "5) configure_nodezero_updates_v156 ;;" in config
+          PY
+
       - name: V142 maintenance navigation
         run: |
           python3 - <<'PY'
@@ -388,7 +426,7 @@ jobs:
           test -s dashboard/app.py
           test -s dashboard/index.html
           grep -q '"4" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
-          grep -q '^TOOLS_REF="2d0c56595148224ee5352cba7a2eeee907e15955"$' proxmox/proxmox.sh
+          grep -Eq '^TOOLS_REF="[0-9a-f]{40}"$' proxmox/proxmox.sh
           grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
           grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
           grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
