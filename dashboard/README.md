@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V154**
+**Dashboard-Stand: V159**
 
 Dateien:
 
@@ -16,6 +16,14 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## Branding V159
+
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
+
+Die bestehenden Dateinamen und internen Update-Marker bleiben aus Kompatibilitätsgründen erhalten.
 
 ## Feinschliff V154
 

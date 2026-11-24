@@ -1,6 +1,12 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V159 · Versionsneutrales Dashboard-Branding und mittiger Titel
+-------------------------------------------------------------------------
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
+
 24.11.2026 – V158 · Dashboard-Fußzeile und Versionsanzeige
 ----------------------------------------------------------
 - Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.

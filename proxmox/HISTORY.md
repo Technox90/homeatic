@@ -1,12 +1,18 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V158 · 24.11.2026**  
+> **Aktueller Stand: V159 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V159 · Versionsneutrales Dashboard-Branding und mittiger Titel
+-------------------------------------------------------------------------
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
 
 24.11.2026 – V158 · Dashboard-Fußzeile und Versionsanzeige
 ----------------------------------------------------------

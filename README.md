@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V158 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V159 · Proxmox Master Installer · 24.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -135,6 +135,12 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V159
+
+- Aktive Branding-IDs und CSS-Klassen ohne Versionssuffix; das Logo verwendet `randMenuLogo`.
+- Konfigurierter Dashboard-Titel wird auf Desktop und Mobilgeräten mittig angezeigt.
+- Manueller und automatischer Updatepfad verwenden dieselben Branding-Quellen; lokale Logos/Favicons bleiben unverändert.
+
 ### V158
 
 - Proxmox-Systeminformationen wandern vom Dashboard-Kopf in eine dezente Fußzeile.
@@ -166,11 +172,3 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 - Wartung → 11: optionale öffentliche Kuma-Statusansicht mit Antwortzeitverlauf, ohne API-Token.
 - Installer-Updateüberwachung alle 15 Minuten mit Dashboard und Pushover.
 - Wildcard-DNS bleibt unverändert.
-
-### V154
-- Das Logo im linken Menü-Toggle ist größer.
-- Der sichtbare Rahmen/Kasten um den Logo-Menübutton ist entfernt.
-- Der Button-Hintergrund ist transparent; nur ein sehr dezenter Hover bleibt.
-- Die Klickfläche bleibt vollständig erhalten.
-
-**[Vollständige Versionshistorie](proxmox/HISTORY.md)**

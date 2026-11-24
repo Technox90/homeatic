@@ -154,7 +154,7 @@ jobs:
           grep -q 'border:0!important' dashboard/branding-v154.css
           grep -q 'background:transparent!important' dashboard/branding-v154.css
           grep -q 'max-width:230px;height:38px' dashboard/branding-v154.css
-          grep -q 'brandMenuToggleV154' dashboard/branding-v154.js
+          grep -q 'brandMenuToggle' dashboard/branding-v154.js
           grep -q 'install_dashboard_branding_v154() {' proxmox/modules/dashboard.sh
           grep -q 'PVE_DASHBOARD_BRANDING_V154' proxmox/modules/dashboard.sh
 
@@ -163,10 +163,10 @@ jobs:
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.css
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
           grep -q 'grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr)' dashboard/branding-v154.css
-          grep -q 'brandMenuToggleV154' dashboard/branding-v154.js
-          grep -q 'toggleNavV154' dashboard/branding-v154.js
-          grep -q 'toolbarCenterV154' dashboard/branding-v154.js
-          grep -q 'toolbarRightV154' dashboard/branding-v154.js
+          grep -q 'brandMenuToggle' dashboard/branding-v154.js
+          grep -q 'toggleNav' dashboard/branding-v154.js
+          grep -q 'toolbarCenter' dashboard/branding-v154.js
+          grep -q 'toolbarRight' dashboard/branding-v154.js
           grep -q '#sideNav .navHead{display:none!important}' dashboard/branding-v154.css
           grep -q 'install_dashboard_branding_v154() {' proxmox/modules/dashboard.sh
           grep -q 'PVE_DASHBOARD_BRANDING_V154' proxmox/modules/dashboard.sh
@@ -180,7 +180,7 @@ jobs:
           assert "center.appendChild(ups)" in js
           assert "right.appendChild(reboot)" in js
           assert "right.appendChild(shutdown)" in js
-          assert "button.onclick=toggleNavV154" in js
+          assert "button.onclick=toggleNav" in js
           assert "z-index:130" in css
           PY
 
@@ -237,7 +237,7 @@ jobs:
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.css
           grep -q '/assets/logo.png' dashboard/branding-v154.js
           grep -q '/assets/favicon.png' dashboard/branding-v154.js
-          grep -q 'dashboardFixedToolbarV154' dashboard/branding-v154.css
+          grep -q 'dashboardFixedToolbar' dashboard/branding-v154.css
           grep -q 'PVE_DASHBOARD_BRANDING_V154' proxmox/modules/dashboard.sh
 
           test -s dashboard/assets/logo.png
@@ -421,7 +421,7 @@ jobs:
           grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="2793e0826a8a8f21b391e49884db0068d600d383"' proxmox/proxmox.sh
+          grep -q 'NODEZERO_MODULE_REF="22a0e71b2c2426f55741f55daa50fce79c163cd3"' proxmox/proxmox.sh
           grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
@@ -450,10 +450,24 @@ jobs:
           js = Path("dashboard/branding-v154.js").read_text()
           css = Path("dashboard/branding-v154.css").read_text()
           assert "getElementById('hostinfo')" in js
-          assert "nodezeroHostInfoHiddenV158" in js and "nodezeroHostInfoHiddenV158" in css
+          assert "nodezeroHostInfoHidden" in js and "nodezeroHostInfoHidden" in css
           assert "document.body.append(footer)" in js
           assert "Number.isSafeInteger(data.local)" in js
           assert "Version '+data.local" in js
           assert "Copyright © Technox1990" in js
           assert "https://github.com/Technox90/homeatic" in js
+          PY
+
+      - name: V159 stable dashboard selectors and centered title
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          js = Path('dashboard/branding-v154.js').read_text()
+          css = Path('dashboard/branding-v154.css').read_text()
+          assert 'id="randMenuLogo"' in js and '.randMenuLogo{' in css
+          assert "getElementById('randMenuLogo')" in js
+          assert 'brandMenuLogoV154' not in js + css
+          assert 'body.dashboardToolbarFixed .top .brand{' in css
+          assert 'margin:0!important;text-align:center!important' in css
+          assert '#dashboardFixedToolbar{' in css and "button.id='brandMenuToggle'" in js
           PY
