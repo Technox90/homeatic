@@ -4,7 +4,13 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZer
 
 ## Aktueller Stand
 
-**Aktueller Stand: V153 · Proxmox Master Installer · 24.11.2026**
+**Aktueller Stand: V154 · Proxmox Master Installer · 24.11.2026**
+
+Neu in V154:
+- Das Logo im linken Menü-Toggle ist größer.
+- Der sichtbare Rahmen/Kasten um den Logo-Menübutton ist entfernt.
+- Der Button-Hintergrund ist transparent; nur ein sehr dezenter Hover bleibt.
+- Die Klickfläche bleibt vollständig erhalten.
 
 Neu in V153:
 - Die obere Dashboard-Leiste ist neu aufgeteilt: links Menü/Logo, mittig LIVE + USV Online, rechts Neustart + Herunterfahren.
@@ -77,7 +83,7 @@ Der Installer kann unter anderem verwalten:
 - Dashboard mit Menü, Kategorien, USV, Pi-hole, Layouts und mehreren Ansichten
 - automatische Updates, Diagnose und Healthchecks
 
-## Dashboard V153
+## Dashboard V154
 
 Das Dashboard liegt lokal unter:
 
