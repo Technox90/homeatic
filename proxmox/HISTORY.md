@@ -1,12 +1,24 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V151 · 24.11.2026**  
+> **Aktueller Stand: V152 · 24.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+24.11.2026 – V152 · In-place Dashboard-Updates / Legacy-Bereinigung
+---------------------------------------------------------------------
+- Normale Dashboard-Updates setzen app.py, index.html und collector.py nicht mehr auf die alte V139-Basis zurück.
+- Vor dem Update prüft `prepare_dashboard_update_mode_v152`, ob der vollständige aktuelle Dashboard-Stand vorhanden ist.
+- Bei aktuellem Stand wird `DASHBOARD_FAST_UPDATE_V152=1` gesetzt.
+- Im Fast-Update bleiben die vorhandenen Programmdateien erhalten; nur aktuelle Komponenten, Branding-Code, Konfiguration, TLS/Links und Validierung werden verarbeitet.
+- Historische Installations-/Migrationsschritte für Menü, Settings, Kategorien, USV, Layout und Pi-hole (V42 bis V81) werden auf einem aktuellen Dashboard übersprungen.
+- Erstinstallation, bewusster Dashboard-Neuaufbau oder ein unvollständiger/alter Stand nutzt weiterhin einmalig den Kompatibilitäts-Bootstrap.
+- Dadurch entfällt beim normalen Dashboard-Update das sichtbare Muster „alte Version installieren → alle alten Patches anwenden → neue Version anwenden“.
+- V151-Regel bleibt bestehen: logo.png und favicon.png werden bei Updates niemals überschrieben.
+- CI prüft den neuen In-place-Pfad und die Versionssynchronisation der Dokumentation.
 
 24.11.2026 – V151 · Generisches Dashboard-Branding / Update-Schutz
 -----------------------------------------------------------------------
