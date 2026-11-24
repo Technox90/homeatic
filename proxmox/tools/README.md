@@ -2,7 +2,7 @@
 
 ## proxmox-auto-updater
 
-Das Hauptskript liegt unter `proxmox/tools/proxmox-auto-updater` und wird auf dem Proxmox-Host unter `/usr/local/sbin/proxmox-auto-updater` installiert. Dateiname und bestehender systemd-Dienst bleiben unverändert.
+Das Hauptskript liegt unter `proxmox/tools/proxmox-auto-updater` und wird auf dem Proxmox-Host unter `/usr/local/sbin/proxmox-auto-updater` installiert. Dateiname und bestehender systemd-Dienst bleiben unverändert. Seit V146 ist diese Datei die einzige kanonische Updater-Quelle; die frühere zweite Kopie im Master-Installer wurde entfernt.
 
 - Der systemd-Timer bestimmt die tägliche Uhrzeit (lokal aktuell durch Drop-in auf 07:00 Uhr eingestellt).
 - Der Updater aktualisiert die konfigurierten LXC-Container, Docker-Compose-Projekte, optionale Home-Assistant-Komponenten und zuletzt den Proxmox-Host.
@@ -50,3 +50,28 @@ TUI-Konfiguration für den automatischen Update-Lauf. Unterstützt Status, tägl
 ## proxmox-pushover-config
 
 Eigenständiges TUI für Pushover. Verwaltet Empfänger, API-Zugangsdaten, Testnachrichten sowie Aktivieren/Deaktivieren. Die Zugangsdaten werden lokal mit restriktiven Dateiberechtigungen gespeichert; die optionale Gerätebindung kann durch Leeren des Feldes entfernt werden.
+
+
+## nodezero-external-urls
+
+TUI-/CLI-Werkzeug für den externen HTTPS-Zugriff auf installierte Webdienste.
+
+- fragt eine Hauptdomain und optional ein DynDNS-/CNAME-Ziel ab,
+- erkennt bekannte NodeZero-VMs/LXCs,
+- schlägt Subdomains automatisch vor,
+- erlaubt das Bearbeiten jedes einzelnen Hostnamens und Backends,
+- erlaubt zusätzliche eigene Reverse-Proxy-Ziele,
+- lässt sensible Admin-Oberflächen standardmäßig deaktiviert,
+- erzeugt nginx-VHosts auf Port 80/443,
+- beantragt/erweitert ein gemeinsames Let's-Encrypt-Zertifikat,
+- speichert Konfiguration, DNS-Vorgaben, Backups und Logs in der NodeZero-`/home`-Struktur.
+
+Aufruf:
+
+```bash
+nodezero-external-urls
+nodezero-external-urls --status
+nodezero-external-urls --reapply
+```
+
+`--reapply` ist nicht interaktiv und wird vom Master-Installer verwendet, um eine bestehende Konfiguration nach Gast-Installationen erneut mit aktuellen internen IP-Adressen zu verbinden.

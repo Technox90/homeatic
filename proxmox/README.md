@@ -4,7 +4,7 @@ Hier liegt der Proxmox VE Master-Installer.
 
 ## Aktueller Stand
 
-Installationskandidat: **V142**
+Installationskandidat: **V146**
 
 Geplante Hauptdatei:
 
@@ -32,6 +32,8 @@ proxmox.sh
 - Downloads und wiederverwendbare Artefakte unter `/home/downloads/`
 - Backups unter `/home/backups/`
 - Diagnose-/Laufprotokolle unter `/home/diagnose/`
+- Pi-hole-Sprachlogs unter `/home/diagnose/pihole-language/` statt unter `/root`
+- externe URLs mit automatischen Subdomain-Vorschlägen, nginx Reverse Proxy und Let's Encrypt
 - finale Healthchecks
 
 ## 🔐 Passwortmanager – Vaultwarden
@@ -196,3 +198,45 @@ proxmox-pushover-config
 ## Navigation-Fix V142
 
 Die Wartungspunkte **Auto-Updater** und **Pushover** kehren nach „Zurück“ wieder in den Master-Installer zurück. Die bisherigen `exit 0`-Anweisungen nach Auswahl 11 und 20 wurden durch `continue` ersetzt.
+
+
+## Externe URLs · V146
+
+Unter **Wartung & Einstellungen → Externe URLs** kann eine Hauptdomain wie `ltwbh.de` hinterlegt werden. Das Tool erkennt installierte Webdienste und schlägt passende Namen vor, zum Beispiel:
+
+```text
+dash.ltwbh.de      → Dashboard
+ha.ltwbh.de        → Home Assistant
+paper.ltwbh.de     → Paperless
+vault.ltwbh.de     → Vaultwarden
+pdf.ltwbh.de       → Stirling PDF
+uptime.ltwbh.de    → Uptime Kuma
+```
+
+Die vorgeschlagenen Hostnamen und internen Backend-URLs können einzeln bearbeitet werden. Zusätzliche eigene Dienste lassen sich ergänzen. Sensible Admin-Oberflächen sind standardmäßig nicht für externen Zugriff ausgewählt.
+
+Das Tool erzeugt exakte nginx-`server_name`-VHosts auf dem Proxmox-Host und verwendet Let's Encrypt für öffentlich vertrauenswürdige Zertifikate. **Proxmox VE selbst bleibt auf dem nativen Port 8006.** Das lokale NodeZero-Dashboard behält Port 80/443.
+
+Voraussetzungen für Let's Encrypt HTTP-01:
+
+- öffentliche DNS-Einträge der gewählten Subdomains zeigen auf den Heimanschluss bzw. auf das hinterlegte DynDNS-/CNAME-Ziel,
+- TCP 80 und 443 werden auf den Proxmox-Host weitergeleitet.
+
+Persistente Dateien:
+
+```text
+/home/Data/proxmox-installer/external-urls/config.json
+/home/Data/proxmox-installer/external-urls/dns-records.txt
+/home/diagnose/external-urls/
+/home/backups/external-urls/
+```
+
+## Pi-hole-Logs · V146
+
+Das Pi-hole-Sprach-/Update-Hilfswerkzeug schreibt keine Laufprotokolle mehr direkt nach `/root`. Neue Logs liegen unter:
+
+```text
+/home/diagnose/pihole-language/
+```
+
+Alte Dateien `/root/pihole-sprache-*.txt` werden beim Installer-Start übernommen. Diagnose-Logs werden nach 60 Tagen bereinigt. Aktive Passwörter und Tokens bleiben davon getrennt unter `/root/passwort/`.

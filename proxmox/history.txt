@@ -1,6 +1,25 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – V146 · Logs, Updater und externe URLs
+---------------------------------------------------
+- Pi-hole-Sprachlogs werden jetzt tatsächlich unter /home/diagnose/pihole-language/ gespeichert; die in V144 dokumentierte, aber im Code fehlende Umstellung ist damit umgesetzt.
+- Alte /root/pihole-sprache-*.txt werden beim Installer-Start einmalig in die neue Diagnose-Ablage migriert.
+- Alte /var/log/proxmox-auto-updater-Inhalte werden nach /home/diagnose/proxmox-auto-updater/ übernommen.
+- Pi-hole-Sprachlogs werden nach 60 Tagen automatisch bereinigt.
+- Die zweite, eingebettete Kopie des Proxmox-Auto-Updaters wurde aus proxmox.sh entfernt.
+- Kanonische Quelle ist nur noch proxmox/tools/proxmox-auto-updater; Master-Installer und manuelle Updates verwenden damit denselben Code.
+- Doppelte dashboard_link_upsert-Aufrufe in einzelnen App-Installationen wurden entfernt; die zentrale Abschluss-Synchronisierung bleibt bestehen.
+- Neuer Wartungspunkt 21: Externe URLs · Domain / Reverse Proxy / Let's Encrypt.
+- nodezero-external-urls erkennt installierte Webdienste und schlägt automatisch Subdomains wie dash.<domain>, ha.<domain>, paper.<domain>, vault.<domain> usw. vor.
+- Jede vorgeschlagene URL und interne Backend-URL kann einzeln bearbeitet werden; zusätzliche eigene Dienste können ergänzt werden.
+- Sensible Admin-Oberflächen wie Proxmox, Pi-hole, NPM, Prometheus und PVE-UPS sind standardmäßig nicht extern aktiviert.
+- Externe URLs werden als exakte nginx server_name-VHosts auf dem Proxmox-Host angelegt. Proxmox selbst bleibt nativ auf :8006; das lokale Dashboard behält 80/443.
+- Let's Encrypt nutzt HTTP-01 über Port 80; optional kann ein vorhandenes DynDNS-/CNAME-Ziel hinterlegt werden.
+- Konfiguration liegt unter /home/Data/proxmox-installer/external-urls/, Logs unter /home/diagnose/external-urls/, Backups unter /home/backups/external-urls/.
+- Nach Installationen wird eine vorhandene External-URL-Konfiguration automatisch erneut auf aktuelle Gast-IP-Adressen angewendet.
+- GitHub-CI prüft ab V146 zusätzlich Pi-hole-Logpfade, die entdoppelte Updater-Quelle, Python-Syntax des URL-Tools und Menüpunkt 21.
+
 17.10.2026 – V145 · NodeZero Dashboard-Ansichten
 ------------------------------------------------
 - Fünf GitHub-Darstellungsprofile: Boot Sequence, Live Pulse, Telemetry Flow, Glass Motion und Status Control.
