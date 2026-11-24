@@ -20,18 +20,13 @@ function menuLogoV150(settings){
   let logo=document.getElementById('dashboardBrandLogoV150');
   if(!logo){
     logo=document.createElement('div');logo.id='dashboardBrandLogoV150';logo.className='brandLogoV150';
-    logo.innerHTML='<img id="dashboardBrandImageV150" class="brandLogoImageV150" src="/assets/logo-lt-wbh.png" alt=""><span class="brandLogoIconV150"><span id="dashboardBrandCompactV150">LT</span></span><span id="dashboardBrandTextV150" class="brandLogoTextV150">LT-WBH</span>';
+    logo.innerHTML='<span id="dashboardBrandTextV150" class="brandLogoTextV150">LT-WBH</span>';
     head.prepend(logo);
   }
   const text=String(settings.logo_text||'LT-WBH').trim()||'LT-WBH';
   const style=['neon','orbit','pulse','minimal'].includes(String(settings.logo_style||'').toLowerCase())?String(settings.logo_style).toLowerCase():'neon';
   logo.dataset.style=style;
-  const useAsset=text.toUpperCase()==='LT-WBH';
-  logo.classList.toggle('assetLogoV150',useAsset);
-  const img=document.getElementById('dashboardBrandImageV150');
-  if(img){img.src='/assets/logo-lt-wbh.png';img.alt=useAsset?'LT-WBH Logo':''}
   document.getElementById('dashboardBrandTextV150').textContent=text;
-  document.getElementById('dashboardBrandCompactV150').textContent=brandCompactV150(text);
 }
 function faviconV150(settings){
   if(settings.favicon_url)return;
