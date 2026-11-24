@@ -1,6 +1,16 @@
 Verfolgung der Änderungen
 ==========================
 
+24.11.2026 – Uptime-Kuma-TLS erfolgreich erweitert
+-----------------------------------------------------
+- `python3-certbot-nginx` auf dem Proxmox-Host installiert.
+- Bestehendes Let's-Encrypt-Zertifikat `ltwbh-services` erfolgreich um `up.ltwbh.de` erweitert.
+- Aktuelle SANs: `dash.ltwbh.de`, `ha.ltwbh.de`, `paper.ltwbh.de`, `pdf.ltwbh.de`, `up.ltwbh.de`, `vault.ltwbh.de`.
+- Zertifikat läuft laut Certbot bis 22.02.2027.
+- `nginx -t` erfolgreich; nginx anschließend neu geladen.
+- Frühere TLS-Fehlermeldung für `up.ltwbh.de` ist damit behoben.
+- Nächster Prüfschritt bei Bedarf: Reverse-Proxy-Kette Proxmox/nginx -> CT 105 `192.168.178.105:443` -> Uptime Kuma `127.0.0.1:3001`.
+
 24.11.2026 – Dokumentation · ChatGPT-Handoff / Uptime-Kuma-TLS
 ----------------------------------------------------------------
 - Neue Datei `proxmox/CHATGPT-HANDOFF.md` für die Übergabe in einen neuen Chat.
