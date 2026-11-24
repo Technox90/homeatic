@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V154
+# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V159
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
@@ -23194,9 +23194,9 @@ PYV151READ
 }
 
 install_dashboard_branding_v154() {
-    header "DASHBOARD · TOOLBAR / BRANDING V154"
+    header "DASHBOARD · TOOLBAR / BRANDING"
 
-    local ref="621ceae761ae5c0f957822a2245eb2d60f290ac7"
+    local ref="94a151d3c64cac5c2c99632ab99394b78cc14a2e"
     local index="/opt/nodezero/dashboard/static/index.html"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"
@@ -23397,8 +23397,9 @@ index_path.write_text(html, encoding="utf-8")
 
 for marker in (
     "PVE_DASHBOARD_BRANDING_V154",
-    "dashboardFixedToolbarV154",
-    "brandMenuToggleV154",
+    "dashboardFixedToolbar",
+    "brandMenuToggle",
+    'id="randMenuLogo"',
     "/assets/logo.png",
     "/assets/favicon.png",
     "USV Online",
@@ -23428,7 +23429,7 @@ PYV154
     nginx -t
     systemctl reload nginx
 
-    ok "Dashboard Toolbar/Branding V154 aktiv: $website_name"
+    ok "Dashboard Toolbar/Branding aktiv: $website_name"
     info "Toolbar: links ☰+Logo · mittig LIVE/USV · rechts Neustart/Herunterfahren"
     info "Eigene Bilder: $logo_target und $favicon_target"
     info "Updates überschreiben diese beiden Dateien niemals."
