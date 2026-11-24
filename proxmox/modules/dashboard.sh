@@ -22991,78 +22991,119 @@ __PVE_DASHBOARD_SETTINGS_PANELS_V81__
 }
 
 # =============================================================================
-# V150 · DASHBOARD BRANDING / FESTE TOOLBAR
+# V151 · GENERISCHES DASHBOARD-BRANDING / UPDATE-SCHUTZ
+# =============================================================================
+#
+# Grundregeln:
+# - Dashboard-Updates überschreiben Logo/Favicon NIEMALS.
+# - Erst-/Neuinstallationen erhalten nur neutrale transparente Platzhalter.
+# - Platzhalter werden nur angelegt, wenn die Zieldatei noch nicht existiert.
+# - Eigene Bilder liegen lokal als:
+#     /opt/nodezero/dashboard/static/assets/logo.png
+#     /opt/nodezero/dashboard/static/assets/favicon.png
 # =============================================================================
 
-DASHBOARD_INSTALL_NAME_V150="${DASHBOARD_INSTALL_NAME_V150:-}"
-DASHBOARD_INSTALL_LOGO_TEXT_V150="${DASHBOARD_INSTALL_LOGO_TEXT_V150:-}"
-DASHBOARD_INSTALL_LOGO_STYLE_V150="${DASHBOARD_INSTALL_LOGO_STYLE_V150:-}"
+DASHBOARD_INSTALL_NAME_V151="${DASHBOARD_INSTALL_NAME_V151:-}"
+DASHBOARD_INSTALL_LOGO_TEXT_V151="${DASHBOARD_INSTALL_LOGO_TEXT_V151:-}"
+DASHBOARD_INSTALL_LOGO_STYLE_V151="${DASHBOARD_INSTALL_LOGO_STYLE_V151:-}"
+DASHBOARD_BRANDING_NEW_V151="${DASHBOARD_BRANDING_NEW_V151:-0}"
 
-prepare_dashboard_branding_v150() {
+prepare_dashboard_branding_v151() {
     (( INSTALL_DASHBOARD )) || return 0
 
     local settings="/etc/pve-sensor-dashboard/ui.json"
-    local current_name="Dashboard LT-WBH"
-    local current_logo="LT-WBH"
+    local index="/opt/nodezero/dashboard/static/index.html"
+    local current_name="PVE Hardware Monitor"
+    local current_logo="NODEZERO"
     local current_style="neon"
     local values=()
     local value=""
     local style=""
 
+    DASHBOARD_BRANDING_NEW_V151=0
+    if [[ ! -f "$index" ]] ||
+       (( ${RESET_DASHBOARD_DATA:-0} )) ||
+       (( ${RESET_DASHBOARD_APP_ONLY:-0} )); then
+        DASHBOARD_BRANDING_NEW_V151=1
+    fi
+
     if [[ -s "$settings" ]]; then
         mapfile -t values < <(
-            python3 - "$settings" <<'PY'
+            python3 - "$settings" <<'PYV151READ'
 from pathlib import Path
 import json
 import sys
+
 try:
-    data=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 except Exception:
-    data={}
-print(str(data.get("website_name") or "Dashboard LT-WBH"))
-print(str(data.get("logo_text") or "LT-WBH"))
+    data = {}
+
+print(str(data.get("website_name") or "PVE Hardware Monitor"))
+print(str(data.get("logo_text") or "NODEZERO"))
 print(str(data.get("logo_style") or "neon"))
-PY
+PYV151READ
         )
+
         [[ -n "${values[0]:-}" ]] && current_name="${values[0]}"
         [[ -n "${values[1]:-}" ]] && current_logo="${values[1]}"
         [[ -n "${values[2]:-}" ]] && current_style="${values[2]}"
     fi
 
-    if (( ${OPTIMAL_INSTALL:-0} )); then
-        DASHBOARD_INSTALL_NAME_V150="$current_name"
-        DASHBOARD_INSTALL_LOGO_TEXT_V150="$current_logo"
-        DASHBOARD_INSTALL_LOGO_STYLE_V150="$current_style"
+    if (( ! DASHBOARD_BRANDING_NEW_V151 )); then
+        DASHBOARD_INSTALL_NAME_V151="$current_name"
+        DASHBOARD_INSTALL_LOGO_TEXT_V151="$current_logo"
+        DASHBOARD_INSTALL_LOGO_STYLE_V151="$current_style"
+        info "Dashboard-Update erkannt: Name, Logo und Favicon bleiben erhalten."
         return 0
     fi
 
-    value="$(tui_input "DASHBOARD · NAME" "Wie soll das Dashboard heißen?\n\nBeispiel: Dashboard LT-WBH" "$current_name")" || value="$current_name"
+    if (( ${OPTIMAL_INSTALL:-0} )); then
+        DASHBOARD_INSTALL_NAME_V151="$current_name"
+        DASHBOARD_INSTALL_LOGO_TEXT_V151="$current_logo"
+        DASHBOARD_INSTALL_LOGO_STYLE_V151="$current_style"
+        return 0
+    fi
+
+    value="$(
+        tui_input \
+            "DASHBOARD · NAME" \
+            "Wie soll das Dashboard heißen?\n\nBeispiel: PVE Hardware Monitor" \
+            "$current_name"
+    )" || value="$current_name"
+
     value="$(printf '%s' "$value" | tr '\r\n' '  ' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
     [[ -n "$value" ]] || value="$current_name"
-    DASHBOARD_INSTALL_NAME_V150="${value:0:80}"
+    DASHBOARD_INSTALL_NAME_V151="${value:0:80}"
 
-    value="$(tui_input "DASHBOARD · LOGO" "Welcher Text soll im Menü-Logo stehen?\n\nBeispiel: LT-WBH\nMaximal 16 Zeichen." "$current_logo")" || value="$current_logo"
+    value="$(
+        tui_input \
+            "DASHBOARD · LOGO-TEXT" \
+            "Fallback-Text im Menü, falls logo.png leer oder nicht vorhanden ist.\n\nBeispiel: NODEZERO\nMaximal 24 Zeichen." \
+            "$current_logo"
+    )" || value="$current_logo"
+
     value="$(printf '%s' "$value" | tr '\r\n' '  ' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
     [[ -n "$value" ]] || value="$current_logo"
-    DASHBOARD_INSTALL_LOGO_TEXT_V150="${value:0:16}"
+    DASHBOARD_INSTALL_LOGO_TEXT_V151="${value:0:24}"
 
     if (( ${TUI_AVAILABLE:-0} )); then
         style="$(
             whiptail \
                 --backtitle "${TUI_BACKTITLE:-Proxmox Installer}" \
-                --title "DASHBOARD · LOGO-DESIGN" \
+                --title "DASHBOARD · FALLBACK-DESIGN" \
                 --ok-button "Übernehmen" \
                 --cancel-button "Standard" \
-                --menu "Logo-Design auswählen" \
+                --menu "Design für den Text-Fallback auswählen" \
                 18 78 6 \
-                "neon" "Neon Hex · futuristisch" \
-                "orbit" "Orbit · technisches Ring-Design" \
-                "pulse" "Pulse · Monitoring / Telemetrie" \
-                "minimal" "Minimal · klar und reduziert" \
+                "neon" "Neon · futuristisch" \
+                "orbit" "Orbit · technisch" \
+                "pulse" "Pulse · Monitoring" \
+                "minimal" "Minimal · reduziert" \
                 3>&1 1>&2 2>&3
         )" || style="$current_style"
     else
-        read -rp "Logo-Design [neon/orbit/pulse/minimal] [$current_style]: " style
+        read -rp "Fallback-Design [neon/orbit/pulse/minimal] [$current_style]: " style
         style="${style:-$current_style}"
     fi
 
@@ -23071,24 +23112,29 @@ PY
         *) style="neon" ;;
     esac
 
-    DASHBOARD_INSTALL_LOGO_STYLE_V150="$style"
-    info "Dashboard: ${DASHBOARD_INSTALL_NAME_V150} · Logo ${DASHBOARD_INSTALL_LOGO_TEXT_V150} (${DASHBOARD_INSTALL_LOGO_STYLE_V150})"
+    DASHBOARD_INSTALL_LOGO_STYLE_V151="$style"
+
+    info "Dashboard-Name: ${DASHBOARD_INSTALL_NAME_V151}"
+    info "Fallback-Logo-Text: ${DASHBOARD_INSTALL_LOGO_TEXT_V151}"
 }
 
-install_dashboard_branding_v150() {
-    header "DASHBOARD · BRANDING / FESTE TOOLBAR"
+install_dashboard_branding_v151() {
+    header "DASHBOARD · GENERISCHES BRANDING / UPDATE-SCHUTZ"
 
-    local ref="d7cbe57007ace24ee94d70af2e4aa6dacc638c25"
+    local ref="d71c0d0605ba5db0b230fd06eafea2d08f75e22a"
     local index="/opt/nodezero/dashboard/static/index.html"
-    local static_dir="/opt/nodezero/dashboard/static"
     local asset_dir="/opt/nodezero/dashboard/static/assets"
+    local logo_target="${asset_dir}/logo.png"
+    local favicon_target="${asset_dir}/favicon.png"
+    local legacy_logo="${asset_dir}/logo-lt-wbh.png"
+    local legacy_favicon="${asset_dir}/favicon-lt-wbh.png"
     local settings="/etc/pve-sensor-dashboard/ui.json"
     local helper="/usr/local/sbin/pve-dashboard-settings-helper"
-    local cache="/home/downloads/nodezero/dashboard-branding/v150"
-    local backup="/home/backups/pve-dashboard-branding-v150-$(date +%Y%m%d-%H%M%S)"
-    local website_name="${DASHBOARD_INSTALL_NAME_V150:-Dashboard LT-WBH}"
-    local logo_text="${DASHBOARD_INSTALL_LOGO_TEXT_V150:-LT-WBH}"
-    local logo_style="${DASHBOARD_INSTALL_LOGO_STYLE_V150:-neon}"
+    local cache="/home/downloads/nodezero/dashboard-branding/v151"
+    local backup="/home/backups/pve-dashboard-branding-v151-$(date +%Y%m%d-%H%M%S)"
+    local website_name="${DASHBOARD_INSTALL_NAME_V151:-PVE Hardware Monitor}"
+    local logo_text="${DASHBOARD_INSTALL_LOGO_TEXT_V151:-NODEZERO}"
+    local logo_style="${DASHBOARD_INSTALL_LOGO_STYLE_V151:-neon}"
 
     [[ -f "$index" ]] || die "Dashboard Branding: index.html fehlt."
     [[ -f "$settings" ]] || die "Dashboard Branding: ui.json fehlt."
@@ -23096,123 +23142,216 @@ install_dashboard_branding_v150() {
 
     mkdir -p "$cache" "$backup" "$asset_dir"
 
-    curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v150.css" -o "$cache/branding-v150.css"
-    curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v150.js" -o "$cache/branding-v150.js"
-    curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/assets/logo-lt-wbh.png" -o "$cache/logo-lt-wbh.png"
-    curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/assets/favicon-lt-wbh.png" -o "$cache/favicon-lt-wbh.png"
+    if [[ ! -e "$logo_target" && -f "$legacy_logo" ]]; then
+        cp -a "$legacy_logo" "$logo_target"
+        ok "Vorhandenes Logo als assets/logo.png übernommen."
+    fi
 
-    grep -Fq 'NodeZero Dashboard Branding V150' "$cache/branding-v150.css" || die "Branding CSS ungültig."
-    grep -Fq 'NodeZero Dashboard Branding V150' "$cache/branding-v150.js" || die "Branding JavaScript ungültig."
+    if [[ ! -e "$favicon_target" && -f "$legacy_favicon" ]]; then
+        cp -a "$legacy_favicon" "$favicon_target"
+        ok "Vorhandenes Favicon als assets/favicon.png übernommen."
+    fi
 
-    python3 - "$cache/logo-lt-wbh.png" "$cache/favicon-lt-wbh.png" <<'PYPNG'
-from pathlib import Path
-import sys
+    curl -fsSL \
+        "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v151.css" \
+        -o "$cache/branding-v151.css"
 
-for raw in sys.argv[1:]:
-    p = Path(raw)
-    data = p.read_bytes()
-    if len(data) < 33 or data[:8] != b"\x89PNG\r\n\x1a\n":
-        raise SystemExit(f"FEHLER: Kein gültiges PNG: {p}")
-    color_type = data[25]
-    has_alpha = color_type in (4, 6) or b"tRNS" in data
-    if not has_alpha:
-        raise SystemExit(f"FEHLER: PNG ohne Alpha-Transparenz: {p}")
-PYPNG
+    curl -fsSL \
+        "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v151.js" \
+        -o "$cache/branding-v151.js"
 
-    install -m 0644 -o root -g root "$cache/logo-lt-wbh.png" "$asset_dir/logo-lt-wbh.png"
-    install -m 0644 -o root -g root "$cache/favicon-lt-wbh.png" "$asset_dir/favicon-lt-wbh.png"
+    grep -Fq 'NodeZero Dashboard Branding V151' "$cache/branding-v151.css" ||
+        die "Branding CSS V151 ungültig."
+
+    grep -Fq 'NodeZero Dashboard Branding V151' "$cache/branding-v151.js" ||
+        die "Branding JavaScript V151 ungültig."
+
+    if (( DASHBOARD_BRANDING_NEW_V151 )); then
+        if [[ ! -e "$logo_target" ]]; then
+            curl -fsSL \
+                "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/assets/logo.png" \
+                -o "$cache/logo.png"
+            install -m 0644 -o root -g root "$cache/logo.png" "$logo_target"
+            ok "Neutraler leerer Logo-Platzhalter angelegt: $logo_target"
+        else
+            info "Logo vorhanden und unverändert beibehalten: $logo_target"
+        fi
+
+        if [[ ! -e "$favicon_target" ]]; then
+            curl -fsSL \
+                "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/assets/favicon.png" \
+                -o "$cache/favicon.png"
+            install -m 0644 -o root -g root "$cache/favicon.png" "$favicon_target"
+            ok "Neutraler leerer Favicon-Platzhalter angelegt: $favicon_target"
+        else
+            info "Favicon vorhanden und unverändert beibehalten: $favicon_target"
+        fi
+    else
+        info "Dashboard-Update: logo.png/favicon.png werden NICHT verändert."
+    fi
 
     cp -a "$index" "$backup/index.html"
     cp -a "$settings" "$backup/ui.json"
     cp -a "$helper" "$backup/pve-dashboard-settings-helper"
 
-    WEBSITE_NAME="$website_name" LOGO_TEXT="$logo_text" LOGO_STYLE="$logo_style" \
-    python3 - "$settings" "$helper" "$index" "$cache/branding-v150.css" "$cache/branding-v150.js" <<'PY'
+    WEBSITE_NAME="$website_name" \
+    LOGO_TEXT="$logo_text" \
+    LOGO_STYLE="$logo_style" \
+    python3 - "$settings" "$helper" "$index" "$cache/branding-v151.css" "$cache/branding-v151.js" <<'PYV151'
 from pathlib import Path
 import json
 import os
 import re
 import sys
 
-settings_path,helper_path,index_path,css_path,js_path=map(Path,sys.argv[1:6])
-name=(os.environ.get("WEBSITE_NAME") or "Dashboard LT-WBH").strip()[:80] or "Dashboard LT-WBH"
-logo=(os.environ.get("LOGO_TEXT") or "LT-WBH").strip()[:16] or "LT-WBH"
-style=(os.environ.get("LOGO_STYLE") or "neon").strip().lower()
-if style not in {"neon","orbit","pulse","minimal"}:
-    style="neon"
+settings_path, helper_path, index_path, css_path, js_path = map(Path, sys.argv[1:6])
+
+name = (os.environ.get("WEBSITE_NAME") or "PVE Hardware Monitor").strip()[:80]
+logo = (os.environ.get("LOGO_TEXT") or "NODEZERO").strip()[:24]
+style = (os.environ.get("LOGO_STYLE") or "neon").strip().lower()
+
+if not name:
+    name = "PVE Hardware Monitor"
+if not logo:
+    logo = "NODEZERO"
+if style not in {"neon", "orbit", "pulse", "minimal"}:
+    style = "neon"
 
 try:
-    data=json.loads(settings_path.read_text(encoding="utf-8"))
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
 except Exception:
-    data={}
-if not isinstance(data,dict):
-    data={}
-data.update({"website_name":name,"logo_text":logo,"logo_style":style})
-# LT-WBH nutzt das versionierte Repository-Favicon. Ein alter/staler
-# Custom-Favicon-Pfad darf dieses Branding nicht mehr überschreiben.
-if logo.upper() == "LT-WBH":
-    data["favicon_url"] = ""
-settings_path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    data = {}
 
-helper=helper_path.read_text(encoding="utf-8")
-if "# PVE_DASHBOARD_BRANDING_HELPER_V150" not in helper:
-    start=helper.find("def apply(payload):")
-    pos=helper.find("    settings = {",start)
-    if start<0 or pos<0:
+if not isinstance(data, dict):
+    data = {}
+
+data["website_name"] = name
+data["logo_text"] = logo
+data["logo_style"] = style
+
+settings_path.write_text(
+    json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+
+helper = helper_path.read_text(encoding="utf-8")
+
+if '"logo_text": logo_text' not in helper:
+    start = helper.find("def apply(payload):")
+    pos = helper.find("    settings = {", start)
+
+    if start < 0 or pos < 0:
         raise SystemExit("FEHLER: Settings-Helper apply() nicht gefunden.")
-    vars_block='''    # PVE_DASHBOARD_BRANDING_HELPER_V150
-    logo_text = str(payload.get("logo_text", current.get("logo_text", "LT-WBH"))).strip()[:16] or "LT-WBH"
-    logo_style = str(payload.get("logo_style", current.get("logo_style", "neon"))).strip().lower()
+
+    vars_block = '''    # PVE_DASHBOARD_BRANDING_HELPER_V151
+    logo_text = str(
+        payload.get("logo_text", current.get("logo_text", "NODEZERO"))
+    ).strip()[:24] or "NODEZERO"
+
+    logo_style = str(
+        payload.get("logo_style", current.get("logo_style", "neon"))
+    ).strip().lower()
+
     if logo_style not in {"neon", "orbit", "pulse", "minimal"}:
         logo_style = "neon"
 
 '''
-    helper=helper[:pos]+vars_block+helper[pos:]
-    pos=helper.find("    settings = {",start)
-    key='        "menu_name": menu_name,\n'
-    keypos=helper.find(key,pos)
-    if keypos<0:
+
+    helper = helper[:pos] + vars_block + helper[pos:]
+
+    pos = helper.find("    settings = {", start)
+    key = '        "menu_name": menu_name,\n'
+    keypos = helper.find(key, pos)
+
+    if keypos < 0:
         raise SystemExit("FEHLER: menu_name im Settings-Helper fehlt.")
-    insert=keypos+len(key)
-    helper=helper[:insert]+'        "logo_text": logo_text,\n        "logo_style": logo_style,\n'+helper[insert:]
-    helper_path.write_text(helper,encoding="utf-8")
 
-html=index_path.read_text(encoding="utf-8")
-css=css_path.read_text(encoding="utf-8")
-js=js_path.read_text(encoding="utf-8")
-css_block="/* PVE_DASHBOARD_BRANDING_V150_BEGIN */\n"+css+"\n/* PVE_DASHBOARD_BRANDING_V150_END */"
-js_block="/* PVE_DASHBOARD_BRANDING_V150_BEGIN */\n"+js+"\n/* PVE_DASHBOARD_BRANDING_V150_END */"
+    insert = keypos + len(key)
+    helper = (
+        helper[:insert]
+        + '        "logo_text": logo_text,\n'
+        + '        "logo_style": logo_style,\n'
+        + helper[insert:]
+    )
 
-html=re.sub(r'/\* PVE_DASHBOARD_BRANDING_V150_BEGIN \*/.*?/\* PVE_DASHBOARD_BRANDING_V150_END \*/\n?', '', html, flags=re.S)
-style_end=html.find("</style>")
-script_end=html.rfind("</script>")
-if style_end<0 or script_end<0:
-    raise SystemExit("FEHLER: Dashboard HTML-Anker fehlen.")
-html=html[:style_end]+css_block+"\n"+html[style_end:]
-script_end=html.rfind("</script>")
-html=html[:script_end]+js_block+"\n"+html[script_end:]
-index_path.write_text(html,encoding="utf-8")
+    helper_path.write_text(helper, encoding="utf-8")
 
-for marker in ("dashboardFixedToolbarV150","dashboardBrandLogoV150","toDataURL('image/png')","USV Online"):
+html = index_path.read_text(encoding="utf-8")
+css = css_path.read_text(encoding="utf-8")
+js = js_path.read_text(encoding="utf-8")
+
+html = re.sub(
+    r'/\* PVE_DASHBOARD_BRANDING_V(?:150|151)_BEGIN \*/.*?'
+    r'/\* PVE_DASHBOARD_BRANDING_V(?:150|151)_END \*/\n?',
+    '',
+    html,
+    flags=re.S,
+)
+
+css_block = (
+    "/* PVE_DASHBOARD_BRANDING_V151_BEGIN */\n"
+    + css
+    + "\n/* PVE_DASHBOARD_BRANDING_V151_END */"
+)
+
+js_block = (
+    "/* PVE_DASHBOARD_BRANDING_V151_BEGIN */\n"
+    + js
+    + "\n/* PVE_DASHBOARD_BRANDING_V151_END */"
+)
+
+style_end = html.find("</style>")
+if style_end < 0:
+    raise SystemExit("FEHLER: </style> für Branding fehlt.")
+
+html = html[:style_end] + css_block + "\n" + html[style_end:]
+
+script_end = html.rfind("</script>")
+if script_end < 0:
+    raise SystemExit("FEHLER: </script> für Branding fehlt.")
+
+html = html[:script_end] + js_block + "\n" + html[script_end:]
+index_path.write_text(html, encoding="utf-8")
+
+for marker in (
+    "PVE_DASHBOARD_BRANDING_V151",
+    "dashboardFixedToolbarV151",
+    "dashboardBrandLogoV151",
+    "/assets/logo.png",
+    "/assets/favicon.png",
+    "USV Online",
+):
     if marker not in html:
-        raise SystemExit("FEHLER: Branding-Marker fehlt: "+marker)
-PY
+        raise SystemExit("FEHLER: Branding-Marker fehlt: " + marker)
+PYV151
 
-    chown root:root "$index" "$helper" "$asset_dir/logo-lt-wbh.png" "$asset_dir/favicon-lt-wbh.png"
-    chown root:pve-monitor "$settings"
-    chmod 644 "$index" "$asset_dir/logo-lt-wbh.png" "$asset_dir/favicon-lt-wbh.png"
+    chown root:root "$index" "$helper"
+    chmod 644 "$index"
     chmod 755 "$helper"
+
+    chown root:pve-monitor "$settings"
     chmod 640 "$settings"
+
+    [[ -f "$logo_target" ]] && {
+        chown root:root "$logo_target"
+        chmod 644 "$logo_target"
+    }
+
+    [[ -f "$favicon_target" ]] && {
+        chown root:root "$favicon_target"
+        chmod 644 "$favicon_target"
+    }
 
     systemctl restart pve-sensor-web.service
     nginx -t
     systemctl reload nginx
 
-    ok "Dashboard Branding aktiv: $website_name · $logo_text ($logo_style)"
+    ok "Dashboard Branding V151 aktiv: $website_name"
     info "Feste Leiste: Menü · LIVE · USV Online · Neustart · Herunterfahren"
-    info "LT-WBH Logo/Favicon: echte PNG-Dateien mit Alpha-Transparenz aus GitHub."
-    info "Eigenes Upload-Favicon hat weiterhin Vorrang; andere Branding-Namen nutzen das wählbare Design."
+    info "Eigene Bilder: $logo_target und $favicon_target"
+    info "Updates überschreiben diese beiden Dateien niemals."
 }
+
 
 # =============================================================================
 # V69 · DASHBOARD FINALEN UI-STAND PRÜFEN
@@ -23251,7 +23390,7 @@ validate_dashboard_final_state_v69() {
         'id="settingsHubTabPihole"'
         'PVE_PIHOLE_MENU_ISOLATION_V80'
         'PVE_SETTINGS_PANELS_HOST_V81'
-        'PVE_DASHBOARD_BRANDING_V150'
+        'PVE_DASHBOARD_BRANDING_V151'
     )
 
     for marker in "${index_markers[@]}"; do
