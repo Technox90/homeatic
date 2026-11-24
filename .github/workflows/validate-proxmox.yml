@@ -188,30 +188,39 @@ jobs:
           assert 'data["favicon_url"] = ""' not in module
           PY
 
-      - name: V151 documentation synchronization
+      - name: Documentation version synchronization
         run: |
-          grep -q 'Aktueller Stand: V151' README.md
-          grep -q 'Installationskandidat: V151' proxmox/README.md
-          grep -q 'Aktueller Stand: V151' proxmox/HISTORY.md
-          grep -q 'V151 · Generisches Dashboard-Branding / Update-Schutz' proxmox/HISTORY.md
-          grep -q 'V151 · Generisches Dashboard-Branding / Update-Schutz' proxmox/history.txt
-          grep -q 'Aktueller Installationskandidat: V151' proxmox/CHATGPT-HANDOFF.md
-          grep -q 'HISTORY.md' README.md
-          grep -q 'HISTORY.md' proxmox/README.md
-
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           master=Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
           root=Path("README.md").read_text(encoding="utf-8")
           readme=Path("proxmox/README.md").read_text(encoding="utf-8")
           history=Path("proxmox/HISTORY.md").read_text(encoding="utf-8")
           history_txt=Path("proxmox/history.txt").read_text(encoding="utf-8")
+          handoff=Path("proxmox/CHATGPT-HANDOFF.md").read_text(encoding="utf-8")
 
-          assert "PROXMOX MODULARER KOMPLETT-INSTALLER V151" in master
-          assert root.index("V151") < root.index("V139") if "V139" in root else True
-          assert readme.index("V151") < readme.index("V113")
-          assert history.index("V151") < history.index("V150")
-          assert history_txt.index("V151") < history_txt.index("V150")
+          match=re.search(r"PROXMOX MODULARER KOMPLETT-INSTALLER V(\d+)",master)
+          assert match, "Installer version marker missing"
+          version="V"+match.group(1)
+
+          assert f"Aktueller Stand: {version}" in root
+          assert f"Installationskandidat: {version}" in readme
+          assert f"Aktueller Stand: {version}" in history
+          assert f"Aktueller Installationskandidat: {version}" in handoff
+          assert version in history_txt.splitlines()[3], "Newest history entry must be first"
+
+          assert "proxmox/HISTORY.md" in root
+          assert "HISTORY.md" in readme
+
+          headings=re.findall(r"^\d{2}\.\d{2}\.\d{4} .*?V\d+.*$",history_txt,re.M)
+          assert headings, "No version history headings found"
+          for heading in headings:
+              assert heading in history, f"Missing HISTORY.md entry: {heading}"
+
+          newest=headings[0]
+          assert version in newest, f"Newest history entry is not {version}: {newest}"
           PY
 
       - name: V149 Uptime Kuma external URL default
