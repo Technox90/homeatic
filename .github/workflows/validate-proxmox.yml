@@ -113,29 +113,29 @@ jobs:
           grep -q 'install_dashboard_branding_v154() {' proxmox/modules/dashboard.sh
           grep -q 'PVE_DASHBOARD_BRANDING_V154' proxmox/modules/dashboard.sh
 
-      - name: V153 toolbar layout
+      - name: Toolbar layout regression
         run: |
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.css
           grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
-          grep -q 'grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr)' dashboard/branding-v153.css
-          grep -q 'brandMenuToggleV153' dashboard/branding-v153.js
-          grep -q 'toggleNavV153' dashboard/branding-v153.js
-          grep -q 'toolbarCenterV153' dashboard/branding-v153.js
-          grep -q 'toolbarRightV153' dashboard/branding-v153.js
-          grep -q '#sideNav .navHead{display:none!important}' dashboard/branding-v153.css
-          grep -q 'install_dashboard_branding_v153() {' proxmox/modules/dashboard.sh
+          grep -q 'grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr)' dashboard/branding-v154.css
+          grep -q 'brandMenuToggleV154' dashboard/branding-v154.js
+          grep -q 'toggleNavV154' dashboard/branding-v154.js
+          grep -q 'toolbarCenterV154' dashboard/branding-v154.js
+          grep -q 'toolbarRightV154' dashboard/branding-v154.js
+          grep -q '#sideNav .navHead{display:none!important}' dashboard/branding-v154.css
+          grep -q 'install_dashboard_branding_v154() {' proxmox/modules/dashboard.sh
           grep -q 'PVE_DASHBOARD_BRANDING_V154' proxmox/modules/dashboard.sh
 
           python3 - <<'PY'
           from pathlib import Path
-          js=Path("dashboard/branding-v153.js").read_text(encoding="utf-8")
-          css=Path("dashboard/branding-v153.css").read_text(encoding="utf-8")
+          js=Path("dashboard/branding-v154.js").read_text(encoding="utf-8")
+          css=Path("dashboard/branding-v154.css").read_text(encoding="utf-8")
           assert "left.appendChild(menu)" in js
           assert "center.appendChild(live)" in js
           assert "center.appendChild(ups)" in js
           assert "right.appendChild(reboot)" in js
           assert "right.appendChild(shutdown)" in js
-          assert "button.onclick=toggleNavV153" in js
+          assert "button.onclick=toggleNavV154" in js
           assert "z-index:130" in css
           PY
 
