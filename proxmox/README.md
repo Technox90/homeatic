@@ -298,3 +298,14 @@ up.<hauptdomain>
 ```
 
 Bei der Hauptdomain `ltwbh.de` wird damit `https://up.ltwbh.de` vorgeschlagen. Die URL kann weiterhin wie jede andere externe URL im Menü einzeln bearbeitet werden.
+
+
+## ChatGPT-Handoff
+
+Für einen neuen Chat bzw. eine vollständige technische Übergabe gibt es:
+
+```text
+proxmox/CHATGPT-HANDOFF.md
+```
+
+Die Datei enthält den aktuellen Proxmox-/nginx-/Domain-/Zertifikatsstand, die produktiven Pfade, den Uptime-Kuma-Stand zu `https://up.ltwbh.de` sowie einen direkt kopierbaren Startprompt. Keine Secrets in dieser Datei hinterlegen.
