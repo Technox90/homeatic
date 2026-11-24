@@ -2,13 +2,10 @@ name: Validate Proxmox Installer
 
 on:
   pull_request:
-    paths:
-      - "proxmox/**"
-      - "dashboard/**"
-      - ".github/workflows/validate-proxmox.yml"
   push:
     branches:
       - main
+      - fix/paperless-domain-persistence
     paths:
       - "proxmox/**"
       - "dashboard/**"
@@ -321,7 +318,7 @@ jobs:
 
       - name: V147 installer self-update checks
         run: |
-          grep -Eq '^# PROXMOX MODULARER KOMPLETT-INSTALLER V[0-9]+ proxmox/proxmox.sh
+          grep -Eq '^# PROXMOX MODULARER KOMPLETT-INSTALLER V[0-9]+$' proxmox/proxmox.sh
           grep -q '^nodezero_self_update_v147() {' proxmox/proxmox.sh
           grep -q 'raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh' proxmox/proxmox.sh
           grep -q 'bash -n "$tmp"' proxmox/proxmox.sh
@@ -391,81 +388,6 @@ jobs:
           test -s dashboard/app.py
           test -s dashboard/index.html
           grep -q '"4" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
-          grep -q '^TOOLS_REF="2d0c56595148224ee5352cba7a2eeee907e15955"$' proxmox/proxmox.sh
-          grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
-          grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
-          grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
-          test "$(wc -c < proxmox/proxmox.sh)" -lt 700000
- proxmox/proxmox.sh
-          grep -q '^nodezero_self_update_v147() {' proxmox/proxmox.sh
-          grep -q 'raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh' proxmox/proxmox.sh
-          grep -q 'bash -n "$tmp"' proxmox/proxmox.sh
-          grep -q 'cmp -s -- "$self" "$tmp"' proxmox/proxmox.sh
-          grep -q '/home/backups/proxmox-installer-self-update' proxmox/proxmox.sh
-          grep -q 'export NODEZERO_SELFUPDATE_DONE=1' proxmox/proxmox.sh
-          grep -q 'exec /usr/bin/env bash "$self" "$@"' proxmox/proxmox.sh
-          python3 - <<'PY'
-          from pathlib import Path
-          text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
-          update_fn = text.index("nodezero_self_update_v147() {")
-          update_call = text.index('nodezero_self_update_v147 "$@"')
-          menu = text.index('TUI_TITLE="PROXMOX INSTALLER V154"')
-          assert update_fn < update_call < menu
-          assert text.count("nodezero_self_update_v147() {") == 1
-          assert text.count('nodezero_self_update_v147 "$@"') == 1
-          PY
-
-      - name: V146 logging, updater dedupe and external URL checks
-        run: |
-          grep -q 'LOG_DIR="/home/diagnose/pihole-language"' proxmox/proxmox.sh
-          if grep -q 'LOGFILE="/root/pihole-sprache-' proxmox/proxmox.sh; then
-            echo "Pi-hole language helper still writes new logs below /root"
-            exit 1
-          fi
-          grep -q "find /root -maxdepth 1 -type f -name 'pihole-sprache-\*.txt'" proxmox/proxmox.sh
-          grep -q 'install_nodezero_tool_v141 "proxmox-auto-updater"' proxmox/proxmox.sh
-          if grep -q "cat > /usr/local/sbin/proxmox-auto-updater <<'__UPDATER__'" proxmox/proxmox.sh; then
-            echo "Auto-Updater is still duplicated inside the master installer"
-            exit 1
-          fi
-          grep -q '"21" "Externe URLs · Domain / Reverse Proxy / Let'"'"'s Encrypt"' proxmox/proxmox.sh
-          grep -q 'install_nodezero_tool_v141 "nodezero-external-urls"' proxmox/proxmox.sh
-          grep -q 'CONFIG_DIR = Path("/home/Data/proxmox-installer/external-urls")' proxmox/tools/nodezero-external-urls
-          grep -q 'DIAG_DIR = Path("/home/diagnose/external-urls")' proxmox/tools/nodezero-external-urls
-          grep -q 'backend = f"https://{hip}:8006"' proxmox/tools/nodezero-external-urls
-          python3 - <<'PY'
-          from pathlib import Path
-          text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
-          marker = 'if [[ "$INSTALL_SELECTION" == "21" ]]; then'
-          start = text.index(marker)
-          end = text.index("\n    fi", start) + len("\n    fi")
-          section = text[start:end]
-          assert "nodezero-external-urls" in section
-          assert "continue" in section
-          assert "exit 0" not in section
-          PY
-
-      - name: V141 installer checks
-        run: |
-          grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="7e8c0882b815e217e8eaf22913c0d825c087d746"' proxmox/proxmox.sh
-          grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
-          grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
-          grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
-          grep -q 'install_dashboard_layout_editor_v71() {' proxmox/modules/dashboard.sh
-          grep -q 'validate_dashboard_final_state_v69() {' proxmox/modules/dashboard.sh
-          grep -q 'local APP_DIR="/opt/nodezero/dashboard"' proxmox/modules/dashboard.sh
-          if grep -q 'install_dashboard() {' proxmox/proxmox.sh; then
-            echo "Dashboard definition still embedded in master installer"
-            exit 1
-          fi
-          test -s dashboard/collector.py
-          test -s dashboard/app.py
-          test -s dashboard/index.html
-          grep -q '"20" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
           grep -q '^TOOLS_REF="2d0c56595148224ee5352cba7a2eeee907e15955"$' proxmox/proxmox.sh
           grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
           grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
