@@ -1440,7 +1440,7 @@ link_modal = r'''
     <h2>Dienste verwalten</h2>
     <p>
       Hier kannst du interne Webseiten hinzufügen. Beispiele:
-      <b>192.168.178.104</b> oder <b>https://mein-server.local</b>.
+      <b>https://example.de</b> oder <b>https://service.example.de</b>.
     </p>
 
     <div id="linkList" class="linkList"></div>
@@ -1453,7 +1453,7 @@ link_modal = r'''
 
       <div>
         <label for="linkUrl">IP / Adresse / URL</label>
-        <input id="linkUrl" type="text" maxlength="300" placeholder="192.168.178.183:5001">
+        <input id="linkUrl" type="text" maxlength="300" placeholder="https://example.de">
       </div>
 
       <div>
@@ -3251,8 +3251,8 @@ index = index.replace(
     'Hier kannst du IP-Adressen, Hostnamen und Domains hinzufügen. Beispiele:',
 )
 index = index.replace(
-    'placeholder="192.168.178.183:5001"',
-    'placeholder="nas.local oder 192.168.178.183:5001"',
+    'placeholder="https://example.de"',
+    'placeholder="https://example.de"',
 )
 
 render_manager = r'''function renderLinkManagerList(){
@@ -4576,7 +4576,7 @@ menu_modal = r'''<div class="modal" id="linksModal">
 
       <div id="menuUrlWrap">
         <label for="linkUrl">IP / Adresse / URL</label>
-        <input id="linkUrl" type="text" maxlength="500" placeholder="nas.local oder 192.168.178.183:5001">
+        <input id="linkUrl" type="text" maxlength="500" placeholder="https://example.de">
       </div>
 
       <div id="menuTargetWrap">
