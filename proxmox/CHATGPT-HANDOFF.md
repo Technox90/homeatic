@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V153
+- Aktueller Installationskandidat: V154
 - External-URL-Tool: `proxmox/tools/nodezero-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -217,6 +217,16 @@ nodezero-external-urls --reapply
 ```
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
+
+## Dashboard · V154 Feinschliff
+
+- Linker Hamburger-/Logo-Menübutton bleibt funktional identisch zu V153.
+- Logo wird größer dargestellt.
+- Sichtbarer Rahmen und permanenter Button-Hintergrund sind entfernt.
+- Grundzustand transparent; nur dezenter Hover-/Focus-Effekt bleibt.
+- Desktop: Logo bis ca. 230×38 px.
+- Mobile/Tablet-Größen ebenfalls vergrößert.
+- Logo/Favicon bleiben updategeschützt.
 
 ## Dashboard · V153 Toolbar
 
