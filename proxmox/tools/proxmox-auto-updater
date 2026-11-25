@@ -704,6 +704,25 @@ update_one_ct() {
         fi
     fi
 
+    # Do not silently report an unhealthy Kuma database/backend as operational.
+    if [[ "$hostname" == "uptime-kuma" ]]; then
+        if pct exec "$ctid" -- bash -c '
+            for i in $(seq 1 30); do
+                health=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" uptime-kuma 2>/dev/null || true)
+                if [[ "$health" == healthy || "$health" == running ]] && curl -fsS --max-time 3 http://127.0.0.1:3001/ >/dev/null 2>&1; then
+                    exit 0
+                fi
+                sleep 2
+            done
+            docker inspect --format "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}" uptime-kuma >&2 || true
+            exit 1
+        '; then
+            echo "[OK] Uptime Kuma: Health und HTTP-Backend erreichbar"
+        else
+            add_failure "${label}: Healthcheck/HTTP 3001 fehlgeschlagen; Datenbank und Dateirechte prüfen"
+        fi
+    fi
+
     if (( was_running == 0 )); then
         echo "Container war vor dem Update gestoppt; stoppe wieder ..."
         pct shutdown "$ctid" --timeout 60 || pct stop "$ctid" || true
