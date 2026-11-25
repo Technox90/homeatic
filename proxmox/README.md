@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V169 · 25.11.2026**
+**Installationskandidat: V170 · 25.11.2026**
 
 ## V164 · Einmalige Migration bestehender Installationen
 
@@ -318,6 +318,10 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 > **Achtung:** Optimal-, Reset- und Neuaufbau-Funktionen können bestehende VMs/LXC oder Dashboard-Daten löschen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V170
+
+- UPPER: Slug-Eingabemaske nur auf der Startseite bzw. bei fehlgeschlagener erstmaliger Auswahl. Nach erfolgreichem Laden wird das Formular vollständig ausgeblendet und bleibt auch bei späteren Abruffehlern verborgen. Andere Statusseiten über `/upper/` oder direkte Slug-URL öffnen. Normale Browser-Zurück-Navigation möglich; keine Änderung an API, Monitoren, Logo oder Favicon.
 
 ### V169
 

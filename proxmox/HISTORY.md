@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V169 · 25.11.2026**  
+> **Aktueller Stand: V170 · 25.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+25.11.2026 – V170 · UPPER ohne Wechselmaske
+--------------------------------------------------------
+- UPPER: Slug-Eingabemaske nur auf der Startseite bzw. bei fehlgeschlagener erstmaliger Auswahl. Nach erfolgreichem Laden wird das Formular vollständig ausgeblendet und bleibt auch bei späteren Abruffehlern verborgen. Andere Statusseiten über `/upper/` oder direkte Slug-URL öffnen. Normale Browser-Zurück-Navigation möglich; keine Änderung an API, Monitoren, Logo oder Favicon.
 
 25.11.2026 – V169 · Feststehende Seitenmenü-Aktionen
 --------------------------------------------------------
