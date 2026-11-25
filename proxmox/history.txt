@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+25.11.2026 – V168 · Browser-Tab Leistungsanzeige
+--------------------------------------------------------
+- Browser-Tab: Leistungsanzeige einheitlich als `Leistung 19,60 W` statt `Teil 19,60 W`; Messwertberechnung und Kennzeichnung der Teilleistung im Dashboard bleiben unverändert.
+
 25.11.2026 – V167 · Dezimale Übertragungsraten
 --------------------------------------------------------
 - Netzwerk- und Datenträger-Übertragungsraten in dezimalen B/s, kB/s, MB/s, GB/s bzw. TB/s (Faktor 1000), einschließlich Diagrammachsen. Automatische Skalierung; Rohdaten, Speichergrößen und RAM-Einheiten unverändert.

@@ -87,7 +87,7 @@ function buildTabFrames(mode,now=Date.now()){
   if(selected.includes('power')){
     const p=localHostPower(d);
     const value=tabNumber(p.value,2);
-    if(value!==null)frames.push((p.total?'':'Teil ')+value+' W');
+    if(value!==null)frames.push('Leistung '+value+' W');
   }
   return frames.length?frames:[tabName];
 }
