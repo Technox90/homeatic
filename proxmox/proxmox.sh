@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V169
+# PROXMOX MODULARER KOMPLETT-INSTALLER V170
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1009,8 +1009,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V169"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V169"
+TUI_TITLE="PROXMOX INSTALLER V170"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V170"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1615,7 +1615,7 @@ cat > "$tmp" <<'KUMA_STATUS_HTML'
 header{flex-direction:column;justify-content:center;text-align:center;gap:15px;margin-bottom:30px}
 header h1{margin:0;text-align:center}
 #upperLogo{display:block;width:auto;height:auto;max-width:min(450px,90%);max-height:150px;object-fit:contain;margin:10px auto}
-#upperLogo[hidden]{display:none!important}
+#upperLogo[hidden],#form[hidden]{display:none!important}
 body{min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px);display:flex;flex-direction:column;box-sizing:border-box}
 #upperFooter{margin-top:auto;padding:25px 10px 12px;text-align:center;color:#888;font-size:12px;line-height:1.8}
 #upperFooter .footerLine{border-top:1px solid #8884;padding-top:15px}
@@ -1627,7 +1627,7 @@ body{min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px);display:flex;f
 .pingTooltip[hidden]{display:none}
 </style></head><body>
 <header><img id="upperLogo" src="/upper/logo.png" alt="" onerror="this.hidden=true"><h1 id="title">Status & Antwortzeiten</h1></header>
-<form id="form"><label for="slug">Statusseiten-Name: </label><input id="slug" required maxlength="100" pattern="[A-Za-z0-9_-]+" placeholder="z. B. familie"><button>Öffnen</button></form>
+<form id="form" method="get" action="/upper/"><label for="slug">Statusseiten-Name: </label><input id="slug" name="slug" required maxlength="100" pattern="[A-Za-z0-9_\-]+" placeholder="z. B. familie"><button>Öffnen</button></form>
 <p id="message" role="status">Öffentliche Kuma-Statusseite auswählen.</p><main id="groups"></main>
 <script>
 "use strict";
@@ -1692,13 +1692,18 @@ function render(config,heartbeat){
 }
 async function refresh(){
  if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
- try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("message").textContent="Aktualisiert: "+new Date().toLocaleTimeString()+" · alle 60 Sekunden";}
+ try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+new Date().toLocaleTimeString()+" · alle 60 Sekunden";}
  catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
  finally{busy=false;if(token!==generation)refresh()}
 }
-function select(slug){if(!valid(slug))return;generation++;active=slug;$("slug").value=slug;$("groups").replaceChildren();$("message").textContent="Lade öffentliche Statusdaten …";history.replaceState(null,"","?slug="+encodeURIComponent(slug));refresh()}
-$("form").addEventListener("submit",e=>{e.preventDefault();select($("slug").value.trim())});
-const initial=new URLSearchParams(location.search).get("slug");if(initial&&valid(initial))select(initial);setInterval(refresh,60000);
+const initial=new URLSearchParams(location.search).get("slug");
+if(initial!==null){
+ const slug=initial.trim();
+ $("slug").value=slug;
+ if(valid(slug)){generation++;active=slug;$("message").textContent="Lade öffentliche Statusdaten …";refresh()}
+ else{$("message").textContent="Ungültiger Statusseiten-Name. Bitte erneut eingeben.";}
+}
+setInterval(refresh,60000);
 </script>
 <footer id="upperFooter">
 <div class="footerLine">UPPER &middot; Powered by Uptime Kuma</div>
@@ -1877,7 +1882,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 169" \
+                    --title "HAUPTMENÜ · Version 170" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8201,7 +8206,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V169",
+    "installer_version": "V170",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8675,7 +8680,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V169 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V170 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"

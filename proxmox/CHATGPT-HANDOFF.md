@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V169
+- Aktueller Installationskandidat: V170
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -464,3 +464,7 @@ Für bestehende Hosts zuerst die dokumentierte Layout-Migration ausführen. Zert
 ## V169
 
 - Seitenmenü: Nur die Diensteliste mit Kategorien scrollt. Einstellungen und GitHub bleiben mit einer durchgehenden Trennlinie am unteren Rand sichtbar, auf Desktop und Mobilgeräten. Bestehende Links und Kategorien bleiben unverändert.
+
+## V170
+
+- UPPER: Slug-Eingabemaske nur auf der Startseite bzw. bei fehlgeschlagener erstmaliger Auswahl. Nach erfolgreichem Laden wird das Formular vollständig ausgeblendet und bleibt auch bei späteren Abruffehlern verborgen. Andere Statusseiten über `/upper/` oder direkte Slug-URL öffnen. Normale Browser-Zurück-Navigation möglich; keine Änderung an API, Monitoren, Logo oder Favicon.

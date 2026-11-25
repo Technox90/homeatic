@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+25.11.2026 – V170 · UPPER ohne Wechselmaske
+--------------------------------------------------------
+- UPPER: Slug-Eingabemaske nur auf der Startseite bzw. bei fehlgeschlagener erstmaliger Auswahl. Nach erfolgreichem Laden wird das Formular vollständig ausgeblendet und bleibt auch bei späteren Abruffehlern verborgen. Andere Statusseiten über `/upper/` oder direkte Slug-URL öffnen. Normale Browser-Zurück-Navigation möglich; keine Änderung an API, Monitoren, Logo oder Favicon.
+
 25.11.2026 – V169 · Feststehende Seitenmenü-Aktionen
 --------------------------------------------------------
 - Seitenmenü: Nur die Diensteliste mit Kategorien scrollt. Einstellungen und GitHub bleiben mit einer durchgehenden Trennlinie am unteren Rand sichtbar, auf Desktop und Mobilgeräten. Bestehende Links und Kategorien bleiben unverändert.

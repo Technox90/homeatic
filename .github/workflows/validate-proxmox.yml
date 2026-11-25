@@ -532,3 +532,6 @@ jobs:
 
       - name: V165 boot title regression tests
         run: node dashboard/tests/boot-title.test.js
+
+      - name: V170 UPPER selection regression tests
+        run: node proxmox/tests/upper-selection.test.js
