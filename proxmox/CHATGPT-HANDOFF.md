@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V170
+- Aktueller Installationskandidat: V171
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -468,3 +468,7 @@ Für bestehende Hosts zuerst die dokumentierte Layout-Migration ausführen. Zert
 ## V170
 
 - UPPER: Slug-Eingabemaske nur auf der Startseite bzw. bei fehlgeschlagener erstmaliger Auswahl. Nach erfolgreichem Laden wird das Formular vollständig ausgeblendet und bleibt auch bei späteren Abruffehlern verborgen. Andere Statusseiten über `/upper/` oder direkte Slug-URL öffnen. Normale Browser-Zurück-Navigation möglich; keine Änderung an API, Monitoren, Logo oder Favicon.
+
+## V171
+
+- Dashboard: Sanfter Update-Klingelton (2,5 Sekunden, standardmäßig 50 %, auch für bestehende Browser), einmal pro neuer verfügbarer Version. Klang, Lautstärke, Aktivierung und Testton in den Einstellungen. Browser-Audiofreigabe bei erster Interaktion. Update-Hinweise verwenden die numerisch neueste Version auf GitHub main statt einer Zwischenversion; direkte Aktualisierung durch den bestehenden Managed-Updater.

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V170
+# PROXMOX MODULARER KOMPLETT-INSTALLER V171
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -62,6 +62,7 @@ set -Eeuo pipefail
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
 #   V148: Stirling PDF verwendet offiziellen GHCR-Pfad; bestehende Compose-Installationen werden beim Updater sicher migriert
+#   V171: Update-Klingelton (sanft, 2,5 s, 50 %); numerischer aktueller GitHub-Stand
 #   V155: Paperless-Reparatur erhält öffentliche URL, CSRF, Hosts und CORS; kein erzwungener Recreate
 #   V154: Logo-Menü vergrößert; sichtbarer Rahmen/Button-Hintergrund entfernt, Klickfläche bleibt erhalten
 #   V153: Toolbar neu aufgebaut: links Hamburger+Logo als Menü-Toggle, LIVE/USV mittig, Neustart/Herunterfahren rechts
@@ -1009,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V170"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V170"
+TUI_TITLE="PROXMOX INSTALLER V171"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V171"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1882,7 +1883,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 170" \
+                    --title "HAUPTMENÜ · Version 171" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8206,7 +8207,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V170",
+    "installer_version": "V171",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8680,7 +8681,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V170 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V171 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8884,7 +8885,83 @@ directory=Path(sys.argv[1])
 index=directory/"index.html"
 tag='<script defer src="/installer-update-v155.js"></script>'
 js="""(() => {
+const soundKey='dashboard.updateSoundSettings';
+const heardKey='dashboard.updateSoundLastVersion';
+const defaults={enabled:true,tone:'soft',volume:50};
+function normalizeSound(value){
+ const v=value||{};
+ return {enabled:v.enabled!==false,tone:['soft','bell','double'].includes(v.tone)?v.tone:'soft',volume:typeof v.volume==='number'&&Number.isFinite(v.volume)?Math.max(0,Math.min(100,v.volume)):50};
+}
+function readSound(){try{return normalizeSound(JSON.parse(localStorage.getItem(soundKey)))}catch{return {...defaults}}}
+let prefs=readSound(),context=null,pending=null,playing=false,heard=0;
+function lastHeard(){try{return Math.max(heard,Number(localStorage.getItem(heardKey))||0)}catch{return heard}}
+function remember(version){heard=Math.max(heard,version);try{localStorage.setItem(heardKey,String(heard))}catch{}}
+function getContext(){
+ const Audio=window.AudioContext||window.webkitAudioContext;
+ if(!Audio)return null;
+ if(!context)context=new Audio();
+ return context;
+}
+function playSound(){
+ const ctx=getContext();
+ if(!ctx||ctx.state!=='running'||prefs.volume===0)return false;
+ const sequences={soft:[[0,523.25],[0.45,659.25],[0.9,783.99]],bell:[[0,659.25],[0.65,880]],double:[[0,587.33],[0.85,698.46]]};
+ const start=ctx.currentTime+0.03;
+ const notes=sequences[prefs.tone];
+ notes.forEach(([offset,hz])=>{
+   const osc=ctx.createOscillator(),gain=ctx.createGain();
+   const t=start+offset,duration=2.5-offset;
+   osc.type='sine';osc.frequency.value=hz;
+   gain.gain.setValueAtTime(0.0001,t);
+   gain.gain.exponentialRampToValueAtTime(Math.max(0.0002,0.09*prefs.volume/100),t+0.04);
+   gain.gain.exponentialRampToValueAtTime(0.0001,t+duration);
+   osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+duration+0.02);
+ });
+ return true;
+}
+async function notify(){
+ if(playing||!pending||!prefs.enabled||prefs.volume===0||pending<=lastHeard())return;
+ playing=true;
+ try{
+   const version=pending;
+   const ctx=getContext();
+   if(!ctx||ctx.state!=='running')return;
+   const deliver=()=>{if(pending===version&&prefs.enabled&&version>lastHeard()&&playSound())remember(version)};
+   if(navigator.locks&&navigator.locks.request)await navigator.locks.request('dashboard-update-sound',deliver);
+   else deliver();
+ }catch{}finally{playing=false}
+}
+async function unlock(){
+ try{const ctx=getContext();if(ctx&&ctx.state!=='running')await ctx.resume();await notify()}catch{}
+}
+document.addEventListener('pointerdown',unlock);
+document.addEventListener('keydown',unlock);
+window.addEventListener('storage',e=>{if(e.key===soundKey||e.key===null){prefs=readSound();syncSoundPanel();notify()}});
+function syncSoundPanel(){
+ const panel=document.getElementById('dashboardUpdateSoundSettings');
+ if(!panel)return;
+ panel.querySelector('[data-sound-enabled]').checked=prefs.enabled;
+ panel.querySelector('[data-sound-tone]').value=prefs.tone;
+ panel.querySelector('[data-sound-volume]').value=String(prefs.volume);
+ panel.querySelector('[data-sound-value]').textContent=prefs.volume+' %';
+}
+function installSoundPanel(){
+ if(document.getElementById('dashboardUpdateSoundSettings'))return;
+ const anchor=document.getElementById('settingsSave')?.closest('.modalButtons');
+ if(!anchor)return;
+ const panel=document.createElement('section');
+ panel.id='dashboardUpdateSoundSettings';panel.className='browserTabSettings';
+ panel.innerHTML='<h3>Update-Benachrichtigungston</h3><label><input type="checkbox" data-sound-enabled> Benachrichtigungston aktivieren</label><label>Klang <select data-sound-tone><option value="soft">Sanftes Klingeln (Standard)</option><option value="bell">Klassisches Klingeln</option><option value="double">Doppelter Signalton</option></select></label><label>Lautstärke <input type="range" min="0" max="100" step="5" data-sound-volume> <span data-sound-value></span></label><div class="browserTabActions"><button type="button" data-sound-test>Testton abspielen</button><button type="button" data-sound-reset>Standard wiederherstellen</button><span role="status" data-sound-message></span></div>';
+ anchor.before(panel);
+ function save(){try{localStorage.setItem(soundKey,JSON.stringify(prefs))}catch{}syncSoundPanel()}
+ panel.addEventListener('input',()=>{prefs=normalizeSound({enabled:panel.querySelector('[data-sound-enabled]').checked,tone:panel.querySelector('[data-sound-tone]').value,volume:Number(panel.querySelector('[data-sound-volume]').value)});save();notify()});
+ panel.querySelector('[data-sound-reset]').addEventListener('click',()=>{prefs={...defaults};save();notify()});
+ panel.querySelector('[data-sound-test]').addEventListener('click',async()=>{const msg=panel.querySelector('[data-sound-message]');try{const ctx=getContext();if(ctx&&ctx.state!=='running')await ctx.resume();msg.textContent=playSound()?'Testton wird abgespielt.':'Ton nicht verfügbar oder Lautstärke 0 %.'}catch{msg.textContent='Audiowiedergabe vom Browser blockiert.'}});
+ syncSoundPanel();
+}
+installSoundPanel();
 const refresh = async () => {
+ installSoundPanel();
  let box = document.getElementById('proxmox-installer-update');
  if (!box) {
    box = document.createElement('aside'); box.id='proxmox-installer-update';
@@ -8896,16 +8973,20 @@ const refresh = async () => {
    const response=await fetch('/installer-update-status.json',{cache:'no-store'});
    if(!response.ok) throw Error();
    const s=await response.json();
+   const checked=Date.parse(s.checked||'');
+   const valid=Number.isSafeInteger(s.remote)&&Number.isSafeInteger(s.local)&&s.remote>s.local&&s.status==='available'&&Number.isFinite(checked)&&Date.now()-checked<3600000;
+   pending=valid?s.remote:null;
+   notify();
    box.hidden=s.status==='current' && Date.now()-Date.parse(s.checked)<3600000;
    box.replaceChildren();
    const label=document.createElement('strong');
-   label.textContent=s.status==='available'?'Installer-Update verfügbar: V'+s.remote:s.status==='local_newer'?'Lokaler Installer neuer als main':'Installer-Updateprüfung nicht aktuell / fehlgeschlagen';
+   label.textContent=valid?'Installer-Update verfügbar: V'+s.remote:s.status==='local_newer'?'Lokaler Installer neuer als main':'Installer-Updateprüfung nicht aktuell / fehlgeschlagen';
    box.append(label);
-   if(s.status==='available'){
+   if(valid){
      const detail=document.createElement('div'); detail.textContent='Lokal V'+s.local+' · GitHub V'+s.remote;box.append(detail);
      const link=document.createElement('a');link.href='https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md';link.textContent='Versionshistorie öffnen';link.target='_blank';link.rel='noopener noreferrer';link.style.color='#8dd8ff';box.append(link);
    }
- } catch {box.hidden=false;box.textContent='Installer-Updateprüfung: keine Daten';}
+ } catch {pending=null;box.hidden=false;box.textContent='Installer-Updateprüfung: keine Daten';}
 };
 refresh();setInterval(refresh,60000);
 })();"""

@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V170 · 25.11.2026**  
+> **Aktueller Stand: V171 · 25.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+25.11.2026 – V171 · Dashboard-Update-Klingelton
+--------------------------------------------------------
+- Dashboard: Sanfter Update-Klingelton (2,5 Sekunden, standardmäßig 50 %, auch für bestehende Browser), einmal pro neuer verfügbarer Version. Klang, Lautstärke, Aktivierung und Testton in den Einstellungen. Browser-Audiofreigabe bei erster Interaktion. Update-Hinweise verwenden die numerisch neueste Version auf GitHub main statt einer Zwischenversion; direkte Aktualisierung durch den bestehenden Managed-Updater.
 
 25.11.2026 – V170 · UPPER ohne Wechselmaske
 --------------------------------------------------------
