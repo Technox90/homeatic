@@ -29,6 +29,24 @@ function tabNumber(value,digits=0){
   if(typeof value!=='number'||!Number.isFinite(value)||value<0)return null;
   return value.toLocaleString('de-DE',{minimumFractionDigits:digits,maximumFractionDigits:digits});
 }
+function decimalTransferRate(v){
+  if(typeof v!=='number'||!Number.isFinite(v)||v<0)return '–';
+  const units=['B/s','kB/s','MB/s','GB/s','TB/s'];
+  let i=0;
+  while(v>=1000&&i<units.length-1){v/=1000;i++}
+  // Promote values which would otherwise round to 1000 of the smaller unit.
+  if(i<units.length-1&&Number(v.toFixed(i?2:0))>=1000){v/=1000;i++}
+  return v.toLocaleString('de-DE',{useGrouping:false,minimumFractionDigits:0,maximumFractionDigits:i?2:0})+' '+units[i];
+}
+ // Existing installations receive this through the managed branding update.
+ if(typeof rate==='function')rate=decimalTransferRate;
+ if(typeof draw==='function'){
+   const originalDraw=draw;
+   draw=function(id,series,opt={}){
+     if(id==='cNet'||id==='cIO')opt={...opt,y:decimalTransferRate};
+     return originalDraw.call(this,id,series,opt);
+   };
+ }
 function localHostPower(d){
   const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
   if(valid(d.system_power_w))return {value:d.system_power_w,total:true,label:'Gesamtserver via IPMI/DCMI'};

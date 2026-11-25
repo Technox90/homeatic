@@ -234,7 +234,16 @@ function bytes(v){
   while(v>=1024&&i<u.length-1){v/=1024;i++}
   return v.toFixed(i?1:0)+' '+u[i]
 }
-function rate(v){return bytes(v)+'/s'}
+function decimalTransferRate(v){
+  if(typeof v!=='number'||!Number.isFinite(v)||v<0)return '–';
+  const units=['B/s','kB/s','MB/s','GB/s','TB/s'];
+  let i=0;
+  while(v>=1000&&i<units.length-1){v/=1000;i++}
+  // Promote values which would otherwise round to 1000 of the smaller unit.
+  if(i<units.length-1&&Number(v.toFixed(i?2:0))>=1000){v/=1000;i++}
+  return v.toLocaleString('de-DE',{useGrouping:false,minimumFractionDigits:0,maximumFractionDigits:i?2:0})+' '+units[i];
+}
+function rate(v){return decimalTransferRate(v)}
 function dur(sec){
   sec=Number(sec||0);
   const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);
@@ -448,12 +457,12 @@ function charts(){
   draw('cNet',[
     {key:'net_rx_bps',label:'Download'},
     {key:'net_tx_bps',label:'Upload'}
-  ],{y:v=>bytes(v)});
+  ],{y:decimalTransferRate});
 
   draw('cIO',[
     {key:'disk_read_bps',label:'Lesen'},
     {key:'disk_write_bps',label:'Schreiben'}
-  ],{y:v=>bytes(v)});
+  ],{y:decimalTransferRate});
 
   draw('cLoad',[
     {key:'load1',label:'1 min'},
