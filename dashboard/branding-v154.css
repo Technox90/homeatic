@@ -179,3 +179,9 @@ body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-w
 #dashboardUpdateSoundSettings [data-sound-value]{flex:0 0 4.5em;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 #proxmox-installer-update[hidden]{display:none!important}
 @media(max-width:600px){#settingsHubModal.show{padding:6px!important}#settingsHubModal .settingsHubDialog{max-height:calc(100dvh - 12px)!important;padding:12px!important}#settingsHubModal .settingsHubTabs{flex-wrap:nowrap;overflow-x:auto}#settingsHubModal .settingsHubTab{flex:none}#settingsHubModal .settingsHubHeader{gap:6px}}
+
+/* V173 Update settings */
+.dashboardUpdateBadge{flex:none;white-space:nowrap;border:1px solid var(--accent);border-radius:6px;padding:2px 5px;font-size:11px;color:var(--accent)}
+#settingsHubPanelUpdates a{color:var(--accent)}
+#settingsHubPanelUpdates [data-update-history]{max-height:180px;overflow:auto}
+#dashboardUpdateSoundSettings input[type=time]{min-width:0;width:auto!important}

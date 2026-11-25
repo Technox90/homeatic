@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V172
+# PROXMOX MODULARER KOMPLETT-INSTALLER V173
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V172"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V172"
+TUI_TITLE="PROXMOX INSTALLER V173"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V173"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1883,7 +1883,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 172" \
+                    --title "HAUPTMENÜ · Version 173" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8207,7 +8207,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V172",
+    "installer_version": "V173",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8681,7 +8681,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V172 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V173 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8887,9 +8887,9 @@ tag='<script defer src="/installer-update-v155.js"></script>'
 js="""(() => {
 const soundKey='dashboard.updateSoundSettings';
 const heardKey='dashboard.updateSoundLastVersion';
-const defaults={enabled:true,tone:'soft',volume:50};
+const defaults={enabled:true,tone:'modern',volume:100,quiet:false,quietFrom:'22:00',quietTo:'07:00'};
 const tones={
- soft:{label:'Soft Chime (Standard)',length:2.5,notes:[[0,523.25],[.45,659.25],[.9,783.99]],partials:[[1,1],[2,.12],[3,.05]]},
+ soft:{label:'Soft Chime',length:2.5,notes:[[0,523.25],[.45,659.25],[.9,783.99]],partials:[[1,1],[2,.12],[3,.05]]},
  bell:{label:'Classic Bell',length:2.5,notes:[[0,660],[.55,660]],partials:[[1,1],[2.01,.3],[2.76,.2],[5.4,.07]]},
  double:{label:'Doorbell (Ding-Dong)',length:2.3,notes:[[0,659.25],[.65,523.25]],partials:[[1,1],[2,.22],[3,.06]]},
  crystal:{label:'Crystal',length:2.5,notes:[[0,880],[.35,1174.66],[.75,1318.51]],partials:[[1,1],[2.1,.18],[3.8,.07]]},
@@ -8898,11 +8898,18 @@ const tones={
  digital:{label:'Digital Classic',length:2,notes:[[0,784],[.28,1046.5],[.65,784]],partials:[[1,1],[3,.14],[5,.04]]},
  piano:{label:'Soft Piano',length:2.8,notes:[[0,392],[.4,523.25],[.8,659.25],[1.1,783.99]],partials:[[1,1],[2,.24],[3,.1],[4,.04]]},
  retro:{label:'Retro Bell',length:2.5,notes:[[0,698.46],[.22,880],[.65,698.46],[.87,880]],partials:[[1,1],[2,.3],[3,.12]]},
- modern:{label:'Modern Chime',length:2.5,notes:[[0,440],[.3,554.37],[.6,659.25],[.95,880]],partials:[[1,1],[2,.08],[3,.03]]}
+ modern:{label:'Modern Chime (Standard)',length:2.5,notes:[[0,440],[.3,554.37],[.6,659.25],[.95,880]],partials:[[1,1],[2,.08],[3,.03]]}
 };
 function normalizeSound(value){
  const v=value||{};
- return {enabled:v.enabled!==false,tone:Object.prototype.hasOwnProperty.call(tones,v.tone)?v.tone:'soft',volume:typeof v.volume==='number'&&Number.isFinite(v.volume)?Math.max(0,Math.min(100,v.volume)):50};
+ const time=(s,fallback)=>typeof s==='string'&&/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(s)?s:fallback;
+ return {enabled:v.enabled!==false,tone:Object.prototype.hasOwnProperty.call(tones,v.tone)?v.tone:defaults.tone,volume:typeof v.volume==='number'&&Number.isFinite(v.volume)?Math.max(0,Math.min(100,v.volume)):defaults.volume,quiet:v.quiet===true,quietFrom:time(v.quietFrom,defaults.quietFrom),quietTo:time(v.quietTo,defaults.quietTo)};
+}
+function isQuiet(p,now=new Date()){
+ if(!p.quiet||p.quietFrom===p.quietTo)return false;
+ const minute=s=>Number(s.slice(0,2))*60+Number(s.slice(3));
+ const a=minute(p.quietFrom),b=minute(p.quietTo),n=now.getHours()*60+now.getMinutes();
+ return a<b?n>=a&&n<b:n>=a||n<b;
 }
 function readSound(){try{return normalizeSound(JSON.parse(localStorage.getItem(soundKey)))}catch{return {...defaults}}}
 let prefs=readSound(),context=null,pending=null,playing=false,heard=0;
@@ -8939,13 +8946,13 @@ function playSound(){
  return true;
 }
 async function notify(){
- if(playing||!pending||!prefs.enabled||prefs.volume===0||pending<=lastHeard())return;
+ if(playing||!pending||!prefs.enabled||prefs.volume===0||isQuiet(prefs)||pending<=lastHeard())return;
  playing=true;
  try{
    const version=pending;
    const ctx=getContext();
    if(!ctx||ctx.state!=='running')return;
-   const deliver=()=>{if(pending===version&&prefs.enabled&&version>lastHeard()&&playSound())remember(version)};
+   const deliver=()=>{if(pending===version&&prefs.enabled&&!isQuiet(prefs)&&version>lastHeard()&&playSound())remember(version)};
    if(navigator.locks&&navigator.locks.request)await navigator.locks.request('dashboard-update-sound',deliver);
    else deliver();
  }catch{}finally{playing=false}
@@ -8963,6 +8970,9 @@ function syncSoundPanel(){
  panel.querySelector('[data-sound-tone]').value=prefs.tone;
  panel.querySelector('[data-sound-volume]').value=String(prefs.volume);
  panel.querySelector('[data-sound-value]').textContent=prefs.volume+' %';
+ panel.querySelector('[data-quiet]').checked=prefs.quiet;
+ panel.querySelector('[data-quiet-from]').value=prefs.quietFrom;
+ panel.querySelector('[data-quiet-to]').value=prefs.quietTo;
 }
 function installSoundPanel(){
  if(document.getElementById('dashboardUpdateSoundSettings'))return;
@@ -8970,17 +8980,74 @@ function installSoundPanel(){
  if(!anchor)return;
  const panel=document.createElement('section');
  panel.id='dashboardUpdateSoundSettings';panel.className='browserTabSettings';
- panel.innerHTML='<h3>Update-Benachrichtigungston</h3><label><input type="checkbox" data-sound-enabled> Benachrichtigungston aktivieren</label><label>Klang <select data-sound-tone>'+Object.entries(tones).map(([key,t])=>'<option value="'+key+'">'+t.label+'</option>').join('')+'</select></label><label>Lautstärke <input type="range" min="0" max="100" step="1" data-sound-volume> <span data-sound-value></span></label><div class="browserTabActions"><button type="button" data-sound-test>Testton abspielen</button><button type="button" data-sound-reset>Standard wiederherstellen</button><span role="status" data-sound-message></span></div>';
- anchor.before(panel);
+ panel.innerHTML='<h3>Update-Benachrichtigungston</h3><label><input type="checkbox" data-sound-enabled> Benachrichtigungston aktivieren</label><label>Klang <select data-sound-tone>'+Object.entries(tones).map(([key,t])=>'<option value="'+key+'">'+t.label+'</option>').join('')+'</select></label><label>Lautstärke <input type="range" min="0" max="100" step="1" data-sound-volume> <span data-sound-value></span></label><label><input type="checkbox" data-quiet> Ruhezeiten aktivieren</label><label>Von <input type="time" data-quiet-from> Bis <input type="time" data-quiet-to></label><div class="browserTabActions"><button type="button" data-sound-test>Testton abspielen</button><button type="button" data-sound-reset>Standard wiederherstellen</button><span role="status" data-sound-message></span></div>';
+ const host=ensureUpdatePanel();
+ if(host)host.append(panel);else anchor.before(panel);
  function save(){try{localStorage.setItem(soundKey,JSON.stringify(prefs))}catch{}syncSoundPanel()}
- panel.addEventListener('input',()=>{prefs=normalizeSound({enabled:panel.querySelector('[data-sound-enabled]').checked,tone:panel.querySelector('[data-sound-tone]').value,volume:Number(panel.querySelector('[data-sound-volume]').value)});save();notify()});
+ panel.addEventListener('input',()=>{prefs=normalizeSound({enabled:panel.querySelector('[data-sound-enabled]').checked,tone:panel.querySelector('[data-sound-tone]').value,volume:Number(panel.querySelector('[data-sound-volume]').value),quiet:panel.querySelector('[data-quiet]').checked,quietFrom:panel.querySelector('[data-quiet-from]').value,quietTo:panel.querySelector('[data-quiet-to]').value});save();notify()});
  panel.querySelector('[data-sound-reset]').addEventListener('click',()=>{prefs={...defaults};save();notify()});
  let testTimer;
  panel.querySelector('[data-sound-test]').addEventListener('click',async()=>{const msg=panel.querySelector('[data-sound-message]');window.clearTimeout(testTimer);try{const ctx=getContext();if(ctx&&ctx.state!=='running')await ctx.resume();msg.textContent=playSound()?'Testton wird abgespielt.':'Ton läuft bereits oder ist nicht verfügbar.'}catch{msg.textContent='Audiowiedergabe vom Browser blockiert.'}testTimer=window.setTimeout(()=>{msg.textContent=''},(tones[prefs.tone].length+.2)*1000)});
  syncSoundPanel();
 }
+const historyKey='dashboard.observedInstallerVersions';
+let lastStatus=null,refreshing=false;
+function readHistory(){try{const a=JSON.parse(localStorage.getItem(historyKey));return Array.isArray(a)?a.filter(x=>Number.isSafeInteger(x?.version)&&typeof x.seen==='string').slice(0,20):[]}catch{return []}}
+function recordVersion(s){
+ if(!Number.isSafeInteger(s.local)||s.local<1)return;
+ const a=readHistory();if(a[0]?.version===s.local)return;
+ a.unshift({version:s.local,seen:new Date().toISOString()});
+ try{localStorage.setItem(historyKey,JSON.stringify(a.slice(0,20)))}catch{}
+}
+function ensureUpdatePanel(){
+ let panel=document.getElementById('settingsHubPanelUpdates');
+ if(panel)return panel;
+ const tabs=document.querySelector('#settingsHubModal .settingsHubTabs'),host=document.getElementById('settingsHubPanelsHostV81');
+ if(!tabs||!host)return null;
+ const tab=document.createElement('button');tab.type='button';tab.id='settingsHubTabUpdates';tab.className='settingsHubTab';tab.setAttribute('role','tab');tab.setAttribute('aria-selected','false');tab.textContent='Updates';
+ panel=document.createElement('section');panel.id='settingsHubPanelUpdates';panel.className='settingsHubPanel';panel.setAttribute('role','tabpanel');
+ panel.innerHTML='<section class="browserTabSettings"><h3>Update-Verwaltung</h3><p data-update-summary>Warte auf Versionsstatus …</p><p data-update-check></p><div class="browserTabActions"><button type="button" data-update-refresh>Status neu laden</button><a href="https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md" target="_blank" rel="noopener noreferrer">Versionshistorie auf GitHub</a></div><h3>Beobachtete lokale Versionen</h3><div data-update-history></div><details><summary>Diagnose</summary><p data-update-diagnostic></p></details></section><section class="browserTabSettings"><h3>Browser-Einstellungen sichern</h3><p>Nur Ton- und Browser-Tab-Einstellungen, keine Zugangsdaten.</p><div class="browserTabActions"><button type="button" data-prefs-export>Exportieren</button><label>Importieren <input type="file" accept=".json,application/json" data-prefs-import></label><span role="status" data-prefs-message></span></div></section>';
+ tabs.append(tab);host.append(panel);
+ tab.addEventListener('click',()=>{
+   tabs.querySelectorAll('[role=tab]').forEach(el=>{el.classList.toggle('active',el===tab);el.setAttribute('aria-selected',String(el===tab))});
+   host.querySelectorAll(':scope > .settingsHubPanel').forEach(el=>el.classList.toggle('active',el===panel));
+ });
+ tabs.addEventListener('click',e=>{const other=e.target.closest('[role=tab]');if(other&&other!==tab){tab.classList.remove('active');tab.setAttribute('aria-selected','false');panel.classList.remove('active')}});
+ panel.querySelector('[data-update-refresh]').addEventListener('click',()=>refresh());
+ panel.querySelector('[data-prefs-export]').addEventListener('click',()=>{
+   const data={schema:1,sound:prefs};try{data.tab=JSON.parse(localStorage.getItem('dashboard.browserTabSettings'))}catch{}
+   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='dashboard-browser-settings.json';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+ });
+ panel.querySelector('[data-prefs-import]').addEventListener('change',async e=>{
+   const msg=panel.querySelector('[data-prefs-message]'),file=e.target.files[0];
+   try{
+     if(!file||file.size>65536)throw Error();
+     const data=JSON.parse(await file.text());if(data.schema!==1||!data.sound||typeof data.sound!=='object')throw Error();
+     const next=normalizeSound(data.sound);localStorage.setItem(soundKey,JSON.stringify(next));prefs=next;syncSoundPanel();
+     if(data.tab&&typeof data.tab==='object'){const t=data.tab;const clean={};for(const k of ['active','inactive'])if(Array.isArray(t[k]))clean[k]=t[k].filter(x=>['name','cpu','ram','power'].includes(x));if([3,5,10,15,30].includes(t.interval))clean.interval=t.interval;if([2,3,5,10].includes(t.updateInterval))clean.updateInterval=t.updateInterval;clean.update=t.update!==false;localStorage.setItem('dashboard.browserTabSettings',JSON.stringify(clean));window.dispatchEvent(new Event('storage'))}
+     msg.textContent='Importiert. Bei Bedarf Seite neu laden.';
+   }catch{msg.textContent='Import fehlgeschlagen.'}finally{e.target.value=''}
+ });
+ return panel;
+}
+function renderUpdateStatus(s,error=false){
+ const panel=ensureUpdatePanel();
+ if(panel){
+   const version=v=>Number.isSafeInteger(v)?'V'+v:'unbekannt';
+   panel.querySelector('[data-update-summary]').textContent=s?'Lokal: '+version(s.local)+' · GitHub: '+version(s.remote):'Versionsstatus nicht erreichbar';
+   const date=Date.parse(s?.checked||'');
+   panel.querySelector('[data-update-check]').textContent='Letzte Host-Prüfung: '+(Number.isFinite(date)?new Date(date).toLocaleString('de-DE'):'unbekannt')+' · Intervall: 15 Minuten';
+   panel.querySelector('[data-update-diagnostic]').textContent=error?'Statusabruf fehlgeschlagen; erneuter Versuch automatisch.':'Monitorstatus: '+(s?.status||'unbekannt');
+   const h=panel.querySelector('[data-update-history]');h.replaceChildren();
+   for(const x of readHistory()){const line=document.createElement('p');line.textContent='V'+x.version+' · erstmals gesehen: '+new Date(x.seen).toLocaleString('de-DE');h.append(line)}
+ }
+ const menu=document.querySelector('.brandMenuToggle');
+ if(menu){let badge=menu.querySelector('.dashboardUpdateBadge');if(pending){if(!badge){badge=document.createElement('span');badge.className='dashboardUpdateBadge';menu.append(badge)}badge.textContent='V'+pending}else badge?.remove()}
+}
 installSoundPanel();
 const refresh = async () => {
+ if(refreshing)return;
+ refreshing=true;
  installSoundPanel();
  let box = document.getElementById('proxmox-installer-update');
  if (!box) {
@@ -8996,6 +9063,7 @@ const refresh = async () => {
    const checked=Date.parse(s.checked||'');
    const valid=Number.isSafeInteger(s.remote)&&Number.isSafeInteger(s.local)&&s.remote>s.local&&s.status==='available'&&Number.isFinite(checked)&&Date.now()-checked<3600000;
    pending=valid?s.remote:null;
+   lastStatus=s;recordVersion(s);renderUpdateStatus(s);
    notify();
    box.hidden=!valid;
    if(!valid){box.replaceChildren();return;}
@@ -9007,8 +9075,9 @@ const refresh = async () => {
      const detail=document.createElement('div'); detail.textContent='Lokal V'+s.local+' · GitHub V'+s.remote;box.append(detail);
      const link=document.createElement('a');link.href='https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md';link.textContent='Versionshistorie öffnen';link.target='_blank';link.rel='noopener noreferrer';link.style.color='#8dd8ff';box.append(link);
    }
- } catch {pending=null;box.hidden=true;box.replaceChildren();}
+ } catch {pending=null;box.hidden=true;box.replaceChildren();renderUpdateStatus(lastStatus,true);}finally{refreshing=false}
 };
+window.addEventListener('online',refresh);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh()});
 refresh();setInterval(refresh,60000);
 })();"""
 def write(path, data, mode):
