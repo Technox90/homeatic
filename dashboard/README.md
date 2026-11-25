@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V165**
+**Dashboard-Stand: V166**
 
 Dateien:
 
@@ -16,6 +16,11 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## V166
+
+- Ausschließlich lokale Host-Leistungsdaten: IPMI/DCMI hat Vorrang; andernfalls CPU-Package (oder vorhandener CPU-Teilbereich) plus separater Intel-RAPL-DRAM-Wert. Cores/Uncore nicht doppelt zählen. GPU separat ausweisen, wenn ihre Unabhängigkeit vom CPU-Messbereich nicht nachgewiesen ist; ohne CPU/DRAM kann GPU als Teilleistung angezeigt werden.
+- Teilleistung wird in Kachel und Browser-Tab ausdrücklich gekennzeichnet. Fehlende Werte werden nicht geschätzt. Keine Smart-Home-, MQTT- oder externen Strommesser; USV/Pi-hole bleiben getrennt.
 
 ## V165
 
