@@ -14,7 +14,7 @@ const ctx=vm.createContext({
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -35,7 +35,7 @@ assert.equal(doc.title,'Dashboard LT-WBH');
 t.setSettings({active:['ram'],inactive:['power'],interval:10});
 assert.deepEqual(list(t.buildTabFrames('active')),['RAM 42 %']);
 t.setMetrics({cpu_power_w:0});
-assert.deepEqual(list(t.buildTabFrames('inactive')),['CPU 0,00 W']);
+assert.deepEqual(list(t.buildTabFrames('inactive')),['Teil 0,00 W']);
 t.setMetrics({cpu_power_w:8},Date.now()-121000);
 assert.deepEqual(list(t.buildTabFrames('inactive')),['Dashboard LT-WBH']);
 const checked=new Date().toISOString();
@@ -48,4 +48,18 @@ assert.equal(doc.title,'Dashboard LT-WBH');
 t.setSettings({active:['name'],update:false});
 t.setTabUpdateStatus({status:'available',local:162,remote:163,checked});
 assert.deepEqual(list(t.buildTabFrames('active')),['Dashboard LT-WBH']);
-console.log('Browser tab title regression tests passed');
+const power=t.localHostPower;
+assert.ok(Math.abs(power({cpu_power_w:17.2,cpu_core_power_w:16.4,uncore_power_w:0,dram_power_w:1.9}).value-19.1)<1e-9);
+assert.equal(power({system_power_w:48,cpu_power_w:17,dram_power_w:2,gpu_power_w:20}).value,48);
+assert.equal(power({system_power_w:48,cpu_power_w:17}).total,true);
+assert.equal(power({cpu_power_w:17,dram_power_w:2,gpu_power_w:20}).value,19);
+assert.equal(power({gpu_power_w:20}).value,20);
+assert.equal(power({dram_power_w:2}).value,2);
+assert.equal(power({cpu_core_power_w:4}).value,4);
+assert.equal(power({cpu_power_w:null,dram_power_w:undefined,ups_power_w:100}).value,null);
+assert.equal(power({cpu_power_w:0}).value,0);
+assert.equal(power({cpu_power_w:-1,dram_power_w:"2"}).value,null);
+t.setMetrics({cpu_power_w:17.2,dram_power_w:1.9});
+t.setSettings({active:['power'],update:false});
+assert.deepEqual(list(t.buildTabFrames('active')),['Teil 19,10 W']);
+console.log('Browser tab and local power regression tests passed');
