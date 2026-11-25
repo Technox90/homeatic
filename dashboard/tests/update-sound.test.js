@@ -20,3 +20,9 @@ vm.runInContext('remember(170);remember(151)',ctx);
 assert.equal(vm.runInContext('lastHeard()',ctx),170);
 assert.match(source,/s\.remote>s\.local/);
 console.log('V171 update sound checks passed');
+
+assert.equal(vm.runInContext('Object.keys(tones).length',ctx),10);
+assert.equal(vm.runInContext('normalizeSound({tone:"bell"}).tone',ctx),'bell');
+assert.equal(vm.runInContext('Object.values(tones).every(t=>t.length>=2&&t.length<=3)',ctx),true);
+assert.match(source,/box.hidden=!valid/);
+assert.match(source,/step="1" data-sound-volume/);

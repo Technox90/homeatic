@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V171 · 25.11.2026**  
+> **Aktueller Stand: V172 · 25.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+25.11.2026 – V172 · Einstellungen und klassische Benachrichtigungsklänge
+--------------------------------------------------------
+- Einstellungen: gemeinsame viewport-begrenzte Dialoghöhe, feste Reiter, scrollbarer Inhalt und erreichbare Aktionsleiste; mobile Reiter horizontal scrollbar. Zehn lokal synthetisierte Benachrichtigungsklänge, 1-%-Lautstärkeschritte, einzeilige Prozentanzeige, keine überlappenden Testtöne, temporärer Teststatus. Update-Hinweis nur bei tatsächlich neuer Version; bestehende Klang-IDs und Einstellungen bleiben erhalten.
 
 25.11.2026 – V171 · Dashboard-Update-Klingelton
 --------------------------------------------------------
