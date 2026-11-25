@@ -29,7 +29,7 @@ assert.deepEqual(list(t.normalizeTabSettings(null).inactive),['name','cpu','ram'
 assert.deepEqual(list(t.normalizeTabSettings({active:[],inactive:['bad']}).active),['name']);
 assert.deepEqual(list(t.buildTabFrames('active')),['Dashboard LT-WBH']);
 t.setMetrics({cpu_percent:10,ram_percent:42,system_power_w:15.21,cpu_power_w:8});
-assert.deepEqual(list(t.buildTabFrames('inactive')),['Dashboard LT-WBH','CPU 10 % | RAM 42 %','15,21 W']);
+assert.deepEqual(list(t.buildTabFrames('inactive')),['Dashboard LT-WBH','CPU 10 % | RAM 42 %','Leistung 15,21 W']);
 doc.visibilityState='hidden';t.refreshTabTitle(true);t.next();
 assert.equal(doc.title,'CPU 10 % | RAM 42 %');
 doc.visibilityState='visible';t.refreshTabTitle();
@@ -37,7 +37,7 @@ assert.equal(doc.title,'Dashboard LT-WBH');
 t.setSettings({active:['ram'],inactive:['power'],interval:10});
 assert.deepEqual(list(t.buildTabFrames('active')),['RAM 42 %']);
 t.setMetrics({cpu_power_w:0});
-assert.deepEqual(list(t.buildTabFrames('inactive')),['Teil 0,00 W']);
+assert.deepEqual(list(t.buildTabFrames('inactive')),['Leistung 0,00 W']);
 t.setMetrics({cpu_power_w:8},Date.now()-121000);
 assert.deepEqual(list(t.buildTabFrames('inactive')),['Dashboard LT-WBH']);
 const checked=new Date().toISOString();
@@ -63,7 +63,7 @@ assert.equal(power({cpu_power_w:0}).value,0);
 assert.equal(power({cpu_power_w:-1,dram_power_w:"2"}).value,null);
 t.setMetrics({cpu_power_w:17.2,dram_power_w:1.9});
 t.setSettings({active:['power'],update:false});
-assert.deepEqual(list(t.buildTabFrames('active')),['Teil 19,10 W']);
+assert.deepEqual(list(t.buildTabFrames('active')),['Leistung 19,10 W']);
 console.log('Browser tab and local power regression tests passed');
 
 const rate=t.decimalTransferRate;
