@@ -104,7 +104,8 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
 @media(max-width:760px){#nodezeroSystemFooter{padding:14px 12px 20px}}
 
 /* Mobile power actions: labels remain accessible; original click handlers stay intact. */
-#dashboardFixedToolbar .brandPowerIcon{display:inline-block;line-height:1}
+#dashboardFixedToolbar .brandPowerIcon{display:inline-flex;line-height:1;vertical-align:middle}
+#dashboardFixedToolbar .brandPowerIcon svg{width:1.15em;height:1.15em;display:block}
 #dashboardFixedToolbar .brandPowerLabel{margin-left:5px}
 @media(max-width:760px){
   #dashboardFixedToolbar .toolbarRight .brandPowerLabel{display:none}

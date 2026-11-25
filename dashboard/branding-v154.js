@@ -194,11 +194,16 @@ function configureBrandMenu(button,settings,force=false){
 }
 
 function preparePowerButton(button,label,symbol){
-  if(button.querySelector('.brandPowerIcon'))return;
+  if(button.querySelector('.brandPowerIcon svg'))return;
   const icon=document.createElement('span');
   icon.className='brandPowerIcon';
   icon.setAttribute('aria-hidden','true');
-  icon.textContent=symbol;
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg');
+  for(const [k,v] of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round',focusable:'false'}))svg.setAttribute(k,v);
+  const paths=symbol==='power'?['M12 2v10','M6 5a9 9 0 1 0 12 0']:['M20 4v6h-6','M20 10a8 8 0 1 0 .1 5'];
+  for(const d of paths){const path=document.createElementNS(ns,'path');path.setAttribute('d',d);svg.appendChild(path)}
+  icon.appendChild(svg);
   const text=document.createElement('span');
   text.className='brandPowerLabel';
   text.textContent=label;
@@ -251,8 +256,8 @@ function ensureBrandToolbarLayout(settings={},refreshLogo=false){
   if(menu){configureBrandMenu(menu,settings,refreshLogo);left.appendChild(menu)}
   if(live)center.appendChild(live);
   if(ups)center.appendChild(ups);
-  if(reboot){preparePowerButton(reboot,'Neustart','↻');right.appendChild(reboot);}
-  if(shutdown){preparePowerButton(shutdown,'Herunterfahren','⏻');right.appendChild(shutdown);}
+  if(reboot){preparePowerButton(reboot,'Neustart','restart');right.appendChild(reboot);}
+  if(shutdown){preparePowerButton(shutdown,'Herunterfahren','power');right.appendChild(shutdown);}
 
   [left,center,right].forEach(el=>bar.appendChild(el));
 }

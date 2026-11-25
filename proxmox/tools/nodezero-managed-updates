@@ -165,29 +165,24 @@ def kuma_update(master):
     if "status: running" not in run(["pct","status",ct],capture_output=True,text=True).stdout:
         report("INFO","Kuma gestoppt; übersprungen")
         return
-    page=extract(master,"cat > \"$tmp\" <<'KUMA_STATUS_HTML'\n","\nKUMA_STATUS_HTML\n")+"\n"
-    if not page.startswith("<!doctype html>") or "/api/status-page/heartbeat/" not in page:
-        raise ValueError("Ungültige Kuma-Statusseite")
-    # Existing extension only. No nginx, Docker or database changes.
-    shell=r"""set -eu
-p=/var/www/nodezero-kuma-status/index.html
-[ -f "$p" ] && [ ! -L "$p" ] || { echo missing; exit 0; }
-grep -Fq 'NODEZERO KUMA PUBLIC STATUS V155' /etc/nginx/conf.d/pve-master-standard-web.conf || { echo missing; exit 0; }
-t=$(mktemp /var/www/nodezero-kuma-status/.update.XXXXXX)
-trap 'rm -f "$t"' EXIT
-cat > "$t"
-if cmp -s "$p" "$t"; then echo current; exit 0; fi
-b=$(mktemp -d /root/kuma-status-update.XXXXXX)
-cp -a "$p" "$b/index.html"
-chmod 644 "$t"
-mv -f "$t" "$p"
-echo updated
+    # UPPER is opt-in; recognize old installs only for migration.
+    probe=r"""set -eu
+conf=/etc/nginx/conf.d/pve-master-standard-web.conf
+if [ -f /var/www/upper/index.html ] || [ -f /var/www/nodezero-kuma-status/index.html ] || grep -Eq 'UPPER PUBLIC STATUS|NODEZERO KUMA PUBLIC STATUS V155' "$conf" 2>/dev/null; then echo installed; else echo missing; fi
 """
-    result=run(["pct","exec",ct,"--","bash","-c",shell],input=page,text=True,capture_output=True).stdout.strip()
-    if result=="updated": report("UPDATED","Kuma: öffentliche Statusseite aktualisiert")
-    elif result=="missing": report("INFO","Kuma-Status-Erweiterung nicht installiert; übersprungen")
-    elif result=="current": report("INFO","Kuma-Status-Erweiterung aktuell")
-    else: raise ValueError("Unerwartete Kuma-Rückmeldung")
+    result=run(["pct","exec",ct,"--","bash","-c",probe],capture_output=True,text=True).stdout.strip()
+    if result=="missing":
+        report("INFO","UPPER nicht installiert; übersprungen")
+        return
+    if result!="installed": raise ValueError("Unerwartete UPPER-Rückmeldung")
+    shell=extract(master,"<<'KUMA_STATUS_INSTALL'\n","\nKUMA_STATUS_INSTALL\n")+"\n"
+    if "/var/www/upper" not in shell or "UPPER PUBLIC STATUS" not in shell:
+        raise ValueError("Ungültiger UPPER-Installer")
+    result=subprocess.run(["pct","exec",ct,"--","bash","-s"],input=shell,text=True,capture_output=True,timeout=120)
+    if result.returncode:
+        raise ValueError("UPPER-Installation fehlgeschlagen: "+(result.stderr or result.stdout)[-500:])
+    report("INFO" if "UPPER_CURRENT" in result.stdout else "UPDATED","UPPER: öffentliche Statusseite geprüft")
+
 
 def installer_update(remote, download):
     path=pathlib.Path((STATE/"installer-path").read_text().strip())

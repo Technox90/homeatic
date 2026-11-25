@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V162
+# PROXMOX MODULARER KOMPLETT-INSTALLER V163
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1002,8 +1002,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V162"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V162"
+TUI_TITLE="PROXMOX INSTALLER V163"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V163"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1554,7 +1554,7 @@ sys.exit(0 if status == "OK" else 1)
 PY_STRESS_V155
 )
 
-install_kuma_public_status_v155() (
+install_upper_public_status_v163() (
     local id="" candidate="" count=0
     for candidate in $(pct list | awk 'NR>1 {print $1}'); do
         if [[ "$(pct config "$candidate" | awk '/^hostname: / {print tolower($2)}')" == uptime-kuma ]]; then
@@ -1573,13 +1573,21 @@ install_kuma_public_status_v155() (
     pct exec "$id" -- bash -s <<'KUMA_STATUS_INSTALL'
 set -Eeuo pipefail
 conf=/etc/nginx/conf.d/pve-master-standard-web.conf
-dir=/var/www/nodezero-kuma-status
+dir=/var/www/upper
 page="$dir/index.html"
-test -f "$conf" || { echo "Verwaltete nginx-Konfiguration fehlt."; exit 1; }
+legacy=/var/www/nodezero-kuma-status
+test -f "$conf"
 curl -fsS --max-time 10 http://127.0.0.1:3001/ >/dev/null
 nginx -t
 install -d -m 0755 "$dir"
-backup="$(mktemp -d /root/kuma-status-backup.XXXXXX)"
+# Copy only missing personal images on migration; never replace them.
+for asset in logo.png favicon.png; do
+    if [[ ! -e "$dir/$asset" && -f "$legacy/$asset" && ! -L "$legacy/$asset" ]]; then
+        cp -n -- "$legacy/$asset" "$dir/$asset"
+        chmod 0644 "$dir/$asset"
+    fi
+done
+backup="$(mktemp -d /root/upper-backup.XXXXXX)"
 cp -a "$conf" "$backup/nginx.conf"
 if [[ -f "$page" ]]; then cp -a "$page" "$backup/index.html"; fi
 tmp="$(mktemp "$dir/.index.XXXXXX")"
@@ -1592,14 +1600,28 @@ rollback() {
 trap rollback ERR
 cat > "$tmp" <<'KUMA_STATUS_HTML'
 <!doctype html>
-<html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Status & Antwortzeiten</title>
+<link rel="icon" type="image/png" href="/upper/favicon.png">
 <style>
 :root{color-scheme:dark light;font:16px system-ui}body{max-width:1000px;margin:30px auto;padding:0 16px}header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}input,button{font:inherit;padding:8px;border-radius:6px;border:1px solid #888}article{border:1px solid #8885;border-radius:12px;padding:16px;margin:12px 0}h2{font-size:1.2rem}h3{margin:0 0 12px}.stats{display:flex;gap:20px;flex-wrap:wrap}.stats span{display:block;font-size:.8rem;opacity:.75}.stats strong{font-size:1.2rem}.bars{display:flex;gap:3px;margin:12px 0;height:22px}.bars i{flex:1;border-radius:3px;background:#888}.up{color:#20a65b}.down{color:#dc4444}.pending{color:#c58b17}.bars .up{background:#20a65b}.bars .down{background:#dc4444}.bars .pending{background:#c58b17}svg{display:block;width:100%;height:auto;margin-top:12px}.muted{opacity:.75;font-size:.85rem}a{color:inherit}
-</style>
-<header><h1 id="title">Status & Antwortzeiten</h1></header>
+header{flex-direction:column;justify-content:center;text-align:center;gap:15px;margin-bottom:30px}
+header h1{margin:0;text-align:center}
+#upperLogo{display:block;width:auto;height:auto;max-width:min(450px,90%);max-height:150px;object-fit:contain;margin:10px auto}
+#upperLogo[hidden]{display:none!important}
+body{min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px);display:flex;flex-direction:column;box-sizing:border-box}
+#upperFooter{margin-top:auto;padding:25px 10px 12px;text-align:center;color:#888;font-size:12px;line-height:1.8}
+#upperFooter .footerLine{border-top:1px solid #8884;padding-top:15px}
+#upperFooter a{color:inherit;text-decoration:none}
+#upperFooter a:hover{color:#20a65b}
+.pingChart{position:relative;min-width:0}
+.pingChart svg{touch-action:pan-y;cursor:crosshair}
+.pingTooltip{position:absolute;z-index:2;pointer-events:none;max-width:100%;box-sizing:border-box;background:#20252b;color:#fff;border:1px solid #707780;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 3px 12px #0005}
+.pingTooltip[hidden]{display:none}
+</style></head><body>
+<header><img id="upperLogo" src="/upper/logo.png" alt="" onerror="this.hidden=true"><h1 id="title">Status & Antwortzeiten</h1></header>
 <form id="form"><label for="slug">Statusseiten-Name: </label><input id="slug" required maxlength="100" pattern="[A-Za-z0-9_-]+" placeholder="z. B. familie"><button>Öffnen</button></form>
-<p id="message" role="status">Öffentliche Kuma-Statusseite auswählen.</p><p><a id="original" hidden>Original-Statusseite</a></p><main id="groups"></main>
+<p id="message" role="status">Öffentliche Kuma-Statusseite auswählen.</p><main id="groups"></main>
 <script>
 "use strict";
 const el=(tag,txt,cls)=>{const n=document.createElement(tag);if(txt!==undefined)n.textContent=txt;if(cls)n.className=cls;return n};
@@ -1619,7 +1641,30 @@ function graph(rows){
  for(const v of [0,max/2,max]){const y=105-v/max*90;add("line",{x1:55,x2:630,y1:y,y2:y,stroke:"currentColor",opacity:".15"});add("text",{x:2,y:y+4,fill:"currentColor","font-size":"10"},Math.round(v)+" ms")}
  let segment=[];const flush=()=>{if(segment.length>1)add("polyline",{points:segment.join(" "),fill:"none",stroke:"#20a65b","stroke-width":"2"});else if(segment.length===1){const [cx,cy]=segment[0].split(",");add("circle",{cx,cy,r:3,fill:"#20a65b"})}segment=[]};
  pts.forEach((p,i)=>{if(p===null){flush();return}segment.push((55+i*575/Math.max(1,pts.length-1))+","+(105-p/max*90))});flush();
- return svg;
+ const wrap=el("div",undefined,"pingChart"),tip=el("div",undefined,"pingTooltip");
+ tip.hidden=true;tip.setAttribute("role","status");
+ const guide=add("line",{y1:15,y2:105,stroke:"currentColor","stroke-dasharray":"4 3",opacity:".6",visibility:"hidden"});
+ const dot=add("circle",{r:4,fill:"#20a65b",stroke:"currentColor","stroke-width":"1",visibility:"hidden"});
+ const xAt=i=>55+i*575/Math.max(1,rows.length-1);
+ let selected=0;
+ function show(i){
+   selected=Math.max(0,Math.min(rows.length-1,i));
+   const row=rows[selected],p=pts[selected],x=xAt(selected);
+   guide.setAttribute("x1",x);guide.setAttribute("x2",x);guide.setAttribute("visibility","visible");
+   dot.setAttribute("cx",x);dot.setAttribute("cy",p===null?105:105-p/max*90);dot.setAttribute("visibility",p===null?"hidden":"visible");
+   const [label]=state(row.status);
+   tip.replaceChildren(el("strong",String(row.time||"—")),el("div","Antwortzeit: "+format(p)),el("div","Status: "+label));
+   tip.hidden=false;tip.style.top="0px";
+   tip.style.left=Math.max(0,Math.min(wrap.clientWidth-tip.offsetWidth,x/640*svg.clientWidth+8))+"px";
+ }
+ function pointer(e){const r=svg.getBoundingClientRect();if(!r.width)return;show(Math.round(((e.clientX-r.left)/r.width*640-55)/575*Math.max(1,rows.length-1)))}
+ function hide(){tip.hidden=true;guide.setAttribute("visibility","hidden");dot.setAttribute("visibility","hidden")}
+ svg.setAttribute("tabindex","0");svg.setAttribute("aria-label","Antwortzeitverlauf; mit Pfeiltasten Messpunkte auswählen");
+ svg.addEventListener("pointermove",pointer);svg.addEventListener("pointerdown",pointer);
+ svg.addEventListener("pointerleave",e=>{if(e.pointerType!=="touch")hide()});
+ svg.addEventListener("keydown",e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();show(selected+(e.key==="ArrowLeft"?-1:1))}else if(e.key==="Escape")hide()});
+ svg.addEventListener("blur",hide);
+ wrap.append(svg,tip);return wrap;
 }
 function render(config,heartbeat){
  const root=document.createDocumentFragment();
@@ -1644,43 +1689,85 @@ async function refresh(){
  catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
  finally{busy=false;if(token!==generation)refresh()}
 }
-function select(slug){if(!valid(slug))return;generation++;active=slug;$("slug").value=slug;$("groups").replaceChildren();$("message").textContent="Lade öffentliche Statusdaten …";$("original").href="/status/"+encodeURIComponent(slug);$("original").hidden=false;history.replaceState(null,"","?slug="+encodeURIComponent(slug));refresh()}
+function select(slug){if(!valid(slug))return;generation++;active=slug;$("slug").value=slug;$("groups").replaceChildren();$("message").textContent="Lade öffentliche Statusdaten …";history.replaceState(null,"","?slug="+encodeURIComponent(slug));refresh()}
 $("form").addEventListener("submit",e=>{e.preventDefault();select($("slug").value.trim())});
 const initial=new URLSearchParams(location.search).get("slug");if(initial&&valid(initial))select(initial);setInterval(refresh,60000);
-</script></html>
+</script>
+<footer id="upperFooter">
+<div class="footerLine">UPPER &middot; Powered by Uptime Kuma</div>
+<div>Copyright &copy; <span id="upperYear"></span> Technox1990 &middot; <a href="https://github.com/Technox90" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+<div>Alle Rechte vorbehalten.</div>
+</footer>
+<script>document.getElementById("upperYear").textContent=new Date().getFullYear();</script>
+</body></html>
 KUMA_STATUS_HTML
 chmod 0644 "$tmp"
-mv -f "$tmp" "$page"
-python3 - "$conf" <<'PY_KUMA_STATUS_NGINX'
+python3 - "$conf" <<'PY_UPPER_NGINX'
 from pathlib import Path
-import sys
+import sys, re
 p=Path(sys.argv[1])
 s=p.read_text()
-marker="# NODEZERO KUMA PUBLIC STATUS V155"
-if marker not in s:
-    anchor="    location / {\n"
-    if s.count(anchor)!=1:
-        raise SystemExit("nginx location nicht eindeutig; keine automatische Änderung.")
-    block='''    # NODEZERO KUMA PUBLIC STATUS V155
-    location = /nodezero-status/ {
-        alias /var/www/nodezero-kuma-status/index.html;
+# Remove only old managed routes (including the temporary /status/ route).
+s=re.sub(r'(?m)^[ \t]*# (?:NODEZERO KUMA PUBLIC STATUS V155|UPPER PUBLIC STATUS)[ \t]*\n[ \t]*location\s*=\s*/(?:nodezero-status|status|upper)/\s*\{[^}]*\}[ \t]*\n?', '', s)
+s=re.sub(r'(?m)^[ \t]*location\s*=\s*/upper(?:/|/logo\.png|/favicon\.png)?\s*\{[^}]*\}[ \t]*\n?', '', s)
+anchor="    location / {\n"
+if s.count(anchor)!=1:
+    raise SystemExit("UPPER: nginx location nicht eindeutig")
+block="""    # UPPER PUBLIC STATUS
+    location = /upper {
+        return 308 /upper/$is_args$args;
+    }
+    location = /upper/ {
+        root /var/www/upper;
+        try_files /index.html =404;
         default_type text/html;
         add_header Cache-Control "no-store";
         add_header X-Content-Type-Options nosniff;
     }
+    location = /upper/logo.png {
+        root /var/www/upper;
+        try_files /logo.png =404;
+        default_type image/png;
+        add_header Cache-Control "no-cache";
+    }
+    location = /upper/favicon.png {
+        root /var/www/upper;
+        try_files /favicon.png =404;
+        default_type image/png;
+        add_header Cache-Control "no-cache";
+    }
 
-'''
-    p.write_text(s.replace(anchor,block+anchor,1))
-PY_KUMA_STATUS_NGINX
-output="$(nginx -t 2>&1)"
-printf '%s\n' "$output"
-if grep -q 'conflicting server name' <<<"$output"; then rollback; exit 1; fi
+"""
+# Remove excess blank lines only immediately before the managed insertion.
+before, after=s.split(anchor,1)
+p.write_text(before.rstrip()+"\n\n"+block+anchor+after)
+PY_UPPER_NGINX
+if cmp -s "$tmp" "$page" && cmp -s "$conf" "$backup/nginx.conf"; then
+    rm -f "$tmp"
+    trap - ERR
+    rm -rf "$backup"
+    echo UPPER_CURRENT
+    exit 0
+fi
+mv -f "$tmp" "$page"
+nginx -t
 systemctl reload nginx
-curl -fkSs --max-time 10 https://127.0.0.1/nodezero-status/ | grep -F 'Status & Antwortzeiten' >/dev/null
+check="$backup/response.html"
+ok=0
+for attempt in $(seq 1 15); do
+    if curl -kfsS --noproxy '*' --max-time 3 https://127.0.0.1/upper/ -o "$check" && cmp -s "$page" "$check"; then ok=1; break; fi
+    sleep 1
+done
+if [[ "$ok" != 1 ]]; then
+    echo "UPPER: HTML-Prüfung fehlgeschlagen" >&2
+    rollback
+    exit 1
+fi
+rm -f "$check"
 trap - ERR
-echo "Statusansicht installiert. Backup: $backup"
+echo "UPPER installiert. Backup: $backup"
 KUMA_STATUS_INSTALL
-    echo "Öffne auf deiner bisherigen Kuma-Domain: /nodezero-status/?slug=DEIN-STATUSSEITENNAME"
+    echo "Öffne auf deiner bisherigen Kuma-Domain: /upper/?slug=DEIN-STATUSSEITENNAME"
 )
 
 tui_maintenance_menu_v106() {
@@ -1704,7 +1791,7 @@ tui_maintenance_menu_v106() {
                 "8" "Setup-Profile · laden / verwalten" \
                 "9" "OpenRGB · Mainboard / RAM / USB-RGB" \
                 "10" "Stresstest · CPU / RAM / Festplatte" \
-                "11" "Uptime Kuma · öffentliche Statusseite mit Ping" \
+                "11" "UPPER · öffentliche Statusseite mit Ping" \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
@@ -1719,7 +1806,7 @@ tui_maintenance_menu_v106() {
     printf '%2d  %s\n' 8 "Setup-Profile · laden / verwalten" >&2
     printf '%2d  %s\n' 9 "OpenRGB · Mainboard / RAM / USB-RGB" >&2
     printf '%2d  %s\n' 10 "Stresstest · CPU / RAM / Festplatte" >&2
-    printf '%2d  %s\n' 11 "Uptime Kuma · öffentliche Statusseite mit Ping" >&2
+    printf '%2d  %s\n' 11 "UPPER · öffentliche Statusseite mit Ping" >&2
         printf ' Z  Zurück\nAuswahl: ' >&2
         read -r result || return 1
     fi
@@ -1783,7 +1870,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 162" \
+                    --title "HAUPTMENÜ · Version 163" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -6181,7 +6268,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="a74c21de705338e649ad7f3f5f911790ce9620b0"
+TOOLS_REF="a80a21db36b98296975fedc5f41f66e9a047a1e2"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
 
@@ -8107,7 +8194,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V162",
+    "installer_version": "V163",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8581,7 +8668,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V162 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V163 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8932,7 +9019,7 @@ while true; do
     fi
 
     if [[ "$INSTALL_SELECTION" == "23" ]]; then
-        install_kuma_public_status_v155 || warn "Kuma-Statusansicht konnte nicht installiert werden."
+        install_upper_public_status_v163 || warn "UPPER konnte nicht installiert werden."
         continue
     fi
 
@@ -9367,11 +9454,11 @@ DATA_ROOT="/home/Data"
 UPTIME_DATA_DIR="${DATA_ROOT}/uptime-kuma"
 
 prepare_persistent_data_base() {
-    mkdir -p         "$DATA_ROOT"         "$UPTIME_DATA_DIR"
-
-    chmod 755         "$DATA_ROOT"         "$UPTIME_DATA_DIR"
-
-    chown -R 100000:100000 "$UPTIME_DATA_DIR" 2>/dev/null || true
+    mkdir -p "$DATA_ROOT"
+    # Initialize only a new directory; never reset database ownership.
+    if [[ ! -e "$UPTIME_DATA_DIR" ]]; then
+        install -d -m 0755 -o 100000 -g 100000 "$UPTIME_DATA_DIR"
+    fi
 }
 
 prepare_image_cache_base() {
@@ -11612,9 +11699,9 @@ create_docker_app_lxc() {
         [[ -n "$persistent_source" && -n "$persistent_mount" ]] || \
             die "${hostname}: persistenter Source/Mount muss vollständig angegeben werden."
 
-        mkdir -p "$persistent_source"
-        chown -R 100000:100000 "$persistent_source" 2>/dev/null || true
-        chmod 755 "$persistent_source"
+        if [[ ! -e "$persistent_source" ]]; then
+            install -d -m 0755 -o 100000 -g 100000 "$persistent_source"
+        fi
 
         extra_mount=(
             --mp3
@@ -11724,7 +11811,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="2a7bc47bb340dfbeb052b3d494e43d269e378ab8"
+NODEZERO_MODULE_REF="e303f40c361017499db77683c4fb5cfdd60c0e9d"
 NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
 
 load_nodezero_module_v140() {

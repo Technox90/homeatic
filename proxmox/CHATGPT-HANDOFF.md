@@ -1,6 +1,6 @@
 # ChatGPT-Handoff · Proxmox / NodeZero
 
-Stand: 24.11.2026
+Stand: 25.11.2026
 
 Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens oder sonstige Secrets hier eintragen.
 
@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V162
+- Aktueller Installationskandidat: V163
 - External-URL-Tool: `proxmox/tools/nodezero-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -428,3 +428,9 @@ Wichtig:
 
 Setze die Arbeit auf Basis des aktuellen GitHub-Stands fort.
 ```
+
+## V163 · UPPER
+
+- UPPER: eigenständige Statusseite unter `/upper/`, Dateien in `/var/www/upper/`, Logo/Favicon bleiben bei Updates erhalten; Copyright und GitHub-Link, interaktive Ping-Diagramme mit Maus, Touch und Tastatur.
+- Originale Kuma-Statusseiten bleiben unverändert. Opt-in-Updates migrieren alte Installationen; Nginx-Prüfung mit Rücksicherung.
+- Dashboard: SVG-Symbole für Neustart und Herunterfahren. Uptime Kuma: Datenbank-Besitzrechte nicht rekursiv zurücksetzen, Health- und HTTP-Prüfung nach Updates.
