@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# NodeZero Dashboard-Ansichten v1: GitHub-Download, Cache und Offline-Wechsel
+# Dashboard-Ansichten v1: GitHub-Download, Cache und Offline-Wechsel
 set -Eeuo pipefail
 umask 022
 
 REMOTE="https://raw.githubusercontent.com/Technox90/homeatic/main/dashboard/views"
-CACHE="/home/downloads/nodezero/dashboard-views/v2"
-STATIC="/opt/nodezero/dashboard/static"
-TARGET="$STATIC/nodezero-views"
+CACHE="/home/downloads/proxmox/dashboard-views/v3"
+STATIC="/opt/dashboard/static"
+TARGET="$STATIC/proxmox-views"
 INDEX="$STATIC/index.html"
 STATE="/etc/pve-sensor-dashboard/dashboard-view"
-BACKUPS="/home/backups/nodezero-dashboard-views"
+BACKUPS="/home/backups/proxmox-dashboard-views"
 VIEWS=(boot live telemetry glass status)
 FILES=(boot.css live.css telemetry.css glass.css status.css runtime.js)
 
@@ -83,7 +83,7 @@ activate() {
   mkdir -p "$TARGET" "$(dirname "$STATE")" "$BACKUPS"
   chmod 0755 "$TARGET"
 
-  if ! grep -Fq '<!-- NODEZERO-VIEWS-START -->' "$INDEX"; then
+  if ! grep -Fq '<!-- PROXMOX-VIEWS-START -->' "$INDEX"; then
     stamp="$(date +%Y%m%d-%H%M%S)"
     cp -a "$INDEX" "$BACKUPS/index-before-views-$stamp.html"
     echo "[BACKUP] Dashboard-HTML gesichert."
@@ -92,7 +92,7 @@ activate() {
   atomic_copy "$CACHE/$id.css" "$TARGET/active.css"
   atomic_copy "$CACHE/runtime.js" "$TARGET/runtime.js"
   tmp="$(mktemp "$TARGET/.active.XXXXXX")"
-  printf 'window.NODEZERO_DASHBOARD_VIEW="%s";\n' "$id" > "$tmp"
+  printf 'window.PROXMOX_DASHBOARD_VIEW="%s";\n' "$id" > "$tmp"
   chmod 0644 "$tmp"
   mv -f "$tmp" "$TARGET/active.js"
 
@@ -102,24 +102,24 @@ import os, re, sys
 from pathlib import Path
 p = Path(sys.argv[1])
 html = p.read_text(encoding="utf-8")
-start = "<!-- NODEZERO-VIEWS-START -->"
-end = "<!-- NODEZERO-VIEWS-END -->"
+start = "<!-- PROXMOX-VIEWS-START -->"
+end = "<!-- PROXMOX-VIEWS-END -->"
 v = os.environ["NZ_VIEW_REV"]
 block = (f'{start}\n'
-         f'<link rel="stylesheet" href="/nodezero-views/active.css?v={v}">\n'
-         f'<script defer src="/nodezero-views/active.js?v={v}"></script>\n'
-         f'<script defer src="/nodezero-views/runtime.js?v={v}"></script>\n'
+         f'<link rel="stylesheet" href="/proxmox-views/active.css?v={v}">\n'
+         f'<script defer src="/proxmox-views/active.js?v={v}"></script>\n'
+         f'<script defer src="/proxmox-views/runtime.js?v={v}"></script>\n'
          f'{end}')
 if start in html or end in html:
     pattern = re.compile(re.escape(start)+r".*?"+re.escape(end), re.S)
     if not pattern.search(html):
-        raise SystemExit("FEHLER: NodeZero-Ansichtsmarker beschädigt.")
+        raise SystemExit("FEHLER: Proxmox-Ansichtsmarker beschädigt.")
     html = pattern.sub(lambda _: block, html, count=1)
 elif "</head>" in html:
     html = html.replace("</head>", block+"\n</head>", 1)
 else:
     raise SystemExit("FEHLER: Dashboard <head> fehlt.")
-new = p.with_name(p.name+".nodezero-new")
+new = p.with_name(p.name+".proxmox-new")
 new.write_text(html, encoding="utf-8")
 new.chmod(0o644)
 new.replace(p)
@@ -150,7 +150,7 @@ menu() {
   need_dashboard
   if command -v whiptail >/dev/null 2>&1 && [[ -t 2 ]]; then
     choice="$(whiptail \
-      --backtitle "NodeZero · GitHub-Pakete lokal gespeichert" \
+      --backtitle "Proxmox · GitHub-Pakete lokal gespeichert" \
       --title "DASHBOARD ANSICHT AUSWÄHLEN" \
       --ok-button "Anwenden" --cancel-button "Zurück" \
       --menu "Aktiv: $(current_view)\nEin Wechsel funktioniert auch offline." \

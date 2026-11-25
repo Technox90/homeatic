@@ -1,4 +1,4 @@
-/* NodeZero Dashboard Toolbar V153 */
+/* Dashboard Toolbar V153 */
 function imageHasVisiblePixelsV153(img){
   try{
     const max=64;
@@ -33,7 +33,7 @@ function toggleNavV153(){
 
 function configureBrandMenuV153(button,settings){
   if(!button)return;
-  const text=String(settings?.logo_text||'NODEZERO').trim()||'NODEZERO';
+  const text=String(settings?.logo_text||'PROXMOX').trim()||'PROXMOX';
 
   button.id='brandMenuToggleV153';
   button.classList.add('brandMenuToggleV153');
@@ -165,7 +165,7 @@ if(typeof setUpsTopState==='function'){
     ){
       text.textContent='USV Online';
     }
-    ensureToolbarLayoutV153(window.__nodezeroUiSettingsV153||{});
+    ensureToolbarLayoutV153(window.__proxmoxUiSettingsV153||{});
     return result;
   };
 }
@@ -175,6 +175,6 @@ setTimeout(async()=>{
   try{
     settings=await getJSON('/api/ui-settings');
   }catch(e){}
-  window.__nodezeroUiSettingsV153=settings||{};
+  window.__proxmoxUiSettingsV153=settings||{};
   applyBrandingV153(settings||{});
 },0);
