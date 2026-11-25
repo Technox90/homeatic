@@ -13,8 +13,8 @@ const ctx={localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.
 vm.createContext(ctx);
 vm.runInContext(snippet,ctx);
 assert.equal(vm.runInContext('prefs.enabled',ctx),true);
-assert.equal(vm.runInContext('prefs.volume',ctx),50);
-assert.equal(vm.runInContext('prefs.tone',ctx),'soft');
+assert.equal(vm.runInContext('prefs.volume',ctx),100);
+assert.equal(vm.runInContext('prefs.tone',ctx),'modern');
 assert.equal(vm.runInContext('normalizeSound({enabled:false,volume:200}).volume',ctx),100);
 vm.runInContext('remember(170);remember(151)',ctx);
 assert.equal(vm.runInContext('lastHeard()',ctx),170);
@@ -26,3 +26,8 @@ assert.equal(vm.runInContext('normalizeSound({tone:"bell"}).tone',ctx),'bell');
 assert.equal(vm.runInContext('Object.values(tones).every(t=>t.length>=2&&t.length<=3)',ctx),true);
 assert.match(source,/box.hidden=!valid/);
 assert.match(source,/step="1" data-sound-volume/);
+
+assert.equal(vm.runInContext('isQuiet({quiet:true,quietFrom:"22:00",quietTo:"07:00"},new Date(2026,0,1,23,0))',ctx),true);
+assert.equal(vm.runInContext('isQuiet({quiet:true,quietFrom:"22:00",quietTo:"07:00"},new Date(2026,0,1,12,0))',ctx),false);
+assert.equal(vm.runInContext('normalizeSound({tone:"soft",volume:45}).volume',ctx),45);
+assert.match(source,/settingsHubPanelUpdates/);
