@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen Homelab
 
 ## Aktueller Stand
 
-**Aktueller Stand: V168 · Proxmox Master Installer · 25.11.2026**
+**Aktueller Stand: V169 · Proxmox Master Installer · 25.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -136,6 +136,10 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 > Reset-/Neuaufbau-Funktionen können VMs/LXC oder Dashboard-Daten entfernen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V169
+
+- Seitenmenü: Nur die Diensteliste mit Kategorien scrollt. Einstellungen und GitHub bleiben mit einer durchgehenden Trennlinie am unteren Rand sichtbar, auf Desktop und Mobilgeräten. Bestehende Links und Kategorien bleiben unverändert.
 
 ### V168
 
