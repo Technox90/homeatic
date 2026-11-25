@@ -401,7 +401,7 @@ prepare_dashboard_update_mode_v152() {
 # Der Ref zeigt auf den unveränderlichen Commit, in dem die V139-Basisdateien
 # abgelegt wurden. Dadurch kann ein späteres main-Update keinen alten Installer
 # mit inkompatiblen Dashboard-Dateien mischen.
-PROXMOX_DASHBOARD_ASSET_REF="a270f7a9c308845065b5179f7b1f75f56912d2f9"
+PROXMOX_DASHBOARD_ASSET_REF="4fb2b8680de1042f55088f5ed1f68015122e5dcc"
 PROXMOX_DASHBOARD_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_DASHBOARD_ASSET_REF}/dashboard"
 
 download_dashboard_asset_v139() {
@@ -23196,7 +23196,7 @@ PYV151READ
 install_dashboard_branding_v154() {
     header "DASHBOARD · TOOLBAR / BRANDING"
 
-    local ref="a270f7a9c308845065b5179f7b1f75f56912d2f9"
+    local ref="4fb2b8680de1042f55088f5ed1f68015122e5dcc"
     local index="/opt/dashboard/static/index.html"
     local asset_dir="/opt/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"
