@@ -61,7 +61,10 @@
       ring.setAttribute("aria-hidden","true");
       const title=document.createElement("strong");
       title.className="view-boot-title";
-      title.textContent="DASHBOARD";
+      const configuredName=()=>String(window.__proxmoxUiSettings?.website_name||document.getElementById("websiteTitle")?.textContent||document.querySelector(".top .brand h1")?.textContent||"").trim();
+      title.textContent=configuredName();
+      const nameEvent=e=>{const name=String(e.detail?.website_name||configuredName()).trim();if(name)title.textContent=name;};
+      window.addEventListener("dashboard-branding-ready",nameEvent);
       const sub=document.createElement("span");
       sub.className="view-boot-sub";
       sub.textContent="SYSTEMDATEN WERDEN GELADEN";
@@ -71,6 +74,7 @@
       function finish() {
         if(finished)return;
         finished=true;
+        window.removeEventListener("dashboard-branding-ready",nameEvent);
         overlay.classList.add("view-finished");
         window.setTimeout(()=>overlay.remove(),650);
       }

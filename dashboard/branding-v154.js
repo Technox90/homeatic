@@ -278,6 +278,7 @@ function applyDashboardBranding(settings){
   settings=settings||{};
   const website=String(settings.website_name||'PVE Hardware Monitor').trim()||'PVE Hardware Monitor';
   tabName=website;
+  window.dispatchEvent(new CustomEvent('dashboard-branding-ready',{detail:{website_name:website}}));
   refreshTabTitle();
 
   const h1=
