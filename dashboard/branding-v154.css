@@ -165,3 +165,17 @@ body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-w
 .browserTabActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
 .browserTabActions [role=status]{color:var(--muted);font-size:12px}
 @media(max-width:480px){.browserTabChoices{grid-template-columns:1fr}}
+
+/* V172: viewport-safe unified settings, independent of the active tab. */
+#settingsHubModal.show{position:fixed!important;inset:0!important;z-index:150!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important;box-sizing:border-box;overflow:hidden!important}
+#settingsHubModal .settingsHubDialog{box-sizing:border-box;display:flex!important;flex-direction:column;min-height:0;max-height:calc(100vh - 24px)!important;max-height:calc(100dvh - 24px)!important;width:min(980px,100%);overflow:hidden!important;margin:0!important}
+#settingsHubModal .settingsHubHeader,#settingsHubModal .settingsHubTabs{flex:0 0 auto;min-width:0}
+#settingsHubModal .settingsHubTabs{flex-wrap:wrap;gap:6px}
+#settingsHubPanelsHostV81{flex:1 1 auto;min-height:0;overflow:auto!important;overscroll-behavior:contain;padding-bottom:12px;box-sizing:border-box}
+#settingsHubPanelsHostV81>.settingsHubPanel.active{min-width:0;max-height:none!important;overflow:visible!important}
+#settingsHubPanelsHostV81>.settingsHubPanel>.dialog{max-height:none!important;overflow:visible!important;min-width:0}
+#settingsHubPanelsHostV81 .modalButtons{position:sticky;bottom:0;z-index:2;background:var(--panel,#111c2a);padding:10px 0;flex-wrap:wrap}
+#dashboardUpdateSoundSettings input[type=range]{flex:1 1 auto;min-width:0;width:auto!important;accent-color:var(--accent)}
+#dashboardUpdateSoundSettings [data-sound-value]{flex:0 0 4.5em;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+#proxmox-installer-update[hidden]{display:none!important}
+@media(max-width:600px){#settingsHubModal.show{padding:6px!important}#settingsHubModal .settingsHubDialog{max-height:calc(100dvh - 12px)!important;padding:12px!important}#settingsHubModal .settingsHubTabs{flex-wrap:nowrap;overflow-x:auto}#settingsHubModal .settingsHubTab{flex:none}#settingsHubModal .settingsHubHeader{gap:6px}}

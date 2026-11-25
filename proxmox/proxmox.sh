@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V171
+# PROXMOX MODULARER KOMPLETT-INSTALLER V172
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V171"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V171"
+TUI_TITLE="PROXMOX INSTALLER V172"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V172"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1883,7 +1883,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 171" \
+                    --title "HAUPTMENÜ · Version 172" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8207,7 +8207,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V171",
+    "installer_version": "V172",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8681,7 +8681,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V171 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V172 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8888,9 +8888,21 @@ js="""(() => {
 const soundKey='dashboard.updateSoundSettings';
 const heardKey='dashboard.updateSoundLastVersion';
 const defaults={enabled:true,tone:'soft',volume:50};
+const tones={
+ soft:{label:'Soft Chime (Standard)',length:2.5,notes:[[0,523.25],[.45,659.25],[.9,783.99]],partials:[[1,1],[2,.12],[3,.05]]},
+ bell:{label:'Classic Bell',length:2.5,notes:[[0,660],[.55,660]],partials:[[1,1],[2.01,.3],[2.76,.2],[5.4,.07]]},
+ double:{label:'Doorbell (Ding-Dong)',length:2.3,notes:[[0,659.25],[.65,523.25]],partials:[[1,1],[2,.22],[3,.06]]},
+ crystal:{label:'Crystal',length:2.5,notes:[[0,880],[.35,1174.66],[.75,1318.51]],partials:[[1,1],[2.1,.18],[3.8,.07]]},
+ westminster:{label:'Westminster',length:3,notes:[[0,659.25],[.48,523.25],[.96,587.33],[1.44,392]],partials:[[1,1],[2.76,.22],[4.1,.09]]},
+ marimba:{label:'Marimba',length:2.4,notes:[[0,440],[.4,523.25],[.8,659.25]],partials:[[1,1],[4,.24],[9,.04]]},
+ digital:{label:'Digital Classic',length:2,notes:[[0,784],[.28,1046.5],[.65,784]],partials:[[1,1],[3,.14],[5,.04]]},
+ piano:{label:'Soft Piano',length:2.8,notes:[[0,392],[.4,523.25],[.8,659.25],[1.1,783.99]],partials:[[1,1],[2,.24],[3,.1],[4,.04]]},
+ retro:{label:'Retro Bell',length:2.5,notes:[[0,698.46],[.22,880],[.65,698.46],[.87,880]],partials:[[1,1],[2,.3],[3,.12]]},
+ modern:{label:'Modern Chime',length:2.5,notes:[[0,440],[.3,554.37],[.6,659.25],[.95,880]],partials:[[1,1],[2,.08],[3,.03]]}
+};
 function normalizeSound(value){
  const v=value||{};
- return {enabled:v.enabled!==false,tone:['soft','bell','double'].includes(v.tone)?v.tone:'soft',volume:typeof v.volume==='number'&&Number.isFinite(v.volume)?Math.max(0,Math.min(100,v.volume)):50};
+ return {enabled:v.enabled!==false,tone:Object.prototype.hasOwnProperty.call(tones,v.tone)?v.tone:'soft',volume:typeof v.volume==='number'&&Number.isFinite(v.volume)?Math.max(0,Math.min(100,v.volume)):50};
 }
 function readSound(){try{return normalizeSound(JSON.parse(localStorage.getItem(soundKey)))}catch{return {...defaults}}}
 let prefs=readSound(),context=null,pending=null,playing=false,heard=0;
@@ -8902,21 +8914,28 @@ function getContext(){
  if(!context)context=new Audio();
  return context;
 }
+let busyUntil=0;
 function playSound(){
  const ctx=getContext();
- if(!ctx||ctx.state!=='running'||prefs.volume===0)return false;
- const sequences={soft:[[0,523.25],[0.45,659.25],[0.9,783.99]],bell:[[0,659.25],[0.65,880]],double:[[0,587.33],[0.85,698.46]]};
- const start=ctx.currentTime+0.03;
- const notes=sequences[prefs.tone];
- notes.forEach(([offset,hz])=>{
-   const osc=ctx.createOscillator(),gain=ctx.createGain();
-   const t=start+offset,duration=2.5-offset;
-   osc.type='sine';osc.frequency.value=hz;
-   gain.gain.setValueAtTime(0.0001,t);
-   gain.gain.exponentialRampToValueAtTime(Math.max(0.0002,0.09*prefs.volume/100),t+0.04);
-   gain.gain.exponentialRampToValueAtTime(0.0001,t+duration);
-   osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+duration+0.02);
- });
+ if(!ctx||ctx.state!=='running'||prefs.volume===0||ctx.currentTime<busyUntil)return false;
+ const tone=tones[prefs.tone],start=ctx.currentTime+.03;
+ const master=ctx.createGain();
+ master.gain.value=.12*prefs.volume/100;
+ master.connect(ctx.destination);
+ busyUntil=start+tone.length+.03;
+ for(const [offset,hz] of tone.notes){
+   for(const [ratio,level] of tone.partials){
+     const osc=ctx.createOscillator(),gain=ctx.createGain(),t=start+offset;
+     const stop=start+tone.length;
+     osc.type='sine';osc.frequency.value=hz*ratio;
+     gain.gain.setValueAtTime(.0001,t);
+     gain.gain.exponentialRampToValueAtTime(level/ tone.notes.length,t+.025);
+     gain.gain.exponentialRampToValueAtTime(.0001,stop);
+     osc.connect(gain);gain.connect(master);osc.start(t);osc.stop(stop+.01);
+     osc.onended=()=>{osc.disconnect();gain.disconnect()};
+   }
+ }
+ window.setTimeout(()=>{master.disconnect();notify()},(tone.length+.15)*1000);
  return true;
 }
 async function notify(){
@@ -8951,12 +8970,13 @@ function installSoundPanel(){
  if(!anchor)return;
  const panel=document.createElement('section');
  panel.id='dashboardUpdateSoundSettings';panel.className='browserTabSettings';
- panel.innerHTML='<h3>Update-Benachrichtigungston</h3><label><input type="checkbox" data-sound-enabled> Benachrichtigungston aktivieren</label><label>Klang <select data-sound-tone><option value="soft">Sanftes Klingeln (Standard)</option><option value="bell">Klassisches Klingeln</option><option value="double">Doppelter Signalton</option></select></label><label>Lautstärke <input type="range" min="0" max="100" step="5" data-sound-volume> <span data-sound-value></span></label><div class="browserTabActions"><button type="button" data-sound-test>Testton abspielen</button><button type="button" data-sound-reset>Standard wiederherstellen</button><span role="status" data-sound-message></span></div>';
+ panel.innerHTML='<h3>Update-Benachrichtigungston</h3><label><input type="checkbox" data-sound-enabled> Benachrichtigungston aktivieren</label><label>Klang <select data-sound-tone>'+Object.entries(tones).map(([key,t])=>'<option value="'+key+'">'+t.label+'</option>').join('')+'</select></label><label>Lautstärke <input type="range" min="0" max="100" step="1" data-sound-volume> <span data-sound-value></span></label><div class="browserTabActions"><button type="button" data-sound-test>Testton abspielen</button><button type="button" data-sound-reset>Standard wiederherstellen</button><span role="status" data-sound-message></span></div>';
  anchor.before(panel);
  function save(){try{localStorage.setItem(soundKey,JSON.stringify(prefs))}catch{}syncSoundPanel()}
  panel.addEventListener('input',()=>{prefs=normalizeSound({enabled:panel.querySelector('[data-sound-enabled]').checked,tone:panel.querySelector('[data-sound-tone]').value,volume:Number(panel.querySelector('[data-sound-volume]').value)});save();notify()});
  panel.querySelector('[data-sound-reset]').addEventListener('click',()=>{prefs={...defaults};save();notify()});
- panel.querySelector('[data-sound-test]').addEventListener('click',async()=>{const msg=panel.querySelector('[data-sound-message]');try{const ctx=getContext();if(ctx&&ctx.state!=='running')await ctx.resume();msg.textContent=playSound()?'Testton wird abgespielt.':'Ton nicht verfügbar oder Lautstärke 0 %.'}catch{msg.textContent='Audiowiedergabe vom Browser blockiert.'}});
+ let testTimer;
+ panel.querySelector('[data-sound-test]').addEventListener('click',async()=>{const msg=panel.querySelector('[data-sound-message]');window.clearTimeout(testTimer);try{const ctx=getContext();if(ctx&&ctx.state!=='running')await ctx.resume();msg.textContent=playSound()?'Testton wird abgespielt.':'Ton läuft bereits oder ist nicht verfügbar.'}catch{msg.textContent='Audiowiedergabe vom Browser blockiert.'}testTimer=window.setTimeout(()=>{msg.textContent=''},(tones[prefs.tone].length+.2)*1000)});
  syncSoundPanel();
 }
 installSoundPanel();
@@ -8977,7 +8997,8 @@ const refresh = async () => {
    const valid=Number.isSafeInteger(s.remote)&&Number.isSafeInteger(s.local)&&s.remote>s.local&&s.status==='available'&&Number.isFinite(checked)&&Date.now()-checked<3600000;
    pending=valid?s.remote:null;
    notify();
-   box.hidden=s.status==='current' && Date.now()-Date.parse(s.checked)<3600000;
+   box.hidden=!valid;
+   if(!valid){box.replaceChildren();return;}
    box.replaceChildren();
    const label=document.createElement('strong');
    label.textContent=valid?'Installer-Update verfügbar: V'+s.remote:s.status==='local_newer'?'Lokaler Installer neuer als main':'Installer-Updateprüfung nicht aktuell / fehlgeschlagen';
@@ -8986,7 +9007,7 @@ const refresh = async () => {
      const detail=document.createElement('div'); detail.textContent='Lokal V'+s.local+' · GitHub V'+s.remote;box.append(detail);
      const link=document.createElement('a');link.href='https://github.com/Technox90/homeatic/blob/main/proxmox/HISTORY.md';link.textContent='Versionshistorie öffnen';link.target='_blank';link.rel='noopener noreferrer';link.style.color='#8dd8ff';box.append(link);
    }
- } catch {pending=null;box.hidden=false;box.textContent='Installer-Updateprüfung: keine Daten';}
+ } catch {pending=null;box.hidden=true;box.replaceChildren();}
 };
 refresh();setInterval(refresh,60000);
 })();"""
