@@ -9,7 +9,7 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V167
+- Aktueller Installationskandidat: V168
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
@@ -456,3 +456,7 @@ Für bestehende Hosts zuerst die dokumentierte Layout-Migration ausführen. Zert
 ## V167
 
 - Netzwerk- und Datenträger-Übertragungsraten in dezimalen B/s, kB/s, MB/s, GB/s bzw. TB/s (Faktor 1000), einschließlich Diagrammachsen. Automatische Skalierung; Rohdaten, Speichergrößen und RAM-Einheiten unverändert.
+
+## V168
+
+- Browser-Tab: Leistungsanzeige einheitlich als `Leistung 19,60 W` statt `Teil 19,60 W`; Messwertberechnung und Kennzeichnung der Teilleistung im Dashboard bleiben unverändert.

@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V167**
+**Dashboard-Stand: V168**
 
 Dateien:
 
@@ -16,6 +16,10 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## V168
+
+- Browser-Tab: Leistungsanzeige einheitlich als `Leistung 19,60 W` statt `Teil 19,60 W`; Messwertberechnung und Kennzeichnung der Teilleistung im Dashboard bleiben unverändert.
 
 ## V167
 

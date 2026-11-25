@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V167 · 25.11.2026**
+**Installationskandidat: V168 · 25.11.2026**
 
 ## V164 · Einmalige Migration bestehender Installationen
 
@@ -318,6 +318,10 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 > **Achtung:** Optimal-, Reset- und Neuaufbau-Funktionen können bestehende VMs/LXC oder Dashboard-Daten löschen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V168
+
+- Browser-Tab: Leistungsanzeige einheitlich als `Leistung 19,60 W` statt `Teil 19,60 W`; Messwertberechnung und Kennzeichnung der Teilleistung im Dashboard bleiben unverändert.
 
 ### V167
 
