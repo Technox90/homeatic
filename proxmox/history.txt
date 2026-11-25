@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+25.11.2026 – V165 · Ladeanimation ohne Dashboard-Präfix
+--------------------------------------------------------
+- Ladeanimation: führendes Wort „Dashboard“ wird ausschließlich im Ladebildschirm entfernt (z. B. `Dashboard LT-WBH` → `LT-WBH`). Gespeicherter Name, Seitentitel, Tab-Titel und Branding bleiben unverändert.
+
 25.11.2026 – V164 · Eigenständiger Installer und Dashboard-Name
 -------------------------------------------------------------
 - Dashboard unter `/opt/dashboard/`; persönliche Dateien bleiben unter `static/assets/` erhalten.

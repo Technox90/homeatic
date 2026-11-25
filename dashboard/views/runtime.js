@@ -1,6 +1,9 @@
 /* Dashboard Views v1 — frontend only, never mutates server state */
 (() => {
   "use strict";
+  function bootDisplayName(value) {
+    return String(value ?? "").trim().replace(/^dashboard(?:\s*[-–—:|·]\s*|\s+|$)/i, "").trim();
+  }
   const id = window.PROXMOX_DASHBOARD_VIEW || "boot";
   const reduce = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -62,8 +65,8 @@
       const title=document.createElement("strong");
       title.className="view-boot-title";
       const configuredName=()=>String(window.__proxmoxUiSettings?.website_name||document.getElementById("websiteTitle")?.textContent||document.querySelector(".top .brand h1")?.textContent||"").trim();
-      title.textContent=configuredName();
-      const nameEvent=e=>{const name=String(e.detail?.website_name||configuredName()).trim();if(name)title.textContent=name;};
+      title.textContent=bootDisplayName(configuredName());
+      const nameEvent=e=>{title.textContent=bootDisplayName(e.detail?.website_name||configuredName());};
       window.addEventListener("dashboard-branding-ready",nameEvent);
       const sub=document.createElement("span");
       sub.className="view-boot-sub";
