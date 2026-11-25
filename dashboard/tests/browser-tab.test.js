@@ -6,15 +6,17 @@ const last=source.lastIndexOf('})();');
 assert.ok(last>0);
 const doc={title:'Dashboard LT-WBH',visibilityState:'visible',readyState:'loading',addEventListener(){}};
 let saved=null, timer=0;
+const originalBytes=v=>v+' MiB';
 const ctx=vm.createContext({
   document:doc,
   localStorage:{getItem(){return saved},setItem(k,v){saved=v}},
   window:{setTimeout(){return ++timer},clearTimeout(){},addEventListener(){}},
+  bytes:originalBytes,rate:v=>'legacy',draw:(id,series,opt)=>opt.y(1000000),
   setTimeout(){},console
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -63,3 +65,21 @@ t.setMetrics({cpu_power_w:17.2,dram_power_w:1.9});
 t.setSettings({active:['power'],update:false});
 assert.deepEqual(list(t.buildTabFrames('active')),['Teil 19,10 W']);
 console.log('Browser tab and local power regression tests passed');
+
+const rate=t.decimalTransferRate;
+assert.equal(rate(0),'0 B/s');
+assert.equal(rate(999),'999 B/s');
+assert.equal(rate(1000),'1 kB/s');
+assert.equal(rate(1000000),'1 MB/s');
+assert.equal(rate(1048576),'1,05 MB/s');
+assert.equal(rate(12500000),'12,5 MB/s');
+assert.equal(rate(1000000000),'1 GB/s');
+assert.equal(rate(999999),'1 MB/s');
+assert.equal(rate(null),'–');
+assert.equal(rate(-1),'–');
+assert.equal(ctx.rate(1000000),'1 MB/s');
+assert.equal(ctx.draw('cNet',[],{}),'1 MB/s');
+assert.equal(ctx.draw('cIO',[],{}),'1 MB/s');
+assert.equal(ctx.draw('cMem',[],{y:originalBytes}),'1000000 MiB');
+assert.equal(ctx.bytes,originalBytes);
+console.log('Decimal transfer rates passed');
