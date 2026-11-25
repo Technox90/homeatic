@@ -52,26 +52,30 @@ TUI-Konfiguration für den automatischen Update-Lauf. Unterstützt Status, tägl
 Eigenständiges TUI für Pushover. Verwaltet Empfänger, API-Zugangsdaten, Testnachrichten sowie Aktivieren/Deaktivieren. Die Zugangsdaten werden lokal mit restriktiven Dateiberechtigungen gespeichert; die optionale Gerätebindung kann durch Leeren des Feldes entfernt werden.
 
 
-## nodezero-external-urls
+## proxmox-external-urls
 
 TUI-/CLI-Werkzeug für den externen HTTPS-Zugriff auf installierte Webdienste.
 
 - fragt eine Hauptdomain und optional ein DynDNS-/CNAME-Ziel ab,
-- erkennt bekannte NodeZero-VMs/LXCs,
+- erkennt bekannte Proxmox-VMs/LXCs,
 - schlägt Subdomains automatisch vor,
 - erlaubt das Bearbeiten jedes einzelnen Hostnamens und Backends,
 - erlaubt zusätzliche eigene Reverse-Proxy-Ziele,
 - lässt sensible Admin-Oberflächen standardmäßig deaktiviert,
 - erzeugt nginx-VHosts auf Port 80/443,
 - beantragt/erweitert ein gemeinsames Let's-Encrypt-Zertifikat,
-- speichert Konfiguration, DNS-Vorgaben, Backups und Logs in der NodeZero-`/home`-Struktur.
+- speichert Konfiguration, DNS-Vorgaben, Backups und Logs in der Proxmox-`/home`-Struktur.
 
 Aufruf:
 
 ```bash
-nodezero-external-urls
-nodezero-external-urls --status
-nodezero-external-urls --reapply
+proxmox-external-urls
+proxmox-external-urls --status
+proxmox-external-urls --reapply
 ```
 
 `--reapply` ist nicht interaktiv und wird vom Master-Installer verwendet, um eine bestehende Konfiguration nach Gast-Installationen erneut mit aktuellen internen IP-Adressen zu verbinden.
+
+## proxmox-migrate-layout
+
+Einmalige Umstellung eines bestehenden Hosts ab V164. Vorprüfung ohne `--apply`, gesicherte Migration mit `--apply`, kein Gast-Reset. Siehe [Anleitung](../README.md#v164--einmalige-migration-bestehender-installationen).

@@ -1,5 +1,5 @@
-/* Legacy updater compatibility signature: NodeZero Dashboard Toolbar V154; dashboardFixedToolbarV154 */
-/* NodeZero Dashboard Toolbar */
+/* Legacy updater compatibility signature: Dashboard Toolbar V154; dashboardFixedToolbarV154 */
+/* Dashboard Toolbar */
 #dashboardFixedToolbar{
   position:fixed;inset:0 0 auto 0;z-index:120;min-height:76px;
   background:linear-gradient(180deg,rgba(8,16,27,.98),rgba(8,16,27,.9));
@@ -92,16 +92,16 @@ body.dashboardToolbarFixed .wrap{padding-top:22px}
 }
 
 /* System footer */
-.nodezeroHostInfoHidden{display:none!important}
-#nodezeroSystemFooter{
+.proxmoxHostInfoHidden{display:none!important}
+#proxmoxSystemFooter{
   margin:28px auto 0;padding:16px 20px 22px;
   border-top:1px solid var(--line,rgba(128,128,128,.25));
   text-align:center;font-size:11px;line-height:1.6;
   color:var(--muted,#8d9caf);overflow-wrap:anywhere;
 }
-#nodezeroSystemFooter .nodezeroFooterCredit{margin-top:4px}
-#nodezeroSystemFooter a{color:inherit;text-decoration:underline;text-underline-offset:2px}
-@media(max-width:760px){#nodezeroSystemFooter{padding:14px 12px 20px}}
+#proxmoxSystemFooter .proxmoxFooterCredit{margin-top:4px}
+#proxmoxSystemFooter a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+@media(max-width:760px){#proxmoxSystemFooter{padding:14px 12px 20px}}
 
 /* Mobile power actions: labels remain accessible; original click handlers stay intact. */
 #dashboardFixedToolbar .brandPowerIcon{display:inline-flex;line-height:1;vertical-align:middle}

@@ -18,10 +18,14 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 DNS_FILE = CONFIG_DIR / "dns-records.txt"
 DIAG_DIR = Path("/home/diagnose/external-urls")
 BACKUP_DIR = Path("/home/backups/external-urls")
-ACME_ROOT = Path("/var/www/nodezero-acme")
-ACME_CONF = Path("/etc/nginx/conf.d/nodezero-external-acme.conf")
-PROXY_CONF = Path("/etc/nginx/conf.d/nodezero-external.conf")
-CERT_NAME = "nodezero-external"
+ACME_ROOT = Path("/var/www/proxmox-acme")
+ACME_CONF = Path("/etc/nginx/conf.d/proxmox-external-acme.conf")
+PROXY_CONF = Path("/etc/nginx/conf.d/proxmox-external.conf")
+CERT_NAME = "proxmox-external"
+# Preserve an already issued certificate lineage; never rotate merely for a name change.
+_legacy_lineage = "nodezero-external"
+if Path("/etc/letsencrypt/renewal", _legacy_lineage + ".conf").is_file():
+    CERT_NAME = _legacy_lineage
 
 for path in (CONFIG_DIR, DIAG_DIR, BACKUP_DIR):
     path.mkdir(parents=True, exist_ok=True)
@@ -284,7 +288,7 @@ def build_catalog(saved=None):
 
     for key, label, prefix, default_on, sensitive in DEFAULTS:
         backend = ""
-        if key == "dash" and hip and Path("/opt/nodezero/dashboard/static/index.html").exists():
+        if key == "dash" and hip and Path("/opt/dashboard/static/index.html").exists():
             backend = f"https://{hip}"
         elif key == "pve" and hip:
             backend = f"https://{hip}:8006"
@@ -446,7 +450,7 @@ def write_dns(cfg):
         if cp.returncode == 0:
             ip = cp.stdout.strip()
     lines = [
-        "# NodeZero · externe URLs",
+        "# Proxmox · externe URLs",
         f"# Erstellt: {datetime.now().isoformat(timespec='seconds')}",
         "# TCP 80 und 443 müssen aus dem Internet auf den Proxmox-Host weitergeleitet sein.",
         "",
@@ -473,7 +477,7 @@ def write_acme(cfg):
     hosts = [proposed_host(s, cfg["base_domain"]) for s in enabled_services(cfg)]
     if not hosts:
         raise SystemExit("FEHLER: Keine aktive externe URL mit Backend ausgewählt.")
-    content = f"""# Automatisch verwaltet durch nodezero-external-urls.
+    content = f"""# Automatisch verwaltet durch proxmox-external-urls.
 server {{
     listen 80;
     listen [::]:80;
@@ -557,7 +561,7 @@ def proxy_server(service, cfg, cert_dir):
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $nodezero_connection_upgrade;
+        proxy_set_header Connection $proxmox_connection_upgrade;
         proxy_read_timeout 3600;
         proxy_send_timeout 3600;
 {ssl_extra}    }}
@@ -567,10 +571,10 @@ def proxy_server(service, cfg, cert_dir):
 
 def write_proxy(cfg, cert_dir):
     if PROXY_CONF.exists():
-        shutil.copy2(PROXY_CONF, BACKUP_DIR / f"nodezero-external-{STAMP}.conf")
+        shutil.copy2(PROXY_CONF, BACKUP_DIR / f"proxmox-external-{STAMP}.conf")
     text = [
-        "# Automatisch verwaltet durch nodezero-external-urls.",
-        "map $http_upgrade $nodezero_connection_upgrade {",
+        "# Automatisch verwaltet durch proxmox-external-urls.",
+        "map $http_upgrade $proxmox_connection_upgrade {",
         "    default upgrade;",
         "    '' close;",
         "}",
@@ -584,7 +588,7 @@ def write_proxy(cfg, cert_dir):
         raise SystemExit("FEHLER: nginx-Konfiguration ungültig. Backup liegt unter /home/backups/external-urls.")
     run(["systemctl", "reload", "nginx"], check=True, capture=False)
 
-    hook = Path("/etc/letsencrypt/renewal-hooks/deploy/20-nodezero-nginx-reload.sh")
+    hook = Path("/etc/letsencrypt/renewal-hooks/deploy/20-proxmox-nginx-reload.sh")
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/usr/bin/env bash\nset -e\nnginx -t\nsystemctl reload nginx\n", encoding="utf-8")
     hook.chmod(0o755)
@@ -669,7 +673,7 @@ def refresh_backends(cfg):
 
 def show_status(cfg):
     print("=" * 68)
-    print(" NODEZERO EXTERNE URLS")
+    print(" PROXMOX EXTERNE URLS")
     print("=" * 68)
     print(summary(cfg))
     print()

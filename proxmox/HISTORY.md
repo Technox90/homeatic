@@ -1,12 +1,19 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V163 · 25.11.2026**  
+> **Aktueller Stand: V164 · 25.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+25.11.2026 – V164 · Eigenständiger Installer und Dashboard-Name
+-------------------------------------------------------------
+- Dashboard unter `/opt/dashboard/`; persönliche Dateien bleiben unter `static/assets/` erhalten.
+- Neutrale Proxmox-Werkzeuge und lokale CA-Dateinamen; UPPER bleibt unabhängig unter `/var/www/upper/`.
+- Boot-Animation übernimmt exakt den gespeicherten Dashboard-Namen, ohne zusätzliches Präfix.
+- Bestehende Installationen erfordern eine einmalige, gesicherte Layout-Migration. Bestehende CA-Schlüssel, Zertifikate, Datenbanken und Gastdaten bleiben erhalten.
 
 25.11.2026 – V163 · UPPER und Stabilität
 ----------------------------------------
@@ -53,7 +60,7 @@
 - Auto-Updater repariert auch bestehende falsch platzierte Branding-Blöcke; Theme-Cache wird erneuert.
 - Regressionstest für externe Script-Tags und wiederholbare Dashboard-Aktualisierung.
 
-24.11.2026 – V156 · Automatische NodeZero-Komponentenupdates
+24.11.2026 – V156 · Automatische frühere Projektbezeichnung-Komponentenupdates
 ------------------------------------------------------------
 - Auto-Updater: drei unabhängige, standardmäßig ausgeschaltete Optionen für Master-Installer/Updater-Werkzeuge, verwaltete Dashboard-Oberfläche und vorhandene Kuma-Statusseite.
 - Abruf aus veröffentlichtem `main`-Commit; Installer-Syntaxprüfung, keine Downgrades, Backups und atomarer Dateiaustausch.
@@ -118,13 +125,13 @@
 - Alte V150-Branding-Dateien aus `main` entfernt; neuer generischer Stand: `dashboard/branding-v151.css` und `dashboard/branding-v151.js`.
 - Generische Bildpfade: `dashboard/assets/logo.png` und `dashboard/assets/favicon.png`.
 - Repository liefert für Neuinstallationen nur vollständig transparente, neutrale PNG-Platzhalter.
-- Zielpfade auf dem Server: `/opt/nodezero/dashboard/static/assets/logo.png` und `/opt/nodezero/dashboard/static/assets/favicon.png`.
+- Zielpfade auf dem Server: `/opt/legacy/dashboard/static/assets/logo.png` und `/opt/legacy/dashboard/static/assets/favicon.png`.
 - Normale Dashboard-Updates laden Logo/Favicon nicht aus GitHub und überschreiben, löschen oder ersetzen bestehende Bilddateien niemals.
 - Erst-/Neuinstallationen laden neutrale Platzhalter ausschließlich dann, wenn die jeweilige Bilddatei noch nicht vorhanden ist.
 - Bestehende V150-Installationen werden kompatibel migriert: vorhandene Legacy-Bilder werden nur byte-identisch auf die generischen Dateinamen kopiert, falls diese fehlen.
 - Ein normales Update übernimmt Dashboard-Name, Logo-Text, Logo-Stil und ein vorhandenes Custom-Favicon unverändert.
 - Abfragen für Dashboard-Name/Fallback-Logo-Text erfolgen nur bei Erst-/Neuinstallation; ein normales Update bleibt rückfragefrei für Branding.
-- Standardwerte sind jetzt generisch: `PVE Hardware Monitor`, Fallback-Text `NODEZERO`, Stil `neon`.
+- Standardwerte sind jetzt generisch: `PVE Hardware Monitor`, Fallback-Text `LEGACY`, Stil `neon`.
 - Ist `logo.png` leer/transparent oder nicht vorhanden, zeigt das Menü automatisch den konfigurierten Text-Fallback.
 - Ein vorhandenes über die Dashboard-Einstellungen hochgeladenes Favicon behält Vorrang; `favicon_url` wird bei Updates nicht zurückgesetzt.
 - Feste Toolbar bleibt erhalten: Menü · LIVE · USV Online · Neustart · Herunterfahren.
@@ -163,7 +170,7 @@
 - Branding wird persistent in `/etc/pve-sensor-dashboard/ui.json` gespeichert und bei späteren Farb-/HTTPS-/Favicon-Änderungen erhalten.
 - Neue modulare Assets: `dashboard/branding-v150.css` und `dashboard/branding-v150.js`.
 - Persönliche LT-WBH-Bilddateien fest im Repository ergänzt: `dashboard/assets/logo-lt-wbh.png` und `dashboard/assets/favicon-lt-wbh.png`.
-- Beide Dateien sind PNG mit echtem Alpha-Kanal/Transparenz und werden vom Installer geprüft und nach `/opt/nodezero/dashboard/static/assets/` installiert.
+- Beide Dateien sind PNG mit echtem Alpha-Kanal/Transparenz und werden vom Installer geprüft und nach `/opt/legacy/dashboard/static/assets/` installiert.
 - Bei `logo_text=LT-WBH` nutzt das Seitenmenü das feste PNG-Logo und der Browser das feste PNG-Favicon; andere Branding-Namen nutzen weiterhin das dynamische Design.
 - Dashboard-Modul und Master-Installer verwenden unveränderliche Commit-Pins; CI prüft V150-Marker, Modul-Pin und Branding-Assets.
 
@@ -184,7 +191,7 @@
 - Uptime Kuma ist für `https://up.ltwbh.de` vorgesehen.
 - Fehlerbild `curl (60) ... no alternative certificate subject name` als fehlender SAN im bestehenden Zertifikat `ltwbh-services` dokumentiert.
 - Sichere Reparatur dokumentiert: bestehende SANs automatisch übernehmen, `up.ltwbh.de` ergänzen, Zertifikat erweitern, `nginx -t`, Reload und curl-Test.
-- Wichtiger Migrationshinweis ergänzt: das Repository-Tool `nodezero-external-urls` verwendet `nodezero-external`, während die bestehende manuelle Produktivkonfiguration aktuell `ltwbh-services` nutzt; doppelte nginx-VHosts vermeiden.
+- Wichtiger Migrationshinweis ergänzt: das Repository-Tool `legacy-external-urls` verwendet `legacy-external`, während die bestehende manuelle Produktivkonfiguration aktuell `ltwbh-services` nutzt; doppelte nginx-VHosts vermeiden.
 - Direkt kopierbarer Startprompt für einen neuen Chat ergänzt.
 
 24.11.2026 – V149 · Uptime Kuma externe Standard-URL
@@ -201,7 +208,7 @@
 - Vor der Migration wird die Compose-Datei als `.pre-v148-stirling-registry.bak` gesichert.
 - Nach der Änderung wird `docker compose config -q` geprüft; bei Fehler wird das Backup automatisch wiederhergestellt.
 - Andere Docker-Dienste und deren Registries bleiben unverändert.
-- Der NodeZero-Tool-Pin wurde auf den geprüften V148-Updater-Stand aktualisiert.
+- Der frühere Projektbezeichnung-Tool-Pin wurde auf den geprüften V148-Updater-Stand aktualisiert.
 
 24.11.2026 – V147 · Automatisches Installer-Self-Update
 --------------------------------------------------------
@@ -210,7 +217,7 @@
 - Ein Download wird nur übernommen, wenn er nicht leer ist, den erwarteten Installer-Marker enthält und `bash -n` erfolgreich ist.
 - Vor dem Ersetzen wird die aktuell ausgeführte Datei unter `/home/backups/proxmox-installer-self-update/` gesichert.
 - Nach erfolgreichem Austausch startet die neue Installer-Version automatisch mit denselben Argumenten neu.
-- `NODEZERO_SELFUPDATE_DONE` verhindert eine Neustartschleife innerhalb desselben Starts.
+- `LEGACY_SELFUPDATE_DONE` verhindert eine Neustartschleife innerhalb desselben Starts.
 - Ist GitHub nicht erreichbar oder schlägt die Prüfung fehl, läuft die vorhandene lokale Installer-Version normal weiter.
 
 24.11.2026 – V146 · Logs, Updater und externe URLs
@@ -223,7 +230,7 @@
 - Kanonische Quelle ist nur noch proxmox/tools/proxmox-auto-updater; Master-Installer und manuelle Updates verwenden damit denselben Code.
 - Doppelte dashboard_link_upsert-Aufrufe in einzelnen App-Installationen wurden entfernt; die zentrale Abschluss-Synchronisierung bleibt bestehen.
 - Neuer Wartungspunkt 21: Externe URLs · Domain / Reverse Proxy / Let's Encrypt.
-- nodezero-external-urls erkennt installierte Webdienste und schlägt automatisch Subdomains wie dash.<domain>, ha.<domain>, paper.<domain>, vault.<domain> usw. vor.
+- legacy-external-urls erkennt installierte Webdienste und schlägt automatisch Subdomains wie dash.<domain>, ha.<domain>, paper.<domain>, vault.<domain> usw. vor.
 - Jede vorgeschlagene URL und interne Backend-URL kann einzeln bearbeitet werden; zusätzliche eigene Dienste können ergänzt werden.
 - Sensible Admin-Oberflächen wie Proxmox, Pi-hole, NPM, Prometheus und PVE-UPS sind standardmäßig nicht extern aktiviert.
 - Externe URLs werden als exakte nginx server_name-VHosts auf dem Proxmox-Host angelegt. Proxmox selbst bleibt nativ auf :8006; das lokale Dashboard behält 80/443.
@@ -232,12 +239,12 @@
 - Nach Installationen wird eine vorhandene External-URL-Konfiguration automatisch erneut auf aktuelle Gast-IP-Adressen angewendet.
 - GitHub-CI prüft ab V146 zusätzlich Pi-hole-Logpfade, die entdoppelte Updater-Quelle, Python-Syntax des URL-Tools und Menüpunkt 21.
 
-17.10.2026 – V145 · NodeZero Dashboard-Ansichten
+17.10.2026 – V145 · frühere Projektbezeichnung Dashboard-Ansichten
 ------------------------------------------------
 - Fünf GitHub-Darstellungsprofile: Boot Sequence, Live Pulse, Telemetry Flow, Glass Motion und Status Control.
 - Neue Auswahl: Basis-Systeme -> DV Dashboard-Ansicht wählen; kein Gast-Reset oder Dashboard-Neuaufbau erforderlich.
 - Alle fünf CSS-Pakete und ein gemeinsames Animationsskript werden lokal zwischengespeichert.
-- Offline-Wechsel über /usr/local/sbin/nodezero-dashboard-views; aktiver Stil bleibt bei Dashboard-Updates erhalten.
+- Offline-Wechsel über /usr/local/sbin/legacy-dashboard-views; aktiver Stil bleibt bei Dashboard-Updates erhalten.
 - Basis-HTML wird vor erstmaliger Integration gesichert; markerbasierte Integration ist wiederholbar.
 - Dashboard-Daten, Kategorien, Links, API, Power-Code und TLS bleiben unverändert.
 - Workflow prüft Bash-/JavaScript-Syntax und die fünf Pakete.
@@ -293,7 +300,7 @@
 - Separate Werkzeuge im Repository:
   * proxmox/tools/proxmox-auto-updater-config
   * proxmox/tools/proxmox-pushover-config
-- Beide Werkzeuge werden versionsgebunden aus einem unveränderlichen Git-Commit nach /root/downloads/nodezero/tools/<git-ref>/ geladen.
+- Beide Werkzeuge werden versionsgebunden aus einem unveränderlichen Git-Commit nach /root/downloads/legacy/tools/<git-ref>/ geladen.
 - Vor Installation wird jedes Werkzeug mit bash -n geprüft.
 - Auto-Updater-Menü an den Whiptail/TUI-Stil des Master-Installers angepasst.
 - Tägliche Update-Uhrzeit kann nachträglich im Format HH:MM geändert werden; Standard bleibt 05:00 Uhr.
@@ -323,7 +330,7 @@
   * Pi-hole-Dashboard-Einstellungen,
   * finale Dashboard-Prüfung und /usv-Shortcut.
 - Der Master-Installer lädt dashboard.sh über einen unveränderlichen Git-Commit.
-- Modul-Cache: /root/downloads/nodezero/modules/<git-ref>/dashboard.sh.
+- Modul-Cache: /root/downloads/legacy/modules/<git-ref>/dashboard.sh.
 - Vor dem source wird das heruntergeladene Modul immer mit bash -n geprüft.
 - Bereits vorhandene Moduldateien werden wiederverwendet und nicht erneut heruntergeladen.
 - Die Dashboard-Basisdateien collector.py, app.py und index.html bleiben weiterhin separat unter dashboard/.
@@ -332,30 +339,30 @@
   * /home/passwort für die lokale Secret-Sicherung,
   * /root/downloads für Downloads,
   * /home/img für permanente Images/Caches,
-  * /opt/nodezero für installierten Eigen-Code.
+  * /opt/legacy für installierten Eigen-Code.
 - OpenRGB, Paperless V138, Pi-hole, PVE-UPS und die übrigen Module bleiben im Master-Installer erhalten.
 - GitHub Actions prüft ab V140 Hauptinstaller, Dashboard-Modul und Python-Basisdateien separat.
 
 23.09.2026 – V139
 -----------------
-- Installer-Dateilayout auf feste NodeZero-Pfade umgestellt:
+- Installer-Dateilayout auf feste frühere Projektbezeichnung-Pfade umgestellt:
   * aktive Passwörter/Tokens/Secrets: /root/passwort/
   * lokale Secret-Sicherung: /home/passwort/
   * normale Downloads und wiederverwendbare kleine Artefakte: /root/downloads/
   * permanente Installations-/Image-Caches: /home/img/
-  * eigener installierter Anwendungscode: /opt/nodezero/
+  * eigener installierter Anwendungscode: /opt/legacy/
 - Bestehende Daten werden beim Start kompatibel übernommen:
   * /home/Images wird, wenn eindeutig möglich, nach /home/img migriert,
   * ein Legacy-Symlink /home/Images -> /home/img hält alte Pfade kompatibel,
   * /home/passwd wird nach /root/passwort und /home/passwort übernommen,
-  * /opt/pve-sensor-dashboard wird nach /opt/nodezero/dashboard verschoben und per Legacy-Symlink erreichbar gehalten.
+  * /opt/pve-sensor-dashboard wird nach /opt/legacy/dashboard verschoben und per Legacy-Symlink erreichbar gehalten.
 - Der Proxmox image-cache Storage wird auf /home/img umgestellt bzw. akzeptiert während der Migration den Legacy-Symlink.
 - Docker-/Paperless-/Ollama-/HAOS-/LXC-/ISO-Caches liegen damit dauerhaft unter /home/img und bleiben bei KOMPLETT NEU erhalten.
 - Dashboard-Grundquellen aus proxmox.sh ausgelagert:
   * dashboard/collector.py
   * dashboard/app.py
   * dashboard/index.html
-- Der Installer lädt diese Dateien versionsgebunden von einem unveränderlichen Git-Commit nach /root/downloads/dashboard/<asset-ref>/ und installiert sie nach /opt/nodezero/dashboard/.
+- Der Installer lädt diese Dateien versionsgebunden von einem unveränderlichen Git-Commit nach /root/downloads/dashboard/<asset-ref>/ und installiert sie nach /opt/legacy/dashboard/.
 - Bereits heruntergeladene Dashboard-Dateien werden wiederverwendet; GitHub muss bei Folgeläufen nicht erneut geladen werden.
 - Die bisherigen Dashboard-Migrations-/Patchfunktionen bleiben im Installer erhalten, damit bestehende Installationen weiterhin aktualisiert werden können.
 - Durch die erste Modularisierung sinkt proxmox.sh um rund 1.450 eingebettete Dashboard-Zeilen.
@@ -539,7 +546,7 @@
   * Warnung
   * Fehler
 - HTML-Farbwähler zeigen Änderungen sofort als Live-Vorschau im Dashboard.
-- „Standardfarben“ setzt alle Farbwähler auf die bisherigen NodeZero-Standardwerte zurück.
+- „Standardfarben“ setzt alle Farbwähler auf die bisherigen frühere Projektbezeichnung-Standardwerte zurück.
 - Schließen ohne Speichern stellt das zuletzt gespeicherte Farbschema wieder her.
 - Bestehende V131-ui.json-Dateien bleiben kompatibel; fehlende Theme-Werte werden automatisch mit den Standardfarben ergänzt.
 - Das Frontend wendet die gespeicherten Farben beim Laden über die vorhandenen CSS-Variablen an.
@@ -559,7 +566,7 @@
 - Der automatische Proxmox-/Dashboard-Sync schreibt ebenfalls direkt nach dns.hosts.
 - Pi-hole FTL erzeugt daraus selbst seine interne custom.list; Datei, DNS-Auflösung und WebUI bleiben damit konsistent.
 - Bereits manuell in Pi-hole gepflegte dns.hosts-Einträge bleiben erhalten.
-- Der Sync speichert nur die von NodeZero verwalteten Hostnamen in:
+- Der Sync speichert nur die von frühere Projektbezeichnung verwalteten Hostnamen in:
   /var/lib/pve-pihole-dns-sync/managed-hosts.json
   und ersetzt bei Folgeläufen ausschließlich diese Hostnamen.
 - Priorität bleibt:
@@ -583,7 +590,7 @@
 - Dashboard-Links werden nur übernommen, wenn die URL eine private RFC1918-IPv4 enthält. Öffentliche Ziele wie GitHub werden nicht übernommen.
 - Bekannte Dienste behalten kurze Namen wie homeassistant.lan, paperless.lan, pihole.lan, netalert.lan, uptime.lan, pdf.lan und ups.lan.
 - Weitere private Dashboard-Dienste erhalten automatisch einen normalisierten <name>.lan-Eintrag.
-- Die custom.list erhält einen klar markierten NODEZERO-MANAGED-Bereich; manuelle Einträge außerhalb bleiben erhalten.
+- Die custom.list erhält einen klar markierten LEGACY-MANAGED-Bereich; manuelle Einträge außerhalb bleiben erhalten.
 - Bei identischem Hostnamen gewinnt die automatisch ermittelte aktuelle IP, damit keine widersprüchlichen DNS-Dubletten entstehen.
 - Pi-hole wird nur neu gestartet, wenn sich die erzeugte custom.list tatsächlich ändert.
 - Automatik:
@@ -733,7 +740,7 @@
 - Fehler behoben: "proxmox.sh: line 11669: $4: unbound variable" beim Docker-Setup des Paperless-LXC.
 - Ursache: Der äußere Aufruf "bash -lc '...'" wurde durch einfache Quotes innerhalb von awk/sed/printf vorzeitig beendet.
   Dadurch wertete der Haupt-Installer unter "set -u" unter anderem das awk-Feld "$4" als eigenes, nicht gesetztes Script-Argument aus.
-- install_docker_in_ct() übergibt das Container-Script jetzt als literales Heredoc "NODEZERO_DOCKER_CT_V119" an "bash -lc".
+- install_docker_in_ct() übergibt das Container-Script jetzt als literales Heredoc "LEGACY_DOCKER_CT_V119" an "bash -lc".
 - Das eingebettete Script /usr/local/sbin/docker-cache-pull verwendet wieder ein normales literales <<'EOS'-Heredoc.
 - Dadurch bleiben awk-, sed-, tr- und printf-Ausdrücke vollständig im LXC-Kontext und werden nicht vom äußeren Proxmox-Installer interpretiert.
 - Installer-Version von V118 auf V119 aktualisiert:

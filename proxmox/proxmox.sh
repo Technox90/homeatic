@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V163
+# PROXMOX MODULARER KOMPLETT-INSTALLER V164
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -53,7 +53,7 @@ set -Eeuo pipefail
 #   V136: Paperless allauth Client-IP hinter nginx korrigiert; X-Real-IP statt HTTP_X_REAL_IP
 #   V137: Paperless Neuinstallation enthält vollständige HTTPS/CSRF/allauth-Proxy-Konfiguration + Abschlussprüfung
 #   V138: Paperless NAS-Inbox auf NFS per Consumer-Polling überwachen; Inbox-Zugriff bei Installation prüfen
-#   V139: NodeZero-Dateilayout + externes Dashboard-Quellpaket; Secrets/Downloads/Image-Cache sauber getrennt
+#   V139: Proxmox-Dateilayout + externes Dashboard-Quellpaket; Secrets/Downloads/Image-Cache sauber getrennt
 #   V140: vollständige Dashboard-Logik als versionsgebundenes GitHub-Modul ausgelagert
 #   V141: Auto-Updater und Pushover getrennt; Update-Uhrzeit frei änderbar; Pushover-Menü im TUI-Stil
 #   V142: Zurück aus Auto-Updater/Pushover kehrt in den Master-Installer zurück statt ihn zu beenden
@@ -107,13 +107,13 @@ command -v pveversion >/dev/null 2>&1 || {
 # V112: Ein Shell-Script gehört niemals nach /etc/apt/sources.list.d/.
 # Falls proxmox.sh versehentlich dort gestartet wurde, kopieren wir uns zuerst
 # an einen sicheren Ort und starten exakt dieselbe Version von dort neu.
-NODEZERO_SELF_PATH="$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
-if [[ "$NODEZERO_SELF_PATH" == /etc/apt/sources.list.d/* ]]; then
-    NODEZERO_SAFE_SCRIPT="/root/proxmox.sh"
-    echo "HINWEIS: Installer liegt im APT-Quellverzeichnis: $NODEZERO_SELF_PATH"
-    echo "         Kopiere ihn nach $NODEZERO_SAFE_SCRIPT und starte dort neu."
-    install -m 0755 -- "$NODEZERO_SELF_PATH" "$NODEZERO_SAFE_SCRIPT"
-    exec "$NODEZERO_SAFE_SCRIPT" "$@"
+PROXMOX_SELF_PATH="$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]}")"
+if [[ "$PROXMOX_SELF_PATH" == /etc/apt/sources.list.d/* ]]; then
+    PROXMOX_SAFE_SCRIPT="/root/proxmox.sh"
+    echo "HINWEIS: Installer liegt im APT-Quellverzeichnis: $PROXMOX_SELF_PATH"
+    echo "         Kopiere ihn nach $PROXMOX_SAFE_SCRIPT und starte dort neu."
+    install -m 0755 -- "$PROXMOX_SELF_PATH" "$PROXMOX_SAFE_SCRIPT"
+    exec "$PROXMOX_SAFE_SCRIPT" "$@"
 fi
 
 # -----------------------------------------------------------------------------
@@ -124,8 +124,8 @@ fi
 # Ein Update wird ausschließlich übernommen, wenn Download, Marker und
 # Bash-Syntaxprüfung erfolgreich sind. Danach wird die neue Version per exec
 # mit denselben Argumenten gestartet. Der Guard verhindert eine Neustartschleife.
-nodezero_self_update_v147() {
-    local self="$NODEZERO_SELF_PATH"
+proxmox_self_update_v147() {
+    local self="$PROXMOX_SELF_PATH"
     local url="https://raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh"
     local backup_dir="/home/backups/proxmox-installer-self-update"
     local tmp=""
@@ -134,7 +134,7 @@ nodezero_self_update_v147() {
     local local_version="unbekannt"
     local remote_version="unbekannt"
 
-    [[ "${NODEZERO_SELFUPDATE_DONE:-0}" == "1" ]] && return 0
+    [[ "${PROXMOX_SELFUPDATE_DONE:-0}" == "1" ]] && return 0
 
     echo
     echo "============================================================"
@@ -156,7 +156,7 @@ nodezero_self_update_v147() {
         return 0
     fi
 
-    tmp="$(mktemp /tmp/nodezero-proxmox-selfupdate.XXXXXX)" || {
+    tmp="$(mktemp /tmp/proxmox-proxmox-selfupdate.XXXXXX)" || {
         echo "[WARNUNG] Temporäre Update-Datei konnte nicht angelegt werden."
         return 0
     }
@@ -175,7 +175,7 @@ nodezero_self_update_v147() {
        ! head -n1 "$tmp" | grep -qx '#!/usr/bin/env bash' ||
        ! grep -q '^# PROXMOX MODULARER KOMPLETT-INSTALLER V[0-9][0-9]*$' "$tmp"
     then
-        echo "[WARNUNG] Heruntergeladene Datei ist kein gültiger NodeZero-Proxmox-Installer."
+        echo "[WARNUNG] Heruntergeladene Datei ist kein gültiger Proxmox-Installer."
         echo "          Lokale Datei wird NICHT verändert."
         rm -f -- "$tmp"
         return 0
@@ -238,11 +238,11 @@ nodezero_self_update_v147() {
     echo "     Starte $remote_version jetzt neu ..."
     echo
 
-    export NODEZERO_SELFUPDATE_DONE=1
+    export PROXMOX_SELFUPDATE_DONE=1
     exec /usr/bin/env bash "$self" "$@"
 }
 
-nodezero_self_update_v147 "$@"
+proxmox_self_update_v147 "$@"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -253,34 +253,34 @@ export DEBIAN_FRONTEND=noninteractive
 BACKUP_ROOT="/home/backups"
 DIAGNOSE_ROOT="/home/diagnose"
 
-# V139/V144 · feste NodeZero-Dateistruktur
-NODEZERO_SECRET_DIR="/root/passwort"
-NODEZERO_SECRET_BACKUP_DIR="/home/passwort"
-NODEZERO_DOWNLOAD_DIR="/home/downloads"
-NODEZERO_IMAGE_DIR="/home/img"
-NODEZERO_APP_ROOT="/opt/nodezero"
+# V139/V144 · feste Proxmox-Dateistruktur
+PROXMOX_SECRET_DIR="/root/passwort"
+PROXMOX_SECRET_BACKUP_DIR="/home/passwort"
+PROXMOX_DOWNLOAD_DIR="/home/downloads"
+PROXMOX_IMAGE_DIR="/home/img"
+PROXMOX_APP_ROOT="/opt"
 
-nodezero_backup_secrets_v139() {
-    install -d -m 0700 -o root -g root "$NODEZERO_SECRET_DIR" "$NODEZERO_SECRET_BACKUP_DIR"
+proxmox_backup_secrets_v139() {
+    install -d -m 0700 -o root -g root "$PROXMOX_SECRET_DIR" "$PROXMOX_SECRET_BACKUP_DIR"
 
     local file=""
     while IFS= read -r -d '' file; do
         install -m 0600 -o root -g root "$file" \
-            "$NODEZERO_SECRET_BACKUP_DIR/$(basename "$file")"
-    done < <(find "$NODEZERO_SECRET_DIR" -maxdepth 1 -type f -print0 2>/dev/null)
+            "$PROXMOX_SECRET_BACKUP_DIR/$(basename "$file")"
+    done < <(find "$PROXMOX_SECRET_DIR" -maxdepth 1 -type f -print0 2>/dev/null)
 }
 
-migrate_nodezero_layout_v139() {
+migrate_proxmox_layout_v139() {
     install -d -m 0700 -o root -g root \
         "$BACKUP_ROOT" \
         "$DIAGNOSE_ROOT" \
-        "$NODEZERO_SECRET_DIR" \
-        "$NODEZERO_SECRET_BACKUP_DIR" \
-        "$NODEZERO_DOWNLOAD_DIR"
+        "$PROXMOX_SECRET_DIR" \
+        "$PROXMOX_SECRET_BACKUP_DIR" \
+        "$PROXMOX_DOWNLOAD_DIR"
 
     install -d -m 0755 -o root -g root \
-        "$NODEZERO_IMAGE_DIR" \
-        "$NODEZERO_APP_ROOT"
+        "$PROXMOX_IMAGE_DIR" \
+        "$PROXMOX_APP_ROOT"
 
     # V144: alte Installer-Artefakte aus /root einmalig in die neue /home-Struktur
     # übernehmen. Nur echte Verzeichnisse werden migriert; vorhandene neuere
@@ -291,7 +291,7 @@ migrate_nodezero_layout_v139() {
     for _legacy_pair in \
         "/root/backups:$BACKUP_ROOT" \
         "/root/diagnose:$DIAGNOSE_ROOT" \
-        "/root/downloads:$NODEZERO_DOWNLOAD_DIR"
+        "/root/downloads:$PROXMOX_DOWNLOAD_DIR"
     do
         _legacy_src="${_legacy_pair%%:*}"
         _legacy_dst="${_legacy_pair#*:}"
@@ -332,37 +332,44 @@ migrate_nodezero_layout_v139() {
 
     # Alter permanenter Image-Cache -> neuer Standardpfad.
     if [[ -d /home/Images && ! -L /home/Images ]]; then
-        if [[ -z "$(find "$NODEZERO_IMAGE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
-            rmdir "$NODEZERO_IMAGE_DIR" 2>/dev/null || true
-            mv /home/Images "$NODEZERO_IMAGE_DIR"
-            ln -s "$NODEZERO_IMAGE_DIR" /home/Images
-            echo "  [V139] Image-Cache nach $NODEZERO_IMAGE_DIR migriert."
+        if [[ -z "$(find "$PROXMOX_IMAGE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+            rmdir "$PROXMOX_IMAGE_DIR" 2>/dev/null || true
+            mv /home/Images "$PROXMOX_IMAGE_DIR"
+            ln -s "$PROXMOX_IMAGE_DIR" /home/Images
+            echo "  [V139] Image-Cache nach $PROXMOX_IMAGE_DIR migriert."
         else
-            echo "  [V139] Hinweis: /home/Images und $NODEZERO_IMAGE_DIR existieren beide; neuer Pfad bleibt maßgeblich."
+            echo "  [V139] Hinweis: /home/Images und $PROXMOX_IMAGE_DIR existieren beide; neuer Pfad bleibt maßgeblich."
         fi
     elif [[ ! -e /home/Images ]]; then
-        ln -s "$NODEZERO_IMAGE_DIR" /home/Images
+        ln -s "$PROXMOX_IMAGE_DIR" /home/Images
     fi
 
     # Alte Secret-Ablage übernehmen, ohne vorhandene neue Dateien zu überschreiben.
     if [[ -d /home/passwd && ! -L /home/passwd ]]; then
-        cp -an /home/passwd/. "$NODEZERO_SECRET_DIR/" 2>/dev/null || true
-        cp -an /home/passwd/. "$NODEZERO_SECRET_BACKUP_DIR/" 2>/dev/null || true
+        cp -an /home/passwd/. "$PROXMOX_SECRET_DIR/" 2>/dev/null || true
+        cp -an /home/passwd/. "$PROXMOX_SECRET_BACKUP_DIR/" 2>/dev/null || true
     fi
 
-    # Bestehendes Dashboard in die neue /opt/nodezero-Struktur verschieben.
+    # Bestehendes Dashboard in die neue /opt-Struktur verschieben.
     if [[ -d /opt/pve-sensor-dashboard && ! -L /opt/pve-sensor-dashboard &&
-          ! -e "$NODEZERO_APP_ROOT/dashboard" ]]; then
-        mv /opt/pve-sensor-dashboard "$NODEZERO_APP_ROOT/dashboard"
+          ! -e "$PROXMOX_APP_ROOT/dashboard" ]]; then
+        mv /opt/pve-sensor-dashboard "$PROXMOX_APP_ROOT/dashboard"
     fi
-    if [[ ! -e /opt/pve-sensor-dashboard && -d "$NODEZERO_APP_ROOT/dashboard" ]]; then
-        ln -s "$NODEZERO_APP_ROOT/dashboard" /opt/pve-sensor-dashboard
+    if [[ ! -e /opt/pve-sensor-dashboard && -d "$PROXMOX_APP_ROOT/dashboard" ]]; then
+        ln -s "$PROXMOX_APP_ROOT/dashboard" /opt/pve-sensor-dashboard
     fi
 
-    nodezero_backup_secrets_v139
+    proxmox_backup_secrets_v139
 }
 
-migrate_nodezero_layout_v139
+# Existing installations must migrate active paths together; do not partially rename.
+if [[ -d /opt/nodezero/dashboard || -e /usr/local/sbin/nodezero-managed-updates || -e /usr/local/sbin/nodezero-installer-monitor || -e /usr/local/sbin/nodezero-external-urls || -e /home/Data/proxmox-installer/tls/nodezero-local-ca.crt || -e /home/Data/proxmox-installer/tls/nodezero-local-ca.key ]]; then
+    echo "Einmalige Layout-Migration erforderlich (V164); keine Neuinstallation." >&2
+    echo "Siehe proxmox/README.md im GitHub-Repository, Abschnitt V164." >&2
+    exit 1
+fi
+
+migrate_proxmox_layout_v139
 
 
 # -----------------------------------------------------------------------------
@@ -565,7 +572,7 @@ cleanup_invalid_apt_source_files_v112() {
     backup_dir="${BACKUP_ROOT}/apt-invalid-sources-${stamp}"
 
     # APT wertet hier nur *.list und *.sources als Quellendateien aus.
-    # Andere Dateien (z. B. proxmox.sh, *.bak, *.nodezero-disabled) erzeugen
+    # Andere Dateien (z. B. proxmox.sh, *.bak, *.proxmox-disabled) erzeugen
     # Warnungen und gehören nicht in dieses Verzeichnis. Wir sichern sie zuerst.
     while IFS= read -r -d '' file; do
         base="$(basename -- "$file")"
@@ -630,8 +637,8 @@ ensure_pve_no_subscription_repositories_v109() {
     command -v python3 >/dev/null 2>&1 || \
         die "python3 fehlt; Proxmox-Repository-Konfiguration kann nicht sicher normalisiert werden."
 
-    NODEZERO_PVE_SUITE="$suite" \
-    NODEZERO_CEPH_ACTIVE="$ceph_active" \
+    PROXMOX_PVE_SUITE="$suite" \
+    PROXMOX_CEPH_ACTIVE="$ceph_active" \
     python3 <<'PY_NOSUB_V109'
 from __future__ import annotations
 
@@ -639,8 +646,8 @@ import os
 import re
 from pathlib import Path
 
-suite = os.environ.get("NODEZERO_PVE_SUITE", "trixie").strip() or "trixie"
-ceph_active = os.environ.get("NODEZERO_CEPH_ACTIVE", "0") == "1"
+suite = os.environ.get("PROXMOX_PVE_SUITE", "trixie").strip() or "trixie"
+ceph_active = os.environ.get("PROXMOX_CEPH_ACTIVE", "0") == "1"
 apt_dir = Path("/etc/apt")
 sources_dir = apt_dir / "sources.list.d"
 target = sources_dir / "proxmox.sources"
@@ -738,7 +745,7 @@ def normalize_list_file(path: Path) -> None:
         # Alte PVE enterprise/no-subscription/test-Zeilen abschalten. Damit
         # existiert anschließend nur unsere Deb822-No-Subscription-Quelle.
         if "/debian/pve" in low and "proxmox.com" in low:
-            out.append("# NODEZERO V109 deaktiviert: " + line)
+            out.append("# PROXMOX V109 deaktiviert: " + line)
             changed = True
             continue
 
@@ -754,7 +761,7 @@ def normalize_list_file(path: Path) -> None:
                 out.append(new)
                 changed = changed or new != line
             else:
-                out.append("# NODEZERO V109 unbenutztes Ceph-Repo deaktiviert: " + line)
+                out.append("# PROXMOX V109 unbenutztes Ceph-Repo deaktiviert: " + line)
                 changed = True
             continue
 
@@ -918,7 +925,7 @@ disable_unused_ceph_repositories_v97() {
 
         cp -a "$file" "$backup_dir/$(basename "$file")"
         sed -Ei \
-            '/^[[:space:]]*deb .*proxmox\.com\/debian\/ceph-/ s|^|# NODEZERO V97: unbenutztes Ceph-Repo deaktiviert: |' \
+            '/^[[:space:]]*deb .*proxmox\.com\/debian\/ceph-/ s|^|# PROXMOX V97: unbenutztes Ceph-Repo deaktiviert: |' \
             "$file"
         changed=1
         warn "Unbenutzter Ceph-Eintrag deaktiviert: $file"
@@ -1002,8 +1009,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V163"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V163"
+TUI_TITLE="PROXMOX INSTALLER V164"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V164"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1144,10 +1151,10 @@ tui_host_status_v106() {
 }
 
 # V145 · Eigenständige Dashboard-Ansichten, ohne Neuinstallation des Stacks.
-# Designpakete liegen unter /home/downloads/nodezero/dashboard-views/v1.
-install_nodezero_dashboard_view_manager_v1() {
-    local target="/usr/local/sbin/nodezero-dashboard-views"
-    local cache="/home/downloads/nodezero/tools/nodezero-dashboard-views-v2"
+# Designpakete liegen unter /home/downloads/proxmox/dashboard-views/v1.
+install_proxmox_dashboard_view_manager_v1() {
+    local target="/usr/local/sbin/proxmox-dashboard-views"
+    local cache="/home/downloads/proxmox/tools/proxmox-dashboard-views-v3"
     local tmp="${cache}.tmp"
 
     mkdir -p "$(dirname "$cache")"
@@ -1155,10 +1162,10 @@ install_nodezero_dashboard_view_manager_v1() {
         rm -f "$tmp"
         if ! curl --fail --silent --show-error --location \
             --retry 3 --retry-delay 2 --connect-timeout 15 \
-            "https://raw.githubusercontent.com/Technox90/homeatic/cf0482eaf2080929acc147beb50194d257f6ba28/proxmox/tools/nodezero-dashboard-views" \
+            "https://raw.githubusercontent.com/Technox90/homeatic/ef337100a030663b477faeea7457a965933a5cdc/proxmox/tools/proxmox-dashboard-views" \
             -o "$tmp"; then
             rm -f "$tmp"
-            warn "NodeZero-Ansichtsauswahl konnte nicht von GitHub geladen werden."
+            warn "Proxmox-Ansichtsauswahl konnte nicht von GitHub geladen werden."
             return 1
         fi
         [[ -s "$tmp" ]] || { rm -f "$tmp"; return 1; }
@@ -1870,7 +1877,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 163" \
+                    --title "HAUPTMENÜ · Version 164" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -2603,7 +2610,7 @@ if [ -s "$WEB_JS" ] && ! grep -q "NoMoreNagging" "$WEB_JS"; then
         "$WEB_JS"
 fi
 
-# NodeZero UI-Patch: "HA State" in der Gast-/Template-Übersicht ist bei
+# Proxmox UI-Patch: "HA State" in der Gast-/Template-Übersicht ist bei
 # diesem Setup missverständlich, weil HA = Home Assistant verwendet wird.
 # Nur das hamanaged-Statusfeld wird auf "PVE-Failover" umbenannt.
 # Der DPkg-Hook führt diesen Patch nach pve-manager-Updates erneut aus.
@@ -2780,7 +2787,7 @@ remove_master_host_components_v72() {
 
     # Dashboard-Daten/Code entfernen.
     rm -rf \
-        /opt/nodezero/dashboard \
+        /opt/dashboard \
         /etc/pve-sensor-dashboard \
         /var/lib/pve-sensor-dashboard \
         /var/lib/pve-sensor-dashboard-web \
@@ -2803,7 +2810,7 @@ remove_master_host_components_v72() {
     # Die persistente CA unter /home/Data bleibt erhalten.
     # Nur die Host-Trust-Kopie wird entfernt, damit der Host wieder möglichst
     # neutral ist.
-    rm -f /usr/local/share/ca-certificates/nodezero-local-ca.crt
+    rm -f /usr/local/share/ca-certificates/proxmox-local-ca.crt
     update-ca-certificates >/dev/null 2>&1 || true
 
     systemctl daemon-reload
@@ -4151,7 +4158,7 @@ PYOPENRGB
 install_update_openrgb() {
     local url=""
     local tmp=""
-    local install_dir="/opt/openrgb-nodezero"
+    local install_dir="/opt/openrgb-proxmox"
     local appimage="${install_dir}/OpenRGB.AppImage"
     local wrapper="/usr/bin/openrgb"
 
@@ -4228,8 +4235,8 @@ install_update_openrgb() {
     cat > "$wrapper" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
-# NODEZERO_OPENRGB_APPIMAGE_WRAPPER
-APPIMAGE="/opt/openrgb-nodezero/OpenRGB.AppImage"
+# PROXMOX_OPENRGB_APPIMAGE_WRAPPER
+APPIMAGE="/opt/openrgb-proxmox/OpenRGB.AppImage"
 [[ -x "$APPIMAGE" ]] || {
     echo "OpenRGB AppImage fehlt: $APPIMAGE" >&2
     exit 127
@@ -4896,13 +4903,13 @@ uninstall_openrgb() {
 
     systemctl daemon-reload
 
-    # V110: Von NodeZero installierte AppImage-Variante entfernen. Den Wrapper
+    # V110: Von Proxmox installierte AppImage-Variante entfernen. Den Wrapper
     # nur löschen, wenn er eindeutig von diesem Installer stammt.
     if [[ -f /usr/bin/openrgb ]] \
-       && grep -Fq 'NODEZERO_OPENRGB_APPIMAGE_WRAPPER' /usr/bin/openrgb 2>/dev/null; then
+       && grep -Fq 'PROXMOX_OPENRGB_APPIMAGE_WRAPPER' /usr/bin/openrgb 2>/dev/null; then
         rm -f /usr/bin/openrgb
     fi
-    rm -rf /opt/openrgb-nodezero
+    rm -rf /opt/openrgb-proxmox
 
     if dpkg-query -W -f='${Status}' openrgb 2>/dev/null \
         | grep -q 'install ok installed'
@@ -6268,11 +6275,11 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="a80a21db36b98296975fedc5f41f66e9a047a1e2"
+TOOLS_REF="ef337100a030663b477faeea7457a965933a5cdc"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
-TOOLS_CACHE="/home/downloads/nodezero/tools/${TOOLS_REF}"
+TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
-install_nodezero_tool_v141() {
+install_proxmox_tool_v141() {
     local name="$1"
     local cached="${TOOLS_CACHE}/${name}"
     local target="/usr/local/sbin/${name}"
@@ -6286,12 +6293,12 @@ install_nodezero_tool_v141() {
             --retry 3 --retry-delay 2 --connect-timeout 15 \
             "${TOOLS_RAW_BASE}/${name}" -o "$tmp" ||
             {
-                echo "FEHLER: NodeZero-Werkzeug konnte nicht geladen werden: ${name}" >&2
+                echo "FEHLER: Proxmox-Werkzeug konnte nicht geladen werden: ${name}" >&2
                 exit 1
             }
 
         [[ -s "$tmp" ]] || {
-            echo "FEHLER: NodeZero-Werkzeug ist leer: ${name}" >&2
+            echo "FEHLER: Proxmox-Werkzeug ist leer: ${name}" >&2
             exit 1
         }
 
@@ -6318,24 +6325,24 @@ install_nodezero_tool_v141() {
     install -m 0755 -o root -g root "$cached" "$target"
 }
 
-install_nodezero_tool_v141 "proxmox-auto-updater"
-install_nodezero_tool_v141 "proxmox-auto-updater-config"
-install_nodezero_tool_v141 "proxmox-pushover-config"
-install_nodezero_tool_v141 "nodezero-external-urls"
-install_nodezero_tool_v141 "nodezero-managed-updates"
-chmod 700 /usr/local/sbin/nodezero-managed-updates
+install_proxmox_tool_v141 "proxmox-auto-updater"
+install_proxmox_tool_v141 "proxmox-auto-updater-config"
+install_proxmox_tool_v141 "proxmox-pushover-config"
+install_proxmox_tool_v141 "proxmox-external-urls"
+install_proxmox_tool_v141 "proxmox-managed-updates"
+chmod 700 /usr/local/sbin/proxmox-managed-updates
 
 chmod 700 \
     /usr/local/sbin/proxmox-auto-updater \
     /usr/local/sbin/proxmox-auto-updater-config \
     /usr/local/sbin/proxmox-pushover-config \
-    /usr/local/sbin/nodezero-external-urls
+    /usr/local/sbin/proxmox-external-urls
 
 chown root:root \
     /usr/local/sbin/proxmox-auto-updater \
     /usr/local/sbin/proxmox-auto-updater-config \
     /usr/local/sbin/proxmox-pushover-config \
-    /usr/local/sbin/nodezero-external-urls
+    /usr/local/sbin/proxmox-external-urls
 
 cat > /etc/systemd/system/proxmox-auto-updater.service <<'EOF'
 [Unit]
@@ -8194,7 +8201,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V163",
+    "installer_version": "V164",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8589,7 +8596,7 @@ show_installer_info() {
     info_text+="  Pocket ID intern 1411 · Semaphore/Grafana intern 3000 · Prometheus 9090 · Exporter 9221\n"
     info_text+="  EMQX: MQTT 1883 · MQTTS 8883 · WS 8083 · WSS 8084 · Dashboard intern 18083\n"
     info_text+="  Newt/CrowdSec: keine normale Weboberfläche\n"
-    info_text+="  Local CA: /home/Data/proxmox-installer/tls/nodezero-local-ca.crt\n"
+    info_text+="  Local CA: /home/Data/proxmox-installer/tls/proxmox-local-ca.crt\n"
 
     tui_msgbox \
         "INSTALLER · INFO" \
@@ -8668,7 +8675,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V163 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V164 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8735,7 +8742,7 @@ persist_install_secrets_v107() {
     secret_write_v107 "emqx-admin" "EMQX Dashboard Admin" "${EMQX_ADMIN_PASS:-}" "admin" "${EMQX_IP:+https://${EMQX_IP}/}"
 
     refresh_secret_index_v107
-    nodezero_backup_secrets_v139
+    proxmox_backup_secrets_v139
 }
 
 # V110: Noch VOR dem ersten apt-get update / Menü die Proxmox-Paketquellen
@@ -8759,15 +8766,15 @@ ensure_no_subscription_after_zero_v72
 # ist aktiv und ein apt-get update wurde bereits erfolgreich durchgeführt.
 install_installer_update_monitor_v155() (
     set -Eeuo pipefail
-    local state=/var/lib/nodezero-installer-monitor
+    local state=/var/lib/proxmox-installer-monitor
     install -d -m 0700 "$state"
-    printf '%s\n' "$NODEZERO_SELF_PATH" > "$state/installer-path"
+    printf '%s\n' "$PROXMOX_SELF_PATH" > "$state/installer-path"
     chmod 600 "$state/installer-path"
-    cat > /usr/local/sbin/nodezero-installer-monitor <<'MONITOR_V155'
+    cat > /usr/local/sbin/proxmox-installer-monitor <<'MONITOR_V155'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-state=/var/lib/nodezero-installer-monitor
+state=/var/lib/proxmox-installer-monitor
 exec 9>"$state/lock"
 flock -n 9 || exit 0
 python3 - "$state" <<'PY_MONITOR'
@@ -8790,7 +8797,7 @@ def version(data):
     return int(match.group(1))
 def publish(result):
     atomic(state/"status.json", json.dumps(result))
-    for directory in (pathlib.Path("/opt/nodezero/dashboard/static"), pathlib.Path("/opt/pve-sensor-dashboard/static")):
+    for directory in (pathlib.Path("/opt/dashboard/static"), pathlib.Path("/opt/pve-sensor-dashboard/static")):
         if (directory/"index.html").is_file():
             atomic(directory/"installer-update-status.json", json.dumps(result), 0o644)
 result = {"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"status":"error","local":None,"remote":None}
@@ -8835,21 +8842,21 @@ for i in (1,2):
         print("Pushover fehlgeschlagen; erneuter Versuch beim nächsten Lauf.")
 PY_MONITOR
 MONITOR_V155
-    chmod 700 /usr/local/sbin/nodezero-installer-monitor
-    cat > /etc/systemd/system/nodezero-installer-monitor.service <<'MONITOR_SERVICE'
+    chmod 700 /usr/local/sbin/proxmox-installer-monitor
+    cat > /etc/systemd/system/proxmox-installer-monitor.service <<'MONITOR_SERVICE'
 [Unit]
-Description=NodeZero Installer Versionsprüfung
+Description=Proxmox Installer Versionsprüfung
 After=network-online.target
 Wants=network-online.target
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/nodezero-installer-monitor
+ExecStart=/usr/local/sbin/proxmox-installer-monitor
 TimeoutStartSec=120
 UMask=0077
 MONITOR_SERVICE
-    cat > /etc/systemd/system/nodezero-installer-monitor.timer <<'MONITOR_TIMER'
+    cat > /etc/systemd/system/proxmox-installer-monitor.timer <<'MONITOR_TIMER'
 [Unit]
-Description=NodeZero Installer Versionsprüfung alle 15 Minuten
+Description=Proxmox Installer Versionsprüfung alle 15 Minuten
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=15min
@@ -8857,13 +8864,13 @@ AccuracySec=30s
 [Install]
 WantedBy=timers.target
 MONITOR_TIMER
-    bash -n /usr/local/sbin/nodezero-installer-monitor
+    bash -n /usr/local/sbin/proxmox-installer-monitor
     systemctl daemon-reload
-    systemctl enable --now nodezero-installer-monitor.timer
+    systemctl enable --now proxmox-installer-monitor.timer
 )
 
 install_installer_update_dashboard_v155() (
-    local dir=/opt/nodezero/dashboard/static
+    local dir=/opt/dashboard/static
     [[ -f "$dir/index.html" ]] || return 0
     python3 - "$dir" <<'PY_MONITOR_DASH'
 from pathlib import Path
@@ -8873,9 +8880,9 @@ index=directory/"index.html"
 tag='<script defer src="/installer-update-v155.js"></script>'
 js="""(() => {
 const refresh = async () => {
- let box = document.getElementById('nodezero-installer-update');
+ let box = document.getElementById('proxmox-installer-update');
  if (!box) {
-   box = document.createElement('aside'); box.id='nodezero-installer-update';
+   box = document.createElement('aside'); box.id='proxmox-installer-update';
    box.setAttribute('role','status');
    Object.assign(box.style,{position:'fixed',bottom:'16px',right:'16px',maxWidth:'min(360px,90vw)',zIndex:'1000',padding:'12px 16px',borderRadius:'10px',background:'#182334',color:'#fff',border:'1px solid #8090aa',boxShadow:'0 4px 15px #0004',font:'14px system-ui'});
    document.body.append(box);
@@ -8936,10 +8943,10 @@ while true; do
     fi
 
     if [[ "${INSTALL_SELECTION^^}" == "DV" ]]; then
-        if [[ ! -s /opt/nodezero/dashboard/static/index.html ]]; then
+        if [[ ! -s /opt/dashboard/static/index.html ]]; then
             warn "Dashboard noch nicht installiert. Bitte zuerst Server-Dashboard installieren."
-        elif install_nodezero_dashboard_view_manager_v1; then
-            /usr/local/sbin/nodezero-dashboard-views --menu ||
+        elif install_proxmox_dashboard_view_manager_v1; then
+            /usr/local/sbin/proxmox-dashboard-views --menu ||
                 warn "Dashboard-Ansicht konnte nicht gewechselt werden."
         else
             warn "Dashboard-Ansichtsauswahl konnte nicht installiert werden."
@@ -8977,7 +8984,7 @@ while true; do
     fi
 
     if [[ "$INSTALL_SELECTION" == "21" ]]; then
-        if ! /usr/local/sbin/nodezero-external-urls; then
+        if ! /usr/local/sbin/proxmox-external-urls; then
             warn "Externe URL-Konfiguration wurde nicht vollständig angewendet. DNS/Portfreigabe und Diagnose-Log prüfen."
         fi
         continue
@@ -9299,8 +9306,8 @@ if (( INSTALL_DASHBOARD )); then
     header "DASHBOARD INSTALLIEREN / AKTUALISIEREN"
 
     DASHBOARD_EXISTS=0
-    if [[ -f /opt/nodezero/dashboard/app.py &&
-          -f /opt/nodezero/dashboard/static/index.html ]]; then
+    if [[ -f /opt/dashboard/app.py &&
+          -f /opt/dashboard/static/index.html ]]; then
         DASHBOARD_EXISTS=1
     fi
 
@@ -10182,13 +10189,13 @@ ABS_MIN_DISK_GB=2
 
 # V65 · persistente lokale CA für interne HTTPS-Dienste.
 LOCAL_CA_ROOT="/home/Data/proxmox-installer/tls"
-LOCAL_CA_CERT="${LOCAL_CA_ROOT}/nodezero-local-ca.crt"
-LOCAL_CA_KEY="${LOCAL_CA_ROOT}/nodezero-local-ca.key"
+LOCAL_CA_CERT="${LOCAL_CA_ROOT}/proxmox-local-ca.crt"
+LOCAL_CA_KEY="${LOCAL_CA_ROOT}/proxmox-local-ca.key"
 
 TLS_CERT_COUNTRY="DE"
 TLS_CERT_STATE="Deutschland"
 TLS_CERT_LOCALITY="HomeLab"
-TLS_CERT_ORG="NodeZero"
+TLS_CERT_ORG="Proxmox"
 TLS_CERT_OU="Proxmox"
 TLS_CERT_DAYS=397
 
@@ -11499,7 +11506,7 @@ install_docker_in_ct() {
     # V119: Remote-Script als literal heredoc an bash -lc übergeben.
     # Dadurch können awk/sed/printf im Container normale einfache Quotes
     # enthalten, ohne den äußeren Installer-String vorzeitig zu beenden.
-    pct exec "$ctid" -- bash -lc "$(cat <<'NODEZERO_DOCKER_CT_V119'
+    pct exec "$ctid" -- bash -lc "$(cat <<'PROXMOX_DOCKER_CT_V119'
         set -Eeuo pipefail
         export DEBIAN_FRONTEND=noninteractive
 
@@ -11677,7 +11684,7 @@ fi
 EOS
 
         chmod 755 /usr/local/sbin/docker-cache-pull
-NODEZERO_DOCKER_CT_V119
+PROXMOX_DOCKER_CT_V119
 )"
 }
 
@@ -11806,22 +11813,22 @@ verify_web_v107() {
 }
 
 # =============================================================================
-# V140 · NODEZERO DASHBOARD-MODUL
+# V140 · PROXMOX DASHBOARD-MODUL
 # =============================================================================
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-NODEZERO_MODULE_REF="e303f40c361017499db77683c4fb5cfdd60c0e9d"
-NODEZERO_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_MODULE_REF}/proxmox/modules"
+PROXMOX_MODULE_REF="ef337100a030663b477faeea7457a965933a5cdc"
+PROXMOX_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_MODULE_REF}/proxmox/modules"
 
-load_nodezero_module_v140() {
+load_proxmox_module_v140() {
     local module="$1"
-    local module_dir="${NODEZERO_DOWNLOAD_DIR}/nodezero/modules/${NODEZERO_MODULE_REF}"
+    local module_dir="${PROXMOX_DOWNLOAD_DIR}/proxmox/modules/${PROXMOX_MODULE_REF}"
     local module_file="${module_dir}/${module}.sh"
-    local module_url="${NODEZERO_MODULE_RAW_BASE}/${module}.sh"
+    local module_url="${PROXMOX_MODULE_RAW_BASE}/${module}.sh"
     local tmp="${module_file}.tmp"
 
-    install -d -m 0700 -o root -g root "$NODEZERO_DOWNLOAD_DIR"
+    install -d -m 0700 -o root -g root "$PROXMOX_DOWNLOAD_DIR"
     install -d -m 0755 -o root -g root "$module_dir"
 
     if [[ ! -s "$module_file" ]]; then
@@ -11829,24 +11836,24 @@ load_nodezero_module_v140() {
         curl --fail --silent --show-error --location \
             --retry 3 --retry-delay 2 --connect-timeout 15 \
             "$module_url" -o "$tmp" ||
-            die "NodeZero-Modul konnte nicht geladen werden: $module_url"
+            die "Proxmox-Modul konnte nicht geladen werden: $module_url"
 
-        [[ -s "$tmp" ]] || die "NodeZero-Modul ist leer: $module_url"
+        [[ -s "$tmp" ]] || die "Proxmox-Modul ist leer: $module_url"
         mv -f "$tmp" "$module_file"
         chmod 0644 "$module_file"
     fi
 
     bash -n "$module_file" ||
-        die "Syntaxprüfung des NodeZero-Moduls fehlgeschlagen: $module_file"
+        die "Syntaxprüfung des Proxmox-Moduls fehlgeschlagen: $module_file"
 
     # shellcheck source=/dev/null
     source "$module_file"
 
-    ok "NodeZero-Modul geladen: $module"
+    ok "Proxmox-Modul geladen: $module"
     info "Modul-Cache: $module_file"
 }
 
-load_nodezero_module_v140 "dashboard"
+load_proxmox_module_v140 "dashboard"
 
 # =============================================================================
 # HOME ASSISTANT
@@ -13955,7 +13962,7 @@ new_managed = set(records)
 replace_hosts = old_managed | new_managed
 
 # Manuelle Pi-hole-Einträge erhalten, sofern sie nicht denselben Hostnamen
-# wie ein von NodeZero verwalteter Datensatz verwenden.
+# wie ein von Proxmox verwalteter Datensatz verwenden.
 preserved = []
 for entry in current_hosts:
     parts = entry.split()
@@ -14758,8 +14765,8 @@ EOF
 configure_vaultwarden_offsite_backup() {
     (( VAULTWARDEN_BACKUP_ENABLED )) || return 0
     local source_base="https://raw.githubusercontent.com/Technox90/homeatic/main/proxmox/tools"
-    local tmp_script="/tmp/nodezero-vw-backup-setup"
-    local tmp_runner="/tmp/nodezero-vw-backup-runner"
+    local tmp_script="/tmp/proxmox-vw-backup-setup"
+    local tmp_runner="/tmp/proxmox-vw-backup-runner"
     local target remote host response ssh_hostkey
     echo
     header "VAULTWARDEN OFFSITE-BACKUP"
@@ -15262,7 +15269,10 @@ ensure_local_ca_v65() {
 
     local created=0
 
-    if [[ ! -s "$LOCAL_CA_CERT" || ! -s "$LOCAL_CA_KEY" ]]; then
+    if [[ -e "$LOCAL_CA_CERT" || -e "$LOCAL_CA_KEY" ]]; then
+        [[ -s "$LOCAL_CA_CERT" && -s "$LOCAL_CA_KEY" ]] || die "Lokale CA unvollständig; keine automatische Neuausstellung."
+    fi
+    if [[ ! -e "$LOCAL_CA_CERT" && ! -e "$LOCAL_CA_KEY" ]]; then
         openssl req \
             -x509 \
             -nodes \
@@ -15271,66 +15281,66 @@ ensure_local_ca_v65() {
             -days 3650 \
             -keyout "$LOCAL_CA_KEY" \
             -out "$LOCAL_CA_CERT" \
-            -subj "/C=${TLS_CERT_COUNTRY}/ST=${TLS_CERT_STATE}/L=${TLS_CERT_LOCALITY}/O=${TLS_CERT_ORG}/OU=${TLS_CERT_OU}/CN=NodeZero Local CA" \
+            -subj "/C=${TLS_CERT_COUNTRY}/ST=${TLS_CERT_STATE}/L=${TLS_CERT_LOCALITY}/O=${TLS_CERT_ORG}/OU=${TLS_CERT_OU}/CN=Proxmox Local CA" \
             >/dev/null 2>&1
 
         created=1
     fi
 
     [[ -s "$LOCAL_CA_CERT" ]] || \
-        die "NodeZero Local CA Zertifikat fehlt: $LOCAL_CA_CERT"
+        die "Proxmox Local CA Zertifikat fehlt: $LOCAL_CA_CERT"
 
     [[ -s "$LOCAL_CA_KEY" ]] || \
-        die "NodeZero Local CA Schlüssel fehlt: $LOCAL_CA_KEY"
+        die "Proxmox Local CA Schlüssel fehlt: $LOCAL_CA_KEY"
 
     chmod 600 "$LOCAL_CA_KEY"
     chmod 644 "$LOCAL_CA_CERT"
 
     install -m 0644 \
         "$LOCAL_CA_CERT" \
-        /usr/local/share/ca-certificates/nodezero-local-ca.crt
+        /usr/local/share/ca-certificates/proxmox-local-ca.crt
 
     update-ca-certificates >/dev/null 2>&1 || true
 
     # V88: Client-Importhilfen persistent bereitstellen. Ohne einmaliges Vertrauen
     # der privaten CA melden Browser bei internen IP-Zertifikaten zwangsläufig
     # "nicht vertrauenswürdig", obwohl Zertifikat und SAN technisch korrekt sind.
-    cat > "${LOCAL_CA_ROOT}/install-nodezero-ca-windows.ps1" <<'POWERSHELL'
+    cat > "${LOCAL_CA_ROOT}/install-proxmox-ca-windows.ps1" <<'POWERSHELL'
 $ErrorActionPreference = 'Stop'
-$cert = Join-Path $PSScriptRoot 'nodezero-local-ca.crt'
+$cert = Join-Path $PSScriptRoot 'proxmox-local-ca.crt'
 if (-not (Test-Path $cert)) { throw "CA-Datei nicht gefunden: $cert" }
 certutil.exe -addstore -f Root $cert
-Write-Host 'NodeZero Local CA wurde in Vertrauenswürdige Stammzertifizierungsstellen importiert.'
+Write-Host 'Proxmox Local CA wurde in Vertrauenswürdige Stammzertifizierungsstellen importiert.'
 POWERSHELL
-    chmod 644 "${LOCAL_CA_ROOT}/install-nodezero-ca-windows.ps1"
+    chmod 644 "${LOCAL_CA_ROOT}/install-proxmox-ca-windows.ps1"
 
     cat > "${LOCAL_CA_ROOT}/README-CA.txt" <<EOF
-NodeZero Local CA
+Proxmox Local CA
 =================
 
 CA-Datei:
   ${LOCAL_CA_CERT}
 
 Windows (PowerShell als Administrator):
-  powershell -ExecutionPolicy Bypass -File .\\install-nodezero-ca-windows.ps1
+  powershell -ExecutionPolicy Bypass -File .\\install-proxmox-ca-windows.ps1
 
 Alternativ manuell:
-  nodezero-local-ca.crt in "Vertrauenswürdige Stammzertifizierungsstellen" importieren.
+  proxmox-local-ca.crt in "Vertrauenswürdige Stammzertifizierungsstellen" importieren.
 
 Danach Browser vollständig schließen und neu öffnen.
 Die CA gilt nur für die von diesem Installer lokal ausgestellten Zertifikate.
 EOF
     chmod 644 "${LOCAL_CA_ROOT}/README-CA.txt"
 
-    if [[ -d /opt/nodezero/dashboard/static ]]; then
-        install -m 0644 "$LOCAL_CA_CERT" /opt/nodezero/dashboard/static/nodezero-local-ca.crt
+    if [[ -d /opt/dashboard/static ]]; then
+        install -m 0644 "$LOCAL_CA_CERT" /opt/dashboard/static/proxmox-local-ca.crt
     fi
 
     # WICHTIG: keine Statusmeldung auf STDOUT.
     if (( created )); then
-        ok "NodeZero Local CA erstellt: $LOCAL_CA_CERT" >&2
+        ok "Proxmox Local CA erstellt: $LOCAL_CA_CERT" >&2
     else
-        info "NodeZero Local CA vorhanden: $LOCAL_CA_CERT" >&2
+        info "Proxmox Local CA vorhanden: $LOCAL_CA_CERT" >&2
     fi
 }
 
@@ -15574,8 +15584,8 @@ install_managed_tls_renewer_v88() {
 set -Eeuo pipefail
 
 CA_ROOT="/home/Data/proxmox-installer/tls"
-CA_CERT="${CA_ROOT}/nodezero-local-ca.crt"
-CA_KEY="${CA_ROOT}/nodezero-local-ca.key"
+CA_CERT="${CA_ROOT}/proxmox-local-ca.crt"
+CA_KEY="${CA_ROOT}/proxmox-local-ca.key"
 REGISTRY="${CA_ROOT}/managed-services.tsv"
 DAYS=397
 CHECKEND=$((45 * 24 * 60 * 60))
@@ -15600,7 +15610,7 @@ EOF
     openssl req -nodes -newkey rsa:2048 -sha256 \
         -keyout "${out}/service.key" \
         -out "${out}/service.csr" \
-        -subj "/C=DE/ST=Deutschland/L=HomeLab/O=NodeZero/OU=Proxmox/CN=${hostname}" \
+        -subj "/C=DE/ST=Deutschland/L=HomeLab/O=Proxmox/OU=Proxmox/CN=${hostname}" \
         >/dev/null 2>&1
 
     openssl x509 -req -sha256 -days "$DAYS" \
@@ -15680,7 +15690,7 @@ __TLS_RENEWER_V88__
 
     cat > "$service" <<'EOF'
 [Unit]
-Description=NodeZero managed TLS certificate renewal
+Description=Proxmox managed TLS certificate renewal
 After=network-online.target pve-cluster.service
 Wants=network-online.target
 
@@ -15691,7 +15701,7 @@ EOF
 
     cat > "$timer" <<'EOF'
 [Unit]
-Description=Weekly NodeZero TLS certificate renewal check
+Description=Weekly Proxmox TLS certificate renewal check
 
 [Timer]
 OnBootSec=15min
@@ -16168,7 +16178,7 @@ configure_monitoring_stack_v107() {
             [[ -n "$pve_target" ]] || die "Monitoring: Proxmox-Ziel-IP konnte nicht ermittelt werden."
         fi
 
-        prom_cfg="$(mktemp /tmp/prometheus-nodezero-v113.XXXXXX.yml)"
+        prom_cfg="$(mktemp /tmp/prometheus-proxmox-v113.XXXXXX.yml)"
         cat > "$prom_cfg" <<'EOF'
 global:
   scrape_interval: 15s
@@ -16208,14 +16218,14 @@ EOF
 EOF
         fi
 
-        pct push "$PROMETHEUS_ID" "$prom_cfg" /tmp/prometheus-nodezero-v113.yml >/dev/null
+        pct push "$PROMETHEUS_ID" "$prom_cfg" /tmp/prometheus-proxmox-v113.yml >/dev/null
         rm -f "$prom_cfg"
 
         pct exec "$PROMETHEUS_ID" -- bash -lc '
             set -Eeuo pipefail
             cp -a /etc/prometheus/prometheus.yml "/etc/prometheus/prometheus.yml.v113.bak.$(date +%s)" 2>/dev/null || true
-            install -m 0644 /tmp/prometheus-nodezero-v113.yml /etc/prometheus/prometheus.yml
-            rm -f /tmp/prometheus-nodezero-v113.yml
+            install -m 0644 /tmp/prometheus-proxmox-v113.yml /etc/prometheus/prometheus.yml
+            rm -f /tmp/prometheus-proxmox-v113.yml
             if command -v promtool >/dev/null 2>&1; then
                 promtool check config /etc/prometheus/prometheus.yml
             fi
@@ -16323,7 +16333,7 @@ configure_pbs_native_tls_v88() {
     pct exec "$ctid" -- systemctl reload proxmox-backup-proxy
 
     register_managed_tls_service_v88 "pbs-native" "$ctid" "Proxmox Backup Server" "$ip" "$hostname"
-    ok "PBS bleibt nativ auf HTTPS-Port 8007 und nutzt das verwaltete NodeZero-Zertifikat."
+    ok "PBS bleibt nativ auf HTTPS-Port 8007 und nutzt das verwaltete Proxmox-Zertifikat."
 }
 
 install_proxmox_backup_server() {
@@ -19671,7 +19681,7 @@ if [ -s "$WEB_JS" ] && ! grep -q "NoMoreNagging" "$WEB_JS"; then
         "$WEB_JS"
 fi
 
-# NodeZero UI-Patch: "HA State" in der Gast-/Template-Übersicht ist bei
+# Proxmox UI-Patch: "HA State" in der Gast-/Template-Übersicht ist bei
 # diesem Setup missverständlich, weil HA = Home Assistant verwendet wird.
 # Nur das hamanaged-Statusfeld wird auf "PVE-Failover" umbenannt.
 # Der DPkg-Hook führt diesen Patch nach pve-manager-Updates erneut aus.
@@ -20059,8 +20069,8 @@ final_install_validation_v107() {
             warn "FINALTEST: TLS-Renewal-Timer ist nicht aktiv."
             failures=$((failures+1))
         }
-        [[ -s "${LOCAL_CA_ROOT}/nodezero-local-ca.crt" && -s "${LOCAL_CA_ROOT}/nodezero-local-ca.key" ]] || {
-            warn "FINALTEST: lokale NodeZero-CA ist unvollständig."
+        [[ -s "${LOCAL_CA_ROOT}/proxmox-local-ca.crt" && -s "${LOCAL_CA_ROOT}/proxmox-local-ca.key" ]] || {
+            warn "FINALTEST: lokale Proxmox-CA ist unvollständig."
             failures=$((failures+1))
         }
     fi
@@ -20300,7 +20310,7 @@ fi
 
 # V134: Bei Dashboard-Updates vorhandene bekannte Web-CTs erneut erkennen.
 # Nur fehlende Links werden ergänzt; manuelle/bestehende Links bleiben erhalten.
-if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]; then
+if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     dashboard_reconcile_existing_guests_v134
 fi
 
@@ -20334,7 +20344,7 @@ fi
 # wenn in diesem Lauf nur PBS/Pulse/PVE-UPS ergänzt wurden.
 if (( INSTALL_DASHBOARD && ! DASHBOARD_FAST_UPDATE_V152 )) || {
     (( ! INSTALL_DASHBOARD )) &&
-    [[ -f /opt/nodezero/dashboard/static/index.html ]] &&
+    [[ -f /opt/dashboard/static/index.html ]] &&
     [[ -f /var/lib/pve-sensor-dashboard-web/categories.json ]];
 }; then
     install_dashboard_default_categories_v42
@@ -20345,7 +20355,7 @@ fi
 # V53: Mainboard-Karte durch USV/NAS ersetzen.
 # Bei frisch installiertem PVE-UPS dessen tatsächlich gewählte IP verwenden.
 # Bei bestehender Installation Standardquelle 192.168.178.111 verwenden.
-if (( INSTALL_DASHBOARD )) || [[ -f /opt/nodezero/dashboard/static/index.html ]]; then
+if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     if (( ! INSTALL_DASHBOARD || ! DASHBOARD_FAST_UPDATE_V152 )); then
         install_dashboard_ups_card_v53
         install_dashboard_ups_settings_v55
@@ -20382,8 +20392,8 @@ fi
 # V145: Designpakete ganz am Ende nach allen UI-Patches anwenden.
 # Eine vorher gewählte Ansicht bleibt auch nach Dashboard-Updates aktiv.
 if (( INSTALL_DASHBOARD )); then
-    if install_nodezero_dashboard_view_manager_v1; then
-        /usr/local/sbin/nodezero-dashboard-views --install ||
+    if install_proxmox_dashboard_view_manager_v1; then
+        /usr/local/sbin/proxmox-dashboard-views --install ||
             die "Dashboard-Ansichten konnten nicht installiert werden."
     else
         die "Dashboard-Ansichtsauswahl konnte nicht geladen werden."
@@ -20394,8 +20404,8 @@ fi
 # erneut auf die aktuellen Gast-IP-Adressen und App-Basis-URLs anwenden.
 # Fehler sind hier nicht fatal, z. B. wenn DNS/Portfreigabe noch vorbereitet wird.
 if [[ -s /home/Data/proxmox-installer/external-urls/config.json &&
-      -x /usr/local/sbin/nodezero-external-urls ]]; then
-    if ! /usr/local/sbin/nodezero-external-urls --reapply; then
+      -x /usr/local/sbin/proxmox-external-urls ]]; then
+    if ! /usr/local/sbin/proxmox-external-urls --reapply; then
         warn "Externe URLs konnten nicht vollständig erneut angewendet werden. /home/diagnose/external-urls prüfen."
     fi
 fi
@@ -20669,7 +20679,7 @@ ui_kv "Diagnosen" "/home/diagnose/"
 ui_kv "Setup zuletzt" "/home/Data/proxmox-installer/last-setup.json"
 ui_kv "Setup erfolgreich" "/home/Data/proxmox-installer/last-success.json"
 ui_kv "Setup-Historie" "/home/Data/proxmox-installer/profiles/"
-ui_kv "Lokale TLS-CA" "/home/Data/proxmox-installer/tls/nodezero-local-ca.crt"
+ui_kv "Lokale TLS-CA" "/home/Data/proxmox-installer/tls/proxmox-local-ca.crt"
 (( INSTALL_PAPERLESS && PAPERLESS_EXTERNAL_STORAGE )) && ui_kv "Paperless NAS" "${PAPERLESS_NAS_IP}:${PAPERLESS_NAS_PATH} → CT ${PL_ID}:${PAPERLESS_NAS_MOUNT}"
 ui_note "Setup-Profile können aus /home/Data, von beliebigen Dateipfaden oder per HTTP/HTTPS geladen werden."
 ui_note "Passwörter, Tokens und Sicherheitscodes werden nicht in Setup-Profilen gespeichert."
@@ -20715,7 +20725,7 @@ fi
 if (( INSTALL_PBS )); then
     ui_section "PBS · nächster Schritt"
     ui_warn_line "Der 128-GB-LXC ist das PBS-System, nicht dein endgültiger Backup-Datastore."
-    ui_note "Webzugriff nativ: https://${PBS_IP}:8007/ · verwaltetes NodeZero-Zertifikat."
+    ui_note "Webzugriff nativ: https://${PBS_IP}:8007/ · verwaltetes Proxmox-Zertifikat."
     ui_note "NAS/NFS-Datastore anschließend in PBS einrichten."
     ui_section_end
     echo

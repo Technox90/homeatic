@@ -1,4 +1,4 @@
-/* NodeZero Dashboard Branding V151 */
+/* Dashboard Branding V151 */
 function fixedToolbarV151(){
   const bar=document.querySelector('.toolbar');
   if(!bar)return;
@@ -54,11 +54,11 @@ function menuLogoV151(settings){
     logo.className='brandLogoV151';
     logo.innerHTML=
       '<img id="dashboardBrandImageV151" class="brandLogoImageV151" alt="">'
-      +'<span id="dashboardBrandTextV151" class="brandLogoTextV151">NODEZERO</span>';
+      +'<span id="dashboardBrandTextV151" class="brandLogoTextV151">PROXMOX</span>';
     head.prepend(logo);
   }
 
-  const text=String(settings.logo_text||'NODEZERO').trim()||'NODEZERO';
+  const text=String(settings.logo_text||'PROXMOX').trim()||'PROXMOX';
   const label=document.getElementById('dashboardBrandTextV151');
   if(label)label.textContent=text;
 
@@ -148,7 +148,7 @@ setTimeout(async()=>{
   }catch(e){
     applyBrandingV151({
       website_name:'PVE Hardware Monitor',
-      logo_text:'NODEZERO'
+      logo_text:'PROXMOX'
     });
   }
 },0);

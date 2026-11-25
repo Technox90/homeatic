@@ -1,9 +1,9 @@
-name: NodeZero dashboard views checks
+name: Proxmox dashboard views checks
 on:
   push:
     paths:
       - "dashboard/views/**"
-      - "proxmox/tools/nodezero-dashboard-views"
+      - "proxmox/tools/proxmox-dashboard-views"
       - "proxmox/proxmox.sh"
       - ".github/workflows/dashboard-views.yml"
   pull_request:
@@ -16,7 +16,7 @@ jobs:
       - name: Shell syntax
         run: |
           bash -n proxmox/proxmox.sh
-          bash -n proxmox/tools/nodezero-dashboard-views
+          bash -n proxmox/tools/proxmox-dashboard-views
       - name: JavaScript syntax
         run: node --check dashboard/views/runtime.js
       - name: Check five local styles and installer hook
@@ -27,15 +27,15 @@ jobs:
           expected = ["boot", "live", "telemetry", "glass", "status"]
           for name in expected:
               css = (root / f"{name}.css").read_text(encoding="utf-8")
-              assert "nz-highlight" in css, name
+              assert "view-highlight" in css, name
               assert "prefers-reduced-motion" in css, name
           main = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
           assert '"3" "Dashboard-Ansicht wählen' in main
           assert "3) printf '%s' 'DV' ;;" in main
-          assert "nodezero-dashboard-views --install" in main
-          manager = Path("proxmox/tools/nodezero-dashboard-views").read_text(encoding="utf-8")
-          assert "NODEZERO-VIEWS-START" in manager
-          assert "NODEZERO-VIEWS-END" in manager
+          assert "proxmox-dashboard-views --install" in main
+          manager = Path("proxmox/tools/proxmox-dashboard-views").read_text(encoding="utf-8")
+          assert "PROXMOX-VIEWS-START" in manager
+          assert "PROXMOX-VIEWS-END" in manager
           assert "dashboard-view" in manager
           assert "docker " not in manager
           assert "systemctl restart" not in manager

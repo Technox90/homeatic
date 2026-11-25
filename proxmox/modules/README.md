@@ -20,7 +20,7 @@ Seit **V140** wird größere Installationslogik aus dem Master-Installer ausgela
 Der Master-Installer lädt das Modul versionsgebunden nach:
 
 ```text
-/home/downloads/nodezero/modules/<git-ref>/dashboard.sh
+/home/downloads/proxmox/modules/<git-ref>/dashboard.sh
 ```
 
 und bindet es anschließend mit `source` ein.

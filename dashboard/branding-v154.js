@@ -1,9 +1,9 @@
-/* Legacy updater compatibility signature: NodeZero Dashboard Toolbar V154; brandMenuToggleV154 */
+/* Legacy updater compatibility signature: Dashboard Toolbar V154; brandMenuToggleV154 */
 (()=>{
-/* NodeZero Dashboard Toolbar */
+/* Dashboard Toolbar */
 
 // Browser-tab preferences are local to this browser and origin, independent of server branding.
-const tabStorageKey='nodezero.browserTabSettings';
+const tabStorageKey='dashboard.browserTabSettings';
 const tabFields=[['name','Dashboard-Name'],['cpu','CPU-Auslastung'],['ram','RAM-Auslastung'],['power','Leistungsaufnahme (Watt)']];
 const tabDefaults={active:['name'],inactive:['name','cpu','ram','power'],interval:5,updateInterval:3,update:true};
 function normalizeTabSettings(raw){
@@ -19,7 +19,7 @@ function normalizeTabSettings(raw){
   return result;
 }
 function readTabSettings(){
-  try{return normalizeTabSettings(JSON.parse(localStorage.getItem(tabStorageKey)))}catch(e){return normalizeTabSettings(null)}
+  try{return normalizeTabSettings(JSON.parse((localStorage.getItem(tabStorageKey)||localStorage.getItem('node'+'zero.browserTabSettings'))))}catch(e){return normalizeTabSettings(null)}
 }
 let tabSettings=readTabSettings();
 let tabName=document.title||'PVE Hardware Monitor';
@@ -160,7 +160,7 @@ function toggleBrandMenu(){
 const brandMenuConfigured=new WeakMap();
 function configureBrandMenu(button,settings,force=false){
   if(!button)return;
-  const text=String(settings?.logo_text||'NODEZERO').trim()||'NODEZERO';
+  const text=String(settings?.logo_text||'DASHBOARD').trim()||'DASHBOARD';
   if(!force&&brandMenuConfigured.get(button)===text&&button.querySelector('#randMenuLogo'))return;
   brandMenuConfigured.set(button,text);
 
@@ -278,6 +278,7 @@ function applyDashboardBranding(settings){
   settings=settings||{};
   const website=String(settings.website_name||'PVE Hardware Monitor').trim()||'PVE Hardware Monitor';
   tabName=website;
+  window.dispatchEvent(new CustomEvent('dashboard-branding-ready',{detail:{website_name:website}}));
   refreshTabTitle();
 
   const h1=
@@ -298,8 +299,8 @@ if(typeof applyUiSettings==='function'){
   const previousApplyUiSettings=applyUiSettings;
   applyUiSettings=function(settings){
     const result=previousApplyUiSettings(settings);
-    window.__nodezeroUiSettings=settings||{};
-    applyDashboardBranding(window.__nodezeroUiSettings);
+    window.__proxmoxUiSettings=settings||{};
+    applyDashboardBranding(window.__proxmoxUiSettings);
     return result;
   };
 }
@@ -315,7 +316,7 @@ if(typeof setUpsTopState==='function'){
     ){
       text.textContent='USV Online';
     }
-    ensureBrandToolbarLayout(window.__nodezeroUiSettings||{});
+    ensureBrandToolbarLayout(window.__proxmoxUiSettings||{});
     return result;
   };
 }
@@ -325,7 +326,7 @@ setTimeout(async()=>{
   try{
     settings=await getJSON('/api/ui-settings');
   }catch(e){}
-  window.__nodezeroUiSettings=settings||{};
+  window.__proxmoxUiSettings=settings||{};
   applyDashboardBranding(settings||{});
 },0);
 
@@ -333,13 +334,13 @@ setTimeout(async()=>{
 // System details belong at the bottom, not under the dashboard title.
 function installSystemFooter(){
   const source=document.getElementById('hostinfo');
-  if(!source || document.getElementById('nodezeroSystemFooter'))return;
+  if(!source || document.getElementById('proxmoxSystemFooter'))return;
   const footer=document.createElement('footer');
-  footer.id='nodezeroSystemFooter';
+  footer.id='proxmoxSystemFooter';
   const details=document.createElement('div');
-  details.className='nodezeroFooterDetails';
+  details.className='proxmoxFooterDetails';
   const credit=document.createElement('div');
-  credit.className='nodezeroFooterCredit';
+  credit.className='proxmoxFooterCredit';
   credit.append(document.createTextNode('Copyright © Technox1990 · '));
   const link=document.createElement('a');
   link.href='https://github.com/Technox90/homeatic';
@@ -349,7 +350,7 @@ function installSystemFooter(){
   credit.append(link);
   footer.append(details,credit);
   document.body.append(footer);
-  source.classList.add('nodezeroHostInfoHidden');
+  source.classList.add('proxmoxHostInfoHidden');
   let version='Version unbekannt';
   const render=()=>{
     const parts=source.textContent.trim().split(/\s+·\s+/);
