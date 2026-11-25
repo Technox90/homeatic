@@ -1,10 +1,10 @@
-# NodeZero Dashboard-Ansichten (v1)
+# Dashboard-Ansichten (v1)
 
-Fünf umschaltbare **Darstellungsprofile für das bestehende NodeZero-/Proxmox-Dashboard**. Die bestehenden API-Routen, Messwerte, Link-/Kategorieverwaltung, Start-/Stop-Funktionen und gespeicherte Einstellungen werden **nicht ersetzt**. Jede Ansicht verwendet dieselbe Dashboard-Weboberfläche plus eigenes CSS und die gemeinsame Frontend-Laufzeit `runtime.js`.
+Fünf umschaltbare **Darstellungsprofile für das bestehende Proxmox-Dashboard**. Die bestehenden API-Routen, Messwerte, Link-/Kategorieverwaltung, Start-/Stop-Funktionen und gespeicherte Einstellungen werden **nicht ersetzt**. Jede Ansicht verwendet dieselbe Dashboard-Weboberfläche plus eigenes CSS und die gemeinsame Frontend-Laufzeit `runtime.js`.
 
 | Ansicht | ID | Besonderheit |
 | --- | --- | --- |
-| 1. Boot Sequence | `boot` | Initialer, zeitlich begrenzter Ladebildschirm mit animiertem Ring; kühles Cyan |
+| 1. Boot Sequence | `boot` | Initialer Ladebildschirm mit animiertem Ring und exakt konfiguriertem Dashboard-Namen; kühles Cyan |
 | 2. Live Pulse | `live` | Pulsierende Verbindungsanzeige und zeitbasierter 15-Sekunden-Balken; Grün/Türkis |
 | 3. Telemetry Flow | `telemetry` | Grafikfokus mit feinem Diagrammraster und animierten Werteänderungen; Blau/Indigo |
 | 4. Glass Motion | `glass` | Halbtransparente Karten, Unschärfe und Hover-Bewegungen; Violett |
@@ -19,11 +19,11 @@ Im Proxmox-Installer `proxmox.sh`: **Basis-Systeme → Dashboard-Ansicht wählen
 Direkt auf dem Proxmox-Host:
 
 ```bash
-nodezero-dashboard-views --menu
-nodezero-dashboard-views --list
-nodezero-dashboard-views --status
-nodezero-dashboard-views --select telemetry
-nodezero-dashboard-views --refresh
+proxmox-dashboard-views --menu
+proxmox-dashboard-views --list
+proxmox-dashboard-views --status
+proxmox-dashboard-views --select telemetry
+proxmox-dashboard-views --refresh
 ```
 
 Vor dem ersten Wechsel lädt das Werkzeug alle fünf CSS-Varianten und `runtime.js` über GitHub herunter; danach wird aus dem lokalen Cache umgeschaltet, selbst ohne Internet.
@@ -31,11 +31,11 @@ Vor dem ersten Wechsel lädt das Werkzeug alle fünf CSS-Varianten und `runtime.
 ## Speicherpfade
 
 - GitHub-Quelldateien: `dashboard/views/{boot,live,telemetry,glass,status}.css`, `dashboard/views/runtime.js`
-- Offline-Cache: `/home/downloads/nodezero/dashboard-views/v1/`
-- Aktive Frontend-Dateien: `/opt/nodezero/dashboard/static/nodezero-views/`
+- Offline-Cache: `/home/downloads/proxmox/dashboard-views/v3/`
+- Aktive Frontend-Dateien: `/opt/dashboard/static/proxmox-views/`
 - Persistente Auswahl: `/etc/pve-sensor-dashboard/dashboard-view`
-- Backup der HTML-Basis vor der ersten Aktivierung: `/home/backups/nodezero-dashboard-views/`
-- Installer-Hilfswerkzeug: `/usr/local/sbin/nodezero-dashboard-views`
+- Backup der HTML-Basis vor der ersten Aktivierung: `/home/backups/proxmox-dashboard-views/`
+- Installer-Hilfswerkzeug: `/usr/local/sbin/proxmox-dashboard-views`
 
 Das Werkzeug fügt **nur** drei Asset-Referenzen mit markiertem Start-/Endbereich im `<head>` hinzu und ersetzt diesen Bereich bei späteren Wechseln. Datenbanken, API-Routen, TLS, Links, Kategorien und Power-Steuercode bleiben unverändert. Ein Browser-Reload (Strg+F5) genügt. Für neue GitHub-Versionen den Cache explizit mit `--refresh` aktualisieren.
 

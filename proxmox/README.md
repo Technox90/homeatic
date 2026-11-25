@@ -4,7 +4,21 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V163 · 25.11.2026**
+**Installationskandidat: V164 · 25.11.2026**
+
+## V164 · Einmalige Migration bestehender Installationen
+
+Diese Version benennt aktive Installer-Pfade, Hilfswerkzeuge und den Dashboard-Ordner um. **Bestehende Installationen nicht durch eine Neuinstallation ersetzen.** Der bisherige Auto-Updater kennt die neuen Dateinamen noch nicht. Einmalig auf dem Proxmox-Host als root ausführen:
+
+```bash
+REF=$(curl -fsSL https://api.github.com/repos/Technox90/homeatic/commits/main | python3 -c 'import json,sys;print(json.load(sys.stdin)["sha"])')
+curl -fsSL "https://raw.githubusercontent.com/Technox90/homeatic/$REF/proxmox/tools/proxmox-migrate-layout" -o /root/proxmox-migrate-layout
+python3 /root/proxmox-migrate-layout --ref "$REF"
+# Erst nach erfolgreicher Vorprüfung:
+python3 /root/proxmox-migrate-layout --ref "$REF" --apply
+```
+
+Die Vorprüfung verändert keine Installation. Die Migration übernimmt vorhandene Dateien und erzeugt eine root-geschützte Sicherung unter `/home/backups/proxmox-layout-*`. Bei Fehlern werden die Änderungen zurückgenommen. Bestehende Zertifikatsidentitäten und historische Sicherungen werden nicht umgeschrieben; eine neue CA wird nicht erzeugt. Zertifikate und CA-Vertrauenseinstellungen bleiben gültig. Ein bestehender Zertifikatsname bleibt bis zu einer bewusst geplanten Zertifikatsmigration bestehen. Alte Git-Commits bleiben unverändert. Anschließend funktionieren die neuen Auto-Updater-Pfade.
 
 ## Installation
 
@@ -65,7 +79,7 @@ Der Installer prüft vor dem Update, ob der vollständige aktuelle Dashboard-Sta
 Installationspfad:
 
 ```text
-/opt/nodezero/dashboard/
+/opt/dashboard/
 ```
 
 ### Eigene Logo-/Favicon-Dateien
@@ -73,8 +87,8 @@ Installationspfad:
 Auf dem Proxmox-Host:
 
 ```text
-/opt/nodezero/dashboard/static/assets/logo.png
-/opt/nodezero/dashboard/static/assets/favicon.png
+/opt/dashboard/static/assets/logo.png
+/opt/dashboard/static/assets/favicon.png
 ```
 
 Repository-Platzhalter:
@@ -109,7 +123,7 @@ Standardwerte für eine generische Installation:
 
 ```text
 Dashboard-Name: PVE Hardware Monitor
-Fallback-Logo:  NODEZERO
+Fallback-Logo:  DASHBOARD
 Fallback-Stil:  neon
 ```
 
@@ -136,7 +150,7 @@ Menü · LIVE · USV Online · Neustart · Herunterfahren
 Werkzeug:
 
 ```text
-/usr/local/sbin/nodezero-dashboard-views
+/usr/local/sbin/proxmox-dashboard-views
 ```
 
 ## Enthaltene Dienste
@@ -214,7 +228,7 @@ Proxmox VE selbst bleibt standardmäßig auf Port `8006`.
 /home/backups/           Konfigurations-/Reparatur-Backups
 /home/diagnose/          Diagnoseberichte und Logs
 /home/img/               Images, Docker-/Template-/Ollama-Caches
-/opt/nodezero/           installierter NodeZero-Code
+/opt/dashboard/         installierter Dashboard-Code
 ```
 
 ## Dashboard-Modul
@@ -304,6 +318,13 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 > **Achtung:** Optimal-, Reset- und Neuaufbau-Funktionen können bestehende VMs/LXC oder Dashboard-Daten löschen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V164
+
+- Dashboard unter `/opt/dashboard/`; persönliche Dateien bleiben unter `static/assets/` erhalten.
+- Neutrale Proxmox-Werkzeuge und lokale CA-Dateinamen; UPPER bleibt unabhängig unter `/var/www/upper/`.
+- Boot-Animation übernimmt exakt den gespeicherten Dashboard-Namen, ohne zusätzliches Präfix.
+- Bestehende Installationen erfordern eine einmalige, gesicherte Layout-Migration. Bestehende CA-Schlüssel, Zertifikate, Datenbanken und Gastdaten bleiben erhalten.
 
 ### V163
 

@@ -1,4 +1,4 @@
-# ChatGPT-Handoff · Proxmox / NodeZero
+# ChatGPT-Handoff · Proxmox
 
 Stand: 25.11.2026
 
@@ -9,8 +9,8 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V163
-- External-URL-Tool: `proxmox/tools/nodezero-external-urls`
+- Aktueller Installationskandidat: V164
+- External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
 
@@ -186,10 +186,10 @@ pct exec 105 -- bash -lc '
 
 ## External-URL-Tool / wichtiger Migrationshinweis
 
-Das aktuelle Repository-Tool `nodezero-external-urls` verwendet als eigenen Zertifikatsnamen:
+Das aktuelle Repository-Tool `proxmox-external-urls` verwendet als eigenen Zertifikatsnamen:
 
 ```text
-nodezero-external
+proxmox-external
 ```
 
 Die bestehende produktive manuelle Installation verwendet dagegen noch:
@@ -198,7 +198,7 @@ Die bestehende produktive manuelle Installation verwendet dagegen noch:
 ltwbh-services
 ```
 
-Nicht unüberlegt parallele nginx-VHosts mit denselben `server_name`-Werten erzeugen. Vor einer vollständigen Migration auf `nodezero-external` zuerst bestehende Dateien unter `/etc/nginx/sites-enabled/`, `/etc/nginx/conf.d/` und die aktiven Zertifikate prüfen.
+Nicht unüberlegt parallele nginx-VHosts mit denselben `server_name`-Werten erzeugen. Vor einer vollständigen Migration auf `proxmox-external` zuerst bestehende Dateien unter `/etc/nginx/sites-enabled/`, `/etc/nginx/conf.d/` und die aktiven Zertifikate prüfen.
 
 Persistente External-URL-Dateien:
 
@@ -212,8 +212,8 @@ Persistente External-URL-Dateien:
 CLI:
 
 ```bash
-nodezero-external-urls --status
-nodezero-external-urls --reapply
+proxmox-external-urls --status
+proxmox-external-urls --reapply
 ```
 
 `--reapply` erst verwenden, wenn geklärt ist, dass keine doppelten nginx-VHosts zur bestehenden manuellen Konfiguration entstehen.
@@ -298,8 +298,8 @@ V151 ersetzt das persönliche V150-Branding durch eine vollständig generische L
 ### Serverpfade
 
 ```text
-/opt/nodezero/dashboard/static/assets/logo.png
-/opt/nodezero/dashboard/static/assets/favicon.png
+/opt/dashboard/static/assets/logo.png
+/opt/dashboard/static/assets/favicon.png
 ```
 
 ### Repository
@@ -349,7 +349,7 @@ Generische Defaults:
 
 ```text
 PVE Hardware Monitor
-NODEZERO
+PROXMOX
 neon
 ```
 
@@ -373,7 +373,7 @@ Dashboard-Ansichten:
 Tool:
 
 ```text
-/usr/local/sbin/nodezero-dashboard-views
+/usr/local/sbin/proxmox-dashboard-views
 ```
 
 ### Dokumentation
@@ -410,9 +410,9 @@ Neue Versionen müssen immer oben dokumentiert werden.
 Kopiere ab hier in einen neuen Chat:
 
 ```text
-Wir arbeiten am Proxmox-/NodeZero-Projekt im GitHub-Repository Technox90/homeatic auf Branch main.
+Wir arbeiten am Proxmox-Projekt im GitHub-Repository Technox90/homeatic auf Branch main.
 
-Bitte lies zuerst pro­xmox/CHATGPT-HANDOFF.md und verwende diese Datei als aktuellen technischen Stand. Prüfe danach den aktuellen Stand von pro­xmox/proxmox.sh, pro­xmox/history.txt, pro­xmox/README.md und bei Bedarf pro­xmox/tools/nodezero-external-urls.
+Bitte lies zuerst pro­xmox/CHATGPT-HANDOFF.md und verwende diese Datei als aktuellen technischen Stand. Prüfe danach den aktuellen Stand von pro­xmox/proxmox.sh, pro­xmox/history.txt, pro­xmox/README.md und bei Bedarf pro­xmox/tools/proxmox-external-urls.
 
 Wichtig:
 - Produktive Namen und Pfade nicht eigenmächtig ändern.
@@ -434,3 +434,12 @@ Setze die Arbeit auf Basis des aktuellen GitHub-Stands fort.
 - UPPER: eigenständige Statusseite unter `/upper/`, Dateien in `/var/www/upper/`, Logo/Favicon bleiben bei Updates erhalten; Copyright und GitHub-Link, interaktive Ping-Diagramme mit Maus, Touch und Tastatur.
 - Originale Kuma-Statusseiten bleiben unverändert. Opt-in-Updates migrieren alte Installationen; Nginx-Prüfung mit Rücksicherung.
 - Dashboard: SVG-Symbole für Neustart und Herunterfahren. Uptime Kuma: Datenbank-Besitzrechte nicht rekursiv zurücksetzen, Health- und HTTP-Prüfung nach Updates.
+
+## V164
+
+- Dashboard unter `/opt/dashboard/`; persönliche Dateien bleiben unter `static/assets/` erhalten.
+- Neutrale Proxmox-Werkzeuge und lokale CA-Dateinamen; UPPER bleibt unabhängig unter `/var/www/upper/`.
+- Boot-Animation übernimmt exakt den gespeicherten Dashboard-Namen, ohne zusätzliches Präfix.
+- Bestehende Installationen erfordern eine einmalige, gesicherte Layout-Migration. Bestehende CA-Schlüssel, Zertifikate, Datenbanken und Gastdaten bleiben erhalten.
+
+Für bestehende Hosts zuerst die dokumentierte Layout-Migration ausführen. Zertifikatsnamen des Bestands nicht ändern.

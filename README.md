@@ -1,13 +1,15 @@
 # Homeatic / Homelab
 
-Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen NodeZero-/Homelab-Werkzeuge.
+Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen Homelab-Werkzeuge.
 
 ## Aktueller Stand
 
-**Aktueller Stand: V163 · Proxmox Master Installer · 25.11.2026**
+**Aktueller Stand: V164 · Proxmox Master Installer · 25.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
+
+Bestehende Installationen: [einmalige Layout-Migration V164](proxmox/README.md#v164--einmalige-migration-bestehender-installationen).
 
 ## Bereiche
 
@@ -50,7 +52,7 @@ Der Installer kann unter anderem verwalten:
 - Prometheus / PVE Exporter / Grafana
 - EMQX
 - weitere optionale Dienste
-- lokale NodeZero-CA und TLS
+- lokale Proxmox-CA und TLS
 - externe URLs per nginx + Let's Encrypt
 - Dashboard mit Menü, Kategorien, USV, Pi-hole, Layouts und mehreren Ansichten
 - automatische Updates, Diagnose und Healthchecks
@@ -60,14 +62,14 @@ Der Installer kann unter anderem verwalten:
 Das Dashboard liegt lokal unter:
 
 ```text
-/opt/nodezero/dashboard/
+/opt/dashboard/
 ```
 
 Eigene Branding-Dateien:
 
 ```text
-/opt/nodezero/dashboard/static/assets/logo.png
-/opt/nodezero/dashboard/static/assets/favicon.png
+/opt/dashboard/static/assets/logo.png
+/opt/dashboard/static/assets/favicon.png
 ```
 
 **Update-Regel:** Ein normales Dashboard-Update verändert diese beiden Dateien niemals. Seit V152 bleiben außerdem die bereits aktuellen Dashboard-Programmdateien erhalten; der Installer setzt sie nicht mehr auf die V139-Basis zurück.
@@ -98,7 +100,7 @@ Hauptmenü → 1 Basis-Systeme → 2 Server-Dashboard installieren / aktualisier
 /home/backups/           Backups
 /home/diagnose/          Diagnoseberichte und Logs
 /home/img/               Images / Container-/Template-Caches
-/opt/nodezero/           installierter NodeZero-Code
+/opt/dashboard/         installierter Dashboard-Code
 ```
 
 ## Passwortmanager
@@ -134,6 +136,13 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 > Reset-/Neuaufbau-Funktionen können VMs/LXC oder Dashboard-Daten entfernen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V164
+
+- Dashboard unter `/opt/dashboard/`; persönliche Dateien bleiben unter `static/assets/` erhalten.
+- Neutrale Proxmox-Werkzeuge und lokale CA-Dateinamen; UPPER bleibt unabhängig unter `/var/www/upper/`.
+- Boot-Animation übernimmt exakt den gespeicherten Dashboard-Namen, ohne zusätzliches Präfix.
+- Bestehende Installationen erfordern eine einmalige, gesicherte Layout-Migration. Bestehende CA-Schlüssel, Zertifikate, Datenbanken und Gastdaten bleiben erhalten.
 
 ### V163
 
