@@ -4,7 +4,7 @@ Ausgelagerte Basisquellen des Proxmox-Dashboards.
 
 ## Aktueller Stand
 
-**Dashboard-Stand: V162**
+**Dashboard-Stand: V163**
 
 Dateien:
 
@@ -16,6 +16,10 @@ Dateien:
 - `assets/logo.png` – neutraler transparenter Logo-Platzhalter.
 - `assets/favicon.png` – neutraler transparenter Favicon-Platzhalter.
 - `views/` – auswählbare Dashboard-Darstellungen.
+
+## V163
+
+- Neustart und Herunterfahren nutzen skalierbare SVG-Icons statt Schriftzeichen.
 
 ## Freigabestand V162
 
