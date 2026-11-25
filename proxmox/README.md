@@ -4,7 +4,7 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V164 · 25.11.2026**
+**Installationskandidat: V165 · 25.11.2026**
 
 ## V164 · Einmalige Migration bestehender Installationen
 
@@ -318,6 +318,10 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 > **Achtung:** Optimal-, Reset- und Neuaufbau-Funktionen können bestehende VMs/LXC oder Dashboard-Daten löschen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V165
+
+- Ladeanimation: führendes Wort „Dashboard“ wird ausschließlich im Ladebildschirm entfernt (z. B. `Dashboard LT-WBH` → `LT-WBH`). Gespeicherter Name, Seitentitel, Tab-Titel und Branding bleiben unverändert.
 
 ### V164
 

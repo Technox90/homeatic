@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V164
+# PROXMOX MODULARER KOMPLETT-INSTALLER V165
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1009,8 +1009,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V164"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V164"
+TUI_TITLE="PROXMOX INSTALLER V165"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V165"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1877,7 +1877,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 164" \
+                    --title "HAUPTMENÜ · Version 165" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8201,7 +8201,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V164",
+    "installer_version": "V165",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8675,7 +8675,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V164 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V165 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"

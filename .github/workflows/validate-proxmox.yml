@@ -529,3 +529,6 @@ jobs:
         run: |
           python3 -m py_compile proxmox/tools/proxmox-migrate-layout
           python3 proxmox/tests/test-layout-migration.py
+
+      - name: V165 boot title regression tests
+        run: node dashboard/tests/boot-title.test.js

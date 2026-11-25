@@ -4,7 +4,7 @@ Fünf umschaltbare **Darstellungsprofile für das bestehende Proxmox-Dashboard**
 
 | Ansicht | ID | Besonderheit |
 | --- | --- | --- |
-| 1. Boot Sequence | `boot` | Initialer Ladebildschirm mit animiertem Ring und exakt konfiguriertem Dashboard-Namen; kühles Cyan |
+| 1. Boot Sequence | `boot` | Initialer Ladebildschirm mit animiertem Ring und konfiguriertem Namen ohne führendes Wort Dashboard; kühles Cyan |
 | 2. Live Pulse | `live` | Pulsierende Verbindungsanzeige und zeitbasierter 15-Sekunden-Balken; Grün/Türkis |
 | 3. Telemetry Flow | `telemetry` | Grafikfokus mit feinem Diagrammraster und animierten Werteänderungen; Blau/Indigo |
 | 4. Glass Motion | `glass` | Halbtransparente Karten, Unschärfe und Hover-Bewegungen; Violett |
