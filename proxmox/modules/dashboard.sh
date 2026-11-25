@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# NODEZERO DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V163
+# PROXMOX DASHBOARD-MODUL · eingeführt V140 · aktueller Stand V164
 # =============================================================================
 # Dieses Modul wird von proxmox/proxmox.sh versionsgebunden aus GitHub geladen.
 # Es enthält die vollständige Dashboard-Installations-, Patch-, Settings-,
@@ -342,9 +342,9 @@ PYV134LINKS
 DASHBOARD_FAST_UPDATE_V152="${DASHBOARD_FAST_UPDATE_V152:-0}"
 
 dashboard_has_current_state_v152() {
-    local index="/opt/nodezero/dashboard/static/index.html"
-    local app="/opt/nodezero/dashboard/app.py"
-    local collector="/opt/nodezero/dashboard/collector.py"
+    local index="/opt/dashboard/static/index.html"
+    local app="/opt/dashboard/app.py"
+    local collector="/opt/dashboard/collector.py"
     local marker=""
 
     [[ -f "$index" && -f "$app" && -f "$collector" ]] || return 1
@@ -401,13 +401,13 @@ prepare_dashboard_update_mode_v152() {
 # Der Ref zeigt auf den unveränderlichen Commit, in dem die V139-Basisdateien
 # abgelegt wurden. Dadurch kann ein späteres main-Update keinen alten Installer
 # mit inkompatiblen Dashboard-Dateien mischen.
-NODEZERO_DASHBOARD_ASSET_REF="f1005bd0a8d385b791d0a4d25cf1ab2dc67198d2"
-NODEZERO_DASHBOARD_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${NODEZERO_DASHBOARD_ASSET_REF}/dashboard"
+PROXMOX_DASHBOARD_ASSET_REF="87e8798aac6f0891719698a9eedc5fd12a9ec06b"
+PROXMOX_DASHBOARD_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_DASHBOARD_ASSET_REF}/dashboard"
 
 download_dashboard_asset_v139() {
     local name="$1"
     local target="$2"
-    local url="${NODEZERO_DASHBOARD_RAW_BASE}/${name}"
+    local url="${PROXMOX_DASHBOARD_RAW_BASE}/${name}"
     local tmp="${target}.tmp"
 
     if [[ -s "$target" ]]; then
@@ -426,13 +426,13 @@ download_dashboard_asset_v139() {
     mv -f "$tmp" "$target"
 }
 
-install_nodezero_dashboard_sources_v139() {
+install_proxmox_dashboard_sources_v139() {
     local app_dir="$1"
     local static_dir="$2"
-    local cache_dir="${NODEZERO_DOWNLOAD_DIR}/dashboard/${NODEZERO_DASHBOARD_ASSET_REF}"
+    local cache_dir="${PROXMOX_DOWNLOAD_DIR}/dashboard/${PROXMOX_DASHBOARD_ASSET_REF}"
 
     mkdir -p "$cache_dir" "$app_dir" "$static_dir"
-    chmod 700 "$NODEZERO_DOWNLOAD_DIR"
+    chmod 700 "$PROXMOX_DOWNLOAD_DIR"
     chmod 755 "$cache_dir"
 
     download_dashboard_asset_v139 "collector.py" "$cache_dir/collector.py"
@@ -450,7 +450,7 @@ install_nodezero_dashboard_sources_v139() {
 install_dashboard() {
     header "SERVER-DASHBOARD INSTALLIEREN / AKTUALISIEREN"
 
-    local APP_DIR="/opt/nodezero/dashboard"
+    local APP_DIR="/opt/dashboard"
     local DATA_DIR="/var/lib/pve-sensor-dashboard"
     local STATIC_DIR="${APP_DIR}/static"
     local CONTROL_DIR="/etc/pve-sensor-dashboard"
@@ -555,7 +555,7 @@ EOF
         ok "Dashboard-Programmstand bleibt erhalten · kein Rücksetzen auf V139-Basis."
         info "Aktualisiert werden nur aktuelle V152-Komponenten und Konfigurationen."
     else
-        install_nodezero_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"
+        install_proxmox_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"
     fi
 
     # -------------------------------------------------------------------------
@@ -914,7 +914,7 @@ set -Eeuo pipefail
     exit 1
 }
 
-APP_DIR="/opt/nodezero/dashboard"
+APP_DIR="/opt/dashboard"
 APP_FILE="${APP_DIR}/app.py"
 INDEX_FILE="${APP_DIR}/static/index.html"
 SERVICE_FILE="/etc/systemd/system/pve-sensor-web.service"
@@ -1933,7 +1933,7 @@ WEB_DIR="$(dirname "$LINKS_FILE")"
 TOOL="/usr/local/sbin/pve-dashboard-link"
 EXAMPLE="/root/pve-dashboard-links-beispiel.txt"
 
-[[ -d /opt/nodezero/dashboard ]] || {
+[[ -d /opt/dashboard ]] || {
     echo "FEHLER: Das PVE Sensor Dashboard wurde nicht gefunden."
     exit 1
 }
@@ -2413,8 +2413,8 @@ set -Eeuo pipefail
     exit 1
 }
 
-APP_FILE="/opt/nodezero/dashboard/app.py"
-INDEX_FILE="/opt/nodezero/dashboard/static/index.html"
+APP_FILE="/opt/dashboard/app.py"
+INDEX_FILE="/opt/dashboard/static/index.html"
 LINK_TOOL="/usr/local/sbin/pve-dashboard-link"
 BACKUP="/home/backups/pve-dashboard-sort-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -3004,8 +3004,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 STAMP2="$(date +%Y%m%d-%H%M%S)"
 BACKUP="/home/backups/pve-dashboard-menu-v3-backup-${STAMP2}"
@@ -3686,7 +3686,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 BACKUP="/home/backups/pve-dashboard-router-top-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -3953,8 +3953,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 CLI="/usr/local/sbin/pve-dashboard-link"
 BACKUP="/home/backups/pve-dashboard-menu-editor-backup-$(date +%Y%m%d-%H%M%S)"
@@ -6010,8 +6010,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 NGINX_SITE="/etc/nginx/sites-available/pve-sensor-dashboard"
 SUDOERS="/etc/sudoers.d/pve-sensor-dashboard"
 SETTINGS_DIR="/etc/pve-sensor-dashboard"
@@ -6136,7 +6136,7 @@ import sys
 import time
 from pathlib import Path
 
-APP_DIR = Path("/opt/nodezero/dashboard")
+APP_DIR = Path("/opt/dashboard")
 STATIC_DIR = APP_DIR / "static"
 SETTINGS_DIR = Path("/etc/pve-sensor-dashboard")
 SETTINGS_FILE = SETTINGS_DIR / "ui.json"
@@ -6414,7 +6414,7 @@ def ensure_self_signed(host, dashboard_ip):
         "-out",
         str(temp_cert),
         "-subj",
-        f"/C=DE/ST=Deutschland/L=HomeLab/O=NodeZero/OU=Proxmox/CN={host}",
+        f"/C=DE/ST=Deutschland/L=HomeLab/O=Proxmox/OU=Proxmox/CN={host}",
         "-addext",
         "subjectAltName=" + ",".join(san),
     ]
@@ -8817,7 +8817,7 @@ install_dashboard_settings_write_paths() {
     mkdir -p \
         "$dropin_dir" \
         /var/lib/pve-sensor-dashboard-web \
-        /opt/nodezero/dashboard/static \
+        /opt/dashboard/static \
         /etc/pve-sensor-dashboard \
         /etc/nginx/sites-available \
         /etc/nginx/sites-enabled
@@ -8832,11 +8832,11 @@ install_dashboard_settings_write_paths() {
 # UI-Einstellungen und lokale TLS-Dateien gespeichert werden.
 
 ReadOnlyPaths=
-ReadOnlyPaths=/opt/nodezero/dashboard /var/lib/pve-sensor-dashboard
+ReadOnlyPaths=/opt/dashboard /var/lib/pve-sensor-dashboard
 
 ReadWritePaths=
 ReadWritePaths=/var/lib/pve-sensor-dashboard-web
-ReadWritePaths=/opt/nodezero/dashboard/static
+ReadWritePaths=/opt/dashboard/static
 ReadWritePaths=/etc/pve-sensor-dashboard
 ReadWritePaths=/etc/nginx/sites-available
 ReadWritePaths=/etc/nginx/sites-enabled
@@ -8871,7 +8871,7 @@ EOF
 
     for dir in \
         /var/lib/pve-sensor-dashboard-web \
-        /opt/nodezero/dashboard/static \
+        /opt/dashboard/static \
         /etc/pve-sensor-dashboard \
         /etc/nginx/sites-available \
         /etc/nginx/sites-enabled
@@ -8910,7 +8910,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo "FEHLER: Bitte als root ausführen."; exit 1; }
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 BACKUP="/home/backups/pve-dashboard-einstellungen-tabs-backup-$(date +%Y%m%d-%H%M%S)"
 [[ -f "$INDEX" ]] || { echo "FEHLER: $INDEX fehlt."; exit 1; }
 
@@ -9290,8 +9290,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 DATA_DIR="/var/lib/pve-sensor-dashboard-web"
 CATEGORY_FILE="${DATA_DIR}/categories.json"
 
@@ -11218,7 +11218,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 BACKUP="/home/backups/pve-dashboard-kategorie-zuordnung-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
@@ -11989,7 +11989,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 BACKUP="/home/backups/pve-dashboard-menue-cleanup-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
@@ -12265,7 +12265,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 LINKS="/var/lib/pve-sensor-dashboard-web/links.json"
 CATEGORIES="/var/lib/pve-sensor-dashboard-web/categories.json"
 BACKUP="/home/backups/pve-dashboard-standard-kategorien-backup-$(date +%Y%m%d-%H%M%S)"
@@ -12754,8 +12754,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
 UPS_STATUS_URL="${PVE_DASHBOARD_UPS_STATUS_URL:-http://192.168.178.111/api/status}"
 
@@ -13861,8 +13861,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 WEB_DIR="/var/lib/pve-sensor-dashboard-web"
 UPS_CONFIG="${WEB_DIR}/ups-source.json"
 OLD_UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
@@ -16539,7 +16539,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 BACKUP="/home/backups/pve-dashboard-usv-ui-backup-$(date +%Y%m%d-%H%M%S)"
 
 [[ -f "$INDEX" ]] || {
@@ -17272,8 +17272,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 SESSION_KEY="/etc/pve-sensor-dashboard/settings-session.key"
 BACKUP="/home/backups/pve-dashboard-settings-login-usv-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -18792,8 +18792,8 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 WEB_DATA="/var/lib/pve-sensor-dashboard-web"
 LAYOUT_FILE="${WEB_DATA}/dashboard-layout.json"
 BACKUP="/home/backups/pve-dashboard-layout-v71-backup-$(date +%Y%m%d-%H%M%S)"
@@ -20388,9 +20388,9 @@ exec > >(tee -a "$LOGFILE") 2>&1
     exit 1
 }
 
-COLLECTOR="/opt/nodezero/dashboard/collector.py"
-APP="/opt/nodezero/dashboard/app.py"
-INDEX="/opt/nodezero/dashboard/static/index.html"
+COLLECTOR="/opt/dashboard/collector.py"
+APP="/opt/dashboard/app.py"
+INDEX="/opt/dashboard/static/index.html"
 WEB_DIR="/var/lib/pve-sensor-dashboard-web"
 CONFIG="${WEB_DIR}/pihole-source.json"
 HELPER="/usr/local/sbin/pve-dashboard-pihole-helper"
@@ -22296,7 +22296,7 @@ install_dashboard_pihole_menu_fix_v80() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 BACKUP="/home/backups/pve-dashboard-pihole-menu-v80-$(date +%Y%m%d-%H%M%S)"
 STAMP="$(date +%d-%m-%H-%M)"
 LOG="/home/diagnose/diagnose-dashboard-pihole-menu-v80-${STAMP}.txt"
@@ -22605,7 +22605,7 @@ install_dashboard_settings_panels_host_v81() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-INDEX="/opt/nodezero/dashboard/static/index.html"
+INDEX="/opt/dashboard/static/index.html"
 BACKUP="/home/backups/pve-dashboard-settings-panels-v81-$(date +%Y%m%d-%H%M%S)"
 STAMP="$(date +%d-%m-%H-%M)"
 LOG="/home/diagnose/diagnose-dashboard-settings-panels-v81-${STAMP}.txt"
@@ -23074,8 +23074,8 @@ __PVE_DASHBOARD_SETTINGS_PANELS_V81__
 # - Erst-/Neuinstallationen erhalten nur neutrale transparente Platzhalter.
 # - Platzhalter werden nur angelegt, wenn die Zieldatei noch nicht existiert.
 # - Eigene Bilder liegen lokal als:
-#     /opt/nodezero/dashboard/static/assets/logo.png
-#     /opt/nodezero/dashboard/static/assets/favicon.png
+#     /opt/dashboard/static/assets/logo.png
+#     /opt/dashboard/static/assets/favicon.png
 # =============================================================================
 
 DASHBOARD_INSTALL_NAME_V151="${DASHBOARD_INSTALL_NAME_V151:-}"
@@ -23087,9 +23087,9 @@ prepare_dashboard_branding_v151() {
     (( INSTALL_DASHBOARD )) || return 0
 
     local settings="/etc/pve-sensor-dashboard/ui.json"
-    local index="/opt/nodezero/dashboard/static/index.html"
+    local index="/opt/dashboard/static/index.html"
     local current_name="PVE Hardware Monitor"
-    local current_logo="NODEZERO"
+    local current_logo="PROXMOX"
     local current_style="neon"
     local values=()
     local value=""
@@ -23115,7 +23115,7 @@ except Exception:
     data = {}
 
 print(str(data.get("website_name") or "PVE Hardware Monitor"))
-print(str(data.get("logo_text") or "NODEZERO"))
+print(str(data.get("logo_text") or "PROXMOX"))
 print(str(data.get("logo_style") or "neon"))
 PYV151READ
         )
@@ -23154,7 +23154,7 @@ PYV151READ
     value="$(
         tui_input \
             "DASHBOARD · LOGO-TEXT" \
-            "Fallback-Text im Menü, falls logo.png leer oder nicht vorhanden ist.\n\nBeispiel: NODEZERO\nMaximal 24 Zeichen." \
+            "Fallback-Text im Menü, falls logo.png leer oder nicht vorhanden ist.\n\nBeispiel: PROXMOX\nMaximal 24 Zeichen." \
             "$current_logo"
     )" || value="$current_logo"
 
@@ -23196,19 +23196,19 @@ PYV151READ
 install_dashboard_branding_v154() {
     header "DASHBOARD · TOOLBAR / BRANDING"
 
-    local ref="a80a21db36b98296975fedc5f41f66e9a047a1e2"
-    local index="/opt/nodezero/dashboard/static/index.html"
-    local asset_dir="/opt/nodezero/dashboard/static/assets"
+    local ref="87e8798aac6f0891719698a9eedc5fd12a9ec06b"
+    local index="/opt/dashboard/static/index.html"
+    local asset_dir="/opt/dashboard/static/assets"
     local logo_target="${asset_dir}/logo.png"
     local favicon_target="${asset_dir}/favicon.png"
     local legacy_logo="${asset_dir}/logo-lt-wbh.png"
     local legacy_favicon="${asset_dir}/favicon-lt-wbh.png"
     local settings="/etc/pve-sensor-dashboard/ui.json"
     local helper="/usr/local/sbin/pve-dashboard-settings-helper"
-    local cache="/home/downloads/nodezero/dashboard-branding/v154"
+    local cache="/home/downloads/proxmox/dashboard-branding/v154"
     local backup="/home/backups/pve-dashboard-branding-v154-$(date +%Y%m%d-%H%M%S)"
     local website_name="${DASHBOARD_INSTALL_NAME_V151:-PVE Hardware Monitor}"
-    local logo_text="${DASHBOARD_INSTALL_LOGO_TEXT_V151:-NODEZERO}"
+    local logo_text="${DASHBOARD_INSTALL_LOGO_TEXT_V151:-DASHBOARD}"
     local logo_style="${DASHBOARD_INSTALL_LOGO_STYLE_V151:-neon}"
 
     [[ -f "$index" ]] || die "Dashboard Branding: index.html fehlt."
@@ -23235,10 +23235,10 @@ install_dashboard_branding_v154() {
         "https://raw.githubusercontent.com/Technox90/homeatic/$ref/dashboard/branding-v154.js" \
         -o "$cache/branding-v154.js"
 
-    grep -Fq 'NodeZero Dashboard Toolbar V154' "$cache/branding-v154.css" ||
+    grep -Fq 'Dashboard Toolbar V154' "$cache/branding-v154.css" ||
         die "Branding CSS V154 ungültig."
 
-    grep -Fq 'NodeZero Dashboard Toolbar V154' "$cache/branding-v154.js" ||
+    grep -Fq 'Dashboard Toolbar V154' "$cache/branding-v154.js" ||
         die "Branding JavaScript V154 ungültig."
 
     if (( DASHBOARD_BRANDING_NEW_V151 )); then
@@ -23282,13 +23282,13 @@ import sys
 settings_path, helper_path, index_path, css_path, js_path = map(Path, sys.argv[1:6])
 
 name = (os.environ.get("WEBSITE_NAME") or "PVE Hardware Monitor").strip()[:80]
-logo = (os.environ.get("LOGO_TEXT") or "NODEZERO").strip()[:24]
+logo = (os.environ.get("LOGO_TEXT") or "PROXMOX").strip()[:24]
 style = (os.environ.get("LOGO_STYLE") or "neon").strip().lower()
 
 if not name:
     name = "PVE Hardware Monitor"
 if not logo:
-    logo = "NODEZERO"
+    logo = "PROXMOX"
 if style not in {"neon", "orbit", "pulse", "minimal"}:
     style = "neon"
 
@@ -23320,8 +23320,8 @@ if '"logo_text": logo_text' not in helper:
 
     vars_block = '''    # PVE_DASHBOARD_BRANDING_HELPER_V151
     logo_text = str(
-        payload.get("logo_text", current.get("logo_text", "NODEZERO"))
-    ).strip()[:24] or "NODEZERO"
+        payload.get("logo_text", current.get("logo_text", "PROXMOX"))
+    ).strip()[:24] or "PROXMOX"
 
     logo_style = str(
         payload.get("logo_style", current.get("logo_style", "neon"))
@@ -23383,13 +23383,13 @@ html = html[:style_end] + css_block + "\n" + html[style_end:]
 
 # Always use a dedicated inline script. External scripts ignore inline content.
 # Remove empty blocks left by earlier branding injections and deduplicate the monitor.
-html = re.sub(r'<script\b[^>]*\bid="nodezero-branding(?:-v154)?"[^>]*>\s*</script\s*>', '', html, flags=re.I)
+html = re.sub(r'<script\b[^>]*\bid="proxmox-branding(?:-v154)?"[^>]*>\s*</script\s*>', '', html, flags=re.I)
 monitor_pattern = r'<script\s+defer\s+src="/installer-update-v155\.js"\s*>\s*</script\s*>'
 monitor_present = bool(re.search(monitor_pattern, html, re.I))
 html = re.sub(monitor_pattern, '', html, flags=re.I)
 if len(re.findall(r'</body\s*>', html, re.I)) != 1:
     raise SystemExit("FEHLER: Dashboard body nicht eindeutig.")
-branding_tag = '<script id="nodezero-branding">\n' + js_block + '\n</script>\n'
+branding_tag = '<script id="proxmox-branding">\n' + js_block + '\n</script>\n'
 if monitor_present:
     branding_tag += '<script defer src="/installer-update-v155.js"></script>\n'
 html = re.sub(r'</body\s*>', lambda m: branding_tag + m.group(), html, count=1, flags=re.I)
@@ -23441,8 +23441,8 @@ PYV154
 # =============================================================================
 
 validate_dashboard_final_state_v69() {
-    local index="/opt/nodezero/dashboard/static/index.html"
-    local app="/opt/nodezero/dashboard/app.py"
+    local index="/opt/dashboard/static/index.html"
+    local app="/opt/dashboard/app.py"
     local marker=""
     local failed=0
 
@@ -23503,7 +23503,7 @@ validate_dashboard_final_state_v69() {
         failed=1
     }
 
-    grep -Fq 'PVE_PIHOLE_COLLECTOR_SETTINGS_V78' /opt/nodezero/dashboard/collector.py || {
+    grep -Fq 'PVE_PIHOLE_COLLECTOR_SETTINGS_V78' /opt/dashboard/collector.py || {
         warn "Dashboard Finalprüfung: Pi-hole Collector V78 fehlt."
         failed=1
     }
@@ -23542,12 +23542,12 @@ path = Path(sys.argv[1])
 target = sys.argv[2]
 text = path.read_text(encoding="utf-8")
 
-begin = "    # NODEZERO-USV-SHORTCUT-V95-BEGIN\n"
-end = "    # NODEZERO-USV-SHORTCUT-V95-END\n"
+begin = "    # PROXMOX-USV-SHORTCUT-V95-BEGIN\n"
+end = "    # PROXMOX-USV-SHORTCUT-V95-END\n"
 
 # Alte verwaltete Version entfernen, damit IP-Änderungen sauber übernommen werden.
 text = re.sub(
-    r"    # NODEZERO-USV-SHORTCUT-V95-BEGIN\n.*?    # NODEZERO-USV-SHORTCUT-V95-END\n\n?",
+    r"    # PROXMOX-USV-SHORTCUT-V95-BEGIN\n.*?    # PROXMOX-USV-SHORTCUT-V95-END\n\n?",
     "",
     text,
     flags=re.S,
