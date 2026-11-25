@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V166
+# PROXMOX MODULARER KOMPLETT-INSTALLER V167
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1009,8 +1009,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V166"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V166"
+TUI_TITLE="PROXMOX INSTALLER V167"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V167"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1877,7 +1877,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 166" \
+                    --title "HAUPTMENÜ · Version 167" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8201,7 +8201,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V166",
+    "installer_version": "V167",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8675,7 +8675,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V166 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V167 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11818,7 +11818,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-PROXMOX_MODULE_REF="0bf761561cdada92afb084f6d66f75240742e6e6"
+PROXMOX_MODULE_REF="a3df777b55821e7834b69fd389b46814f5f47256"
 PROXMOX_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_MODULE_REF}/proxmox/modules"
 
 load_proxmox_module_v140() {
