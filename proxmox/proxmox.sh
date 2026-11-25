@@ -363,7 +363,7 @@ migrate_proxmox_layout_v139() {
 }
 
 # Existing installations must migrate active paths together; do not partially rename.
-if [[ -d /opt/nodezero/dashboard || -e /usr/local/sbin/nodezero-managed-updates || -e /usr/local/sbin/nodezero-installer-monitor || -e /usr/local/sbin/nodezero-external-urls || -e /home/Data/proxmox-installer/tls/nodezero-local-ca.crt ]]; then
+if [[ -d /opt/nodezero/dashboard || -e /usr/local/sbin/nodezero-managed-updates || -e /usr/local/sbin/nodezero-installer-monitor || -e /usr/local/sbin/nodezero-external-urls || -e /home/Data/proxmox-installer/tls/nodezero-local-ca.crt || -e /home/Data/proxmox-installer/tls/nodezero-local-ca.key ]]; then
     echo "Einmalige Layout-Migration erforderlich (V164); keine Neuinstallation." >&2
     echo "Siehe proxmox/README.md im GitHub-Repository, Abschnitt V164." >&2
     exit 1
@@ -15269,7 +15269,10 @@ ensure_local_ca_v65() {
 
     local created=0
 
-    if [[ ! -s "$LOCAL_CA_CERT" || ! -s "$LOCAL_CA_KEY" ]]; then
+    if [[ -e "$LOCAL_CA_CERT" || -e "$LOCAL_CA_KEY" ]]; then
+        [[ -s "$LOCAL_CA_CERT" && -s "$LOCAL_CA_KEY" ]] || die "Lokale CA unvollständig; keine automatische Neuausstellung."
+    fi
+    if [[ ! -e "$LOCAL_CA_CERT" && ! -e "$LOCAL_CA_KEY" ]]; then
         openssl req \
             -x509 \
             -nodes \

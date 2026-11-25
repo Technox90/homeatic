@@ -254,6 +254,8 @@ def main():
     running=[u for u in units if active(u)]
     old_enabled=enabled(LEGACY_MONITOR+".timer")
     moved_monitor=any(a.name==LEGACY_MONITOR+".timer" for a,b in pairs)
+    if old_enabled and not moved_monitor:
+        raise RuntimeError("Alter Monitor-Timer nicht im verwalteten Pfad; manuell pruefen.")
     try:
         # Stop affected readers/writers before moving files, not any guest.
         for unit in running:
@@ -340,7 +342,8 @@ def main():
         tx.write(installer,master,0o755)
         for name,data in tools.items():
             tx.write(Path("/usr/local/sbin")/name,data,0o700 if name=="proxmox-managed-updates" else 0o755)
-        if state.is_file() and state.read_text().strip()!=str(installer):
+        if not state.is_file() or state.read_text().strip()!=str(installer):
+            state.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
             tx.write(state,(str(installer)+"\n").encode(),0o600)
         # Existing browser preferences and service registrations remain intact.
         if shutil.which("nginx"):

@@ -524,3 +524,8 @@ jobs:
           PY
           node --check dashboard/views/runtime.js
           node --check dashboard/branding-v154.js
+
+      - name: V164 migration safety checks
+        run: |
+          python3 -m py_compile proxmox/tools/proxmox-migrate-layout
+          python3 proxmox/tests/test-layout-migration.py
