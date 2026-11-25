@@ -33,7 +33,7 @@ jobs:
           bash -n proxmox/tools/proxmox-auto-updater
           bash -n proxmox/tools/proxmox-auto-updater-config
           bash -n proxmox/tools/proxmox-pushover-config
-          python3 -m py_compile proxmox/tools/nodezero-external-urls
+          python3 -m py_compile proxmox/tools/proxmox-external-urls
           bash -n proxmox/tests/test-auto-updater.sh
 
       - name: Updater isolated regression tests
@@ -41,19 +41,19 @@ jobs:
 
       - name: V156 managed component update offline checks
         run: |
-          python3 -m py_compile proxmox/tools/nodezero-managed-updates
+          python3 -m py_compile proxmox/tools/proxmox-managed-updates
           python3 - <<'PY'
           from pathlib import Path
           from importlib.machinery import SourceFileLoader
           import importlib.util
-          p = Path("proxmox/tools/nodezero-managed-updates")
+          p = Path("proxmox/tools/proxmox-managed-updates")
           loader = SourceFileLoader("managed", str(p))
           spec = importlib.util.spec_from_loader(loader.name, loader)
           m = importlib.util.module_from_spec(spec)
           loader.exec_module(m)
           master = Path("proxmox/proxmox.sh").read_text()
           assert m.version(master.encode()) >= 156
-          assert "nodezero-installer-update" in m.extract(master, 'js="""(() => {\n', '})();"""')
+          assert "proxmox-installer-update" in m.extract(master, 'js="""(() => {\n', '})();"""')
           assert "/api/status-page/heartbeat/" in m.extract(master, 'cat > "$tmp" <<\'KUMA_STATUS_HTML\'\n', '\nKUMA_STATUS_HTML\n')
           begin = "/* PVE_DASHBOARD_BRANDING_V154_BEGIN */"
           end = "/* PVE_DASHBOARD_BRANDING_V154_END */"
@@ -65,12 +65,12 @@ jobs:
           assert "<img src='/assets/logo.png'>" in result
           assert m.dashboard_payload(result, css, js) == result
           assert result.count('<script defer src="/installer-update-v155.js"></script>') == 1
-          assert '<script id="nodezero-branding">\n' + begin in result
+          assert '<script id="proxmox-branding">\n' + begin in result
           assert '<script defer src="/installer-update-v155.js">' + begin not in result
           module = Path("proxmox/modules/dashboard.sh").read_text()
           fn = module.split("install_dashboard_branding_v154() {", 1)[1].split("\n}\n", 1)[0]
           assert 'html.rfind("</script>")' not in fn
-          assert '<script id="nodezero-branding">' in fn
+          assert '<script id="proxmox-branding">' in fn
           runtime = Path("dashboard/views/runtime.js").read_text()
           assert 'badge.remove()' in runtime
           assert 'container.append(badge)' not in runtime
@@ -80,11 +80,11 @@ jobs:
               pass
           else:
               raise AssertionError("unmanaged dashboard must be rejected")
-          assert 'install_nodezero_tool_v141 "nodezero-managed-updates"' in master
+          assert 'install_proxmox_tool_v141 "proxmox-managed-updates"' in master
           updater = Path("proxmox/tools/proxmox-auto-updater").read_text()
           config = Path("proxmox/tools/proxmox-auto-updater-config").read_text()
-          assert "\nupdate_nodezero_components_v156\n" in updater
-          assert "5) configure_nodezero_updates_v156 ;;" in config
+          assert "\nupdate_proxmox_components_v156\n" in updater
+          assert "5) configure_proxmox_updates_v156 ;;" in config
           PY
 
       - name: V142 maintenance navigation
@@ -128,10 +128,10 @@ jobs:
         run: |
           grep -q 'BACKUP_ROOT="/home/backups"' proxmox/proxmox.sh
           grep -q 'DIAGNOSE_ROOT="/home/diagnose"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/tools/proxmox-auto-updater
           grep -q 'LOG_DIR="/home/diagnose/proxmox-auto-updater"' proxmox/tools/proxmox-auto-updater-config
           grep -q '/home/backups' proxmox/modules/dashboard.sh
@@ -146,12 +146,12 @@ jobs:
           fi
           grep -q '"/root/backups:$BACKUP_ROOT"' proxmox/proxmox.sh
           grep -q '"/root/diagnose:$DIAGNOSE_ROOT"' proxmox/proxmox.sh
-          grep -q '"/root/downloads:$NODEZERO_DOWNLOAD_DIR"' proxmox/proxmox.sh
+          grep -q '"/root/downloads:$PROXMOX_DOWNLOAD_DIR"' proxmox/proxmox.sh
 
       - name: V154 logo menu visual polish
         run: |
-          grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.css
-          grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
+          grep -q 'Dashboard Toolbar V154' dashboard/branding-v154.css
+          grep -q 'Dashboard Toolbar V154' dashboard/branding-v154.js
           grep -q 'border:0!important' dashboard/branding-v154.css
           grep -q 'background:transparent!important' dashboard/branding-v154.css
           grep -q 'max-width:350px;max-height:60px' dashboard/branding-v154.css
@@ -161,8 +161,8 @@ jobs:
 
       - name: Toolbar layout regression
         run: |
-          grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.css
-          grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
+          grep -q 'Dashboard Toolbar V154' dashboard/branding-v154.css
+          grep -q 'Dashboard Toolbar V154' dashboard/branding-v154.js
           grep -q 'grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr)' dashboard/branding-v154.css
           grep -q 'brandMenuToggle' dashboard/branding-v154.js
           grep -q 'toggleBrandMenu' dashboard/branding-v154.js
@@ -203,7 +203,7 @@ jobs:
 
           assert re.search(r"(?m)^# PROXMOX MODULARER KOMPLETT-INSTALLER V\d+$", master)
           assert 'if (( DASHBOARD_FAST_UPDATE_V152 )); then' in module
-          assert 'install_nodezero_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"' in module
+          assert 'install_proxmox_dashboard_sources_v139 "$APP_DIR" "$STATIC_DIR"' in module
 
           required=[
               "install_dashboard_extras",
@@ -232,10 +232,10 @@ jobs:
           grep -q 'install_dashboard_branding_v154' proxmox/proxmox.sh
           grep -q 'Dashboard-Update: logo.png/favicon.png werden NICHT verändert' proxmox/modules/dashboard.sh
           grep -q 'DASHBOARD_BRANDING_NEW_V151' proxmox/modules/dashboard.sh
-          grep -q '/opt/nodezero/dashboard/static/assets/logo.png' proxmox/modules/dashboard.sh
-          grep -q '/opt/nodezero/dashboard/static/assets/favicon.png' proxmox/modules/dashboard.sh
-          grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.js
-          grep -q 'NodeZero Dashboard Toolbar V154' dashboard/branding-v154.css
+          grep -q '/opt/dashboard/static/assets/logo.png' proxmox/modules/dashboard.sh
+          grep -q '/opt/dashboard/static/assets/favicon.png' proxmox/modules/dashboard.sh
+          grep -q 'Dashboard Toolbar V154' dashboard/branding-v154.js
+          grep -q 'Dashboard Toolbar V154' dashboard/branding-v154.css
           grep -q '/assets/logo.png' dashboard/branding-v154.js
           grep -q '/assets/favicon.png' dashboard/branding-v154.js
           grep -q 'dashboardFixedToolbar' dashboard/branding-v154.css
@@ -347,8 +347,8 @@ jobs:
 
       - name: V149 Uptime Kuma external URL default
         run: |
-          grep -q '("uptime", "Uptime Kuma", "up", True, False)' proxmox/tools/nodezero-external-urls
-          if grep -q '("uptime", "Uptime Kuma", "uptime", True, False)' proxmox/tools/nodezero-external-urls; then
+          grep -q '("uptime", "Uptime Kuma", "up", True, False)' proxmox/tools/proxmox-external-urls
+          if grep -q '("uptime", "Uptime Kuma", "uptime", True, False)' proxmox/tools/proxmox-external-urls; then
             echo "Uptime Kuma still defaults to uptime.<domain>"
             exit 1
           fi
@@ -368,22 +368,22 @@ jobs:
       - name: V147 installer self-update checks
         run: |
           grep -Eq '^# PROXMOX MODULARER KOMPLETT-INSTALLER V[0-9]+$' proxmox/proxmox.sh
-          grep -q '^nodezero_self_update_v147() {' proxmox/proxmox.sh
+          grep -q '^proxmox_self_update_v147() {' proxmox/proxmox.sh
           grep -q 'raw.githubusercontent.com/Technox90/homeatic/refs/heads/main/proxmox/proxmox.sh' proxmox/proxmox.sh
           grep -q 'bash -n "$tmp"' proxmox/proxmox.sh
           grep -q 'cmp -s -- "$self" "$tmp"' proxmox/proxmox.sh
           grep -q '/home/backups/proxmox-installer-self-update' proxmox/proxmox.sh
-          grep -q 'export NODEZERO_SELFUPDATE_DONE=1' proxmox/proxmox.sh
+          grep -q 'export PROXMOX_SELFUPDATE_DONE=1' proxmox/proxmox.sh
           grep -q 'exec /usr/bin/env bash "$self" "$@"' proxmox/proxmox.sh
           python3 - <<'PY'
           from pathlib import Path
           text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
-          update_fn = text.index("nodezero_self_update_v147() {")
-          update_call = text.index('nodezero_self_update_v147 "$@"')
+          update_fn = text.index("proxmox_self_update_v147() {")
+          update_call = text.index('proxmox_self_update_v147 "$@"')
           menu = text.index('TUI_TITLE="PROXMOX INSTALLER V')
           assert update_fn < update_call < menu
-          assert text.count("nodezero_self_update_v147() {") == 1
-          assert text.count('nodezero_self_update_v147 "$@"') == 1
+          assert text.count("proxmox_self_update_v147() {") == 1
+          assert text.count('proxmox_self_update_v147 "$@"') == 1
           PY
 
       - name: V146 logging, updater dedupe and external URL checks
@@ -394,16 +394,16 @@ jobs:
             exit 1
           fi
           grep -q "find /root -maxdepth 1 -type f -name 'pihole-sprache-\*.txt'" proxmox/proxmox.sh
-          grep -q 'install_nodezero_tool_v141 "proxmox-auto-updater"' proxmox/proxmox.sh
+          grep -q 'install_proxmox_tool_v141 "proxmox-auto-updater"' proxmox/proxmox.sh
           if grep -q "cat > /usr/local/sbin/proxmox-auto-updater <<'__UPDATER__'" proxmox/proxmox.sh; then
             echo "Auto-Updater is still duplicated inside the master installer"
             exit 1
           fi
           grep -q '"5" "Externe URLs · Domain / Reverse Proxy / Let'"'"'s Encrypt"' proxmox/proxmox.sh
-          grep -q 'install_nodezero_tool_v141 "nodezero-external-urls"' proxmox/proxmox.sh
-          grep -q 'CONFIG_DIR = Path("/home/Data/proxmox-installer/external-urls")' proxmox/tools/nodezero-external-urls
-          grep -q 'DIAG_DIR = Path("/home/diagnose/external-urls")' proxmox/tools/nodezero-external-urls
-          grep -q 'backend = f"https://{hip}:8006"' proxmox/tools/nodezero-external-urls
+          grep -q 'install_proxmox_tool_v141 "proxmox-external-urls"' proxmox/proxmox.sh
+          grep -q 'CONFIG_DIR = Path("/home/Data/proxmox-installer/external-urls")' proxmox/tools/proxmox-external-urls
+          grep -q 'DIAG_DIR = Path("/home/diagnose/external-urls")' proxmox/tools/proxmox-external-urls
+          grep -q 'backend = f"https://{hip}:8006"' proxmox/tools/proxmox-external-urls
           python3 - <<'PY'
           from pathlib import Path
           text = Path("proxmox/proxmox.sh").read_text(encoding="utf-8")
@@ -411,24 +411,24 @@ jobs:
           start = text.index(marker)
           end = text.index("\n    fi", start) + len("\n    fi")
           section = text[start:end]
-          assert "nodezero-external-urls" in section
+          assert "proxmox-external-urls" in section
           assert "continue" in section
           assert "exit 0" not in section
           PY
 
       - name: V141 installer checks
         run: |
-          grep -q 'NODEZERO_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'NODEZERO_MODULE_REF="e303f40c361017499db77683c4fb5cfdd60c0e9d"' proxmox/proxmox.sh
-          grep -q 'load_nodezero_module_v140 "dashboard"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_SECRET_DIR="/root/passwort"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
+          grep -q 'PROXMOX_MODULE_REF="ef337100a030663b477faeea7457a965933a5cdc"' proxmox/proxmox.sh
+          grep -q 'load_proxmox_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_layout_editor_v71() {' proxmox/modules/dashboard.sh
           grep -q 'validate_dashboard_final_state_v69() {' proxmox/modules/dashboard.sh
-          grep -q 'local APP_DIR="/opt/nodezero/dashboard"' proxmox/modules/dashboard.sh
+          grep -q 'local APP_DIR="/opt/dashboard"' proxmox/modules/dashboard.sh
           if grep -q 'install_dashboard() {' proxmox/proxmox.sh; then
             echo "Dashboard definition still embedded in master installer"
             exit 1
@@ -451,7 +451,7 @@ jobs:
           js = Path("dashboard/branding-v154.js").read_text()
           css = Path("dashboard/branding-v154.css").read_text()
           assert "getElementById('hostinfo')" in js
-          assert "nodezeroHostInfoHidden" in js and "nodezeroHostInfoHidden" in css
+          assert "proxmoxHostInfoHidden" in js and "proxmoxHostInfoHidden" in css
           assert "document.body.append(footer)" in js
           assert "Number.isSafeInteger(data.local)" in js
           assert "Version '+data.local" in js
@@ -507,3 +507,20 @@ jobs:
           for f in /tmp/upper-script-*.js; do node --check "$f"; done
           node --check dashboard/branding-v154.js
           grep -q 'createElementNS(ns,' dashboard/branding-v154.js
+
+      - name: V164 independent layout and boot title
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          m=Path('proxmox/proxmox.sh').read_text()
+          d=Path('proxmox/modules/dashboard.sh').read_text()
+          r=Path('dashboard/views/runtime.js').read_text()
+          b=Path('dashboard/branding-v154.js').read_text()
+          assert '/opt/dashboard/static/assets/logo.png' in d
+          assert 'configuredName' in r and 'website_name' in r
+          assert 'dashboard-branding-ready' in r and 'dashboard-branding-ready' in b
+          assert 'title.textContent="DASHBOARD"' not in r
+          assert 'Einmalige Layout-Migration erforderlich' in m
+          PY
+          node --check dashboard/views/runtime.js
+          node --check dashboard/branding-v154.js
