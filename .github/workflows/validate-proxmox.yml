@@ -535,3 +535,6 @@ jobs:
 
       - name: V170 UPPER selection regression tests
         run: node proxmox/tests/upper-selection.test.js
+
+      - name: V171 update sound checks
+        run: node dashboard/tests/update-sound.test.js
