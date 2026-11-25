@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+"""One-time migration of the Proxmox installer layout; no guest or database changes."""
+import argparse
+import fcntl
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import urllib.request
+
+RAW = "https://raw.githubusercontent.com/Technox90/homeatic/"
+API = "https://api.github.com/repos/Technox90/homeatic/commits/main"
+OLD = "nodezero"  # Legacy migration source only; never a new installation path.
+NEW = "proxmox"
+OLD_DASH = Path("/opt") / OLD / "dashboard"
+DASH = Path("/opt/dashboard")
+TLS = Path("/home/Data/proxmox-installer/tls")
+TOOLS = ("proxmox-auto-updater", "proxmox-auto-updater-config",
+         "proxmox-pushover-config", "proxmox-managed-updates",
+         "proxmox-external-urls", "proxmox-dashboard-views")
+MONITOR = "proxmox-installer-monitor"
+LEGACY_MONITOR = OLD + "-installer-monitor"
+
+def cmd(*args, check=True, **kw):
+    return subprocess.run(args, check=check, timeout=120, **kw)
+
+def request(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent":"Proxmox-layout-migration"}), timeout=30) as r:
+        data = r.read(4 * 1024 * 1024 + 1)
+    if not data or len(data) > 4 * 1024 * 1024:
+        raise ValueError("Ungueltiger Download")
+    return data
+
+def exists(p):
+    return p.exists() or p.is_symlink()
+
+def legacy_path(p):
+    return Path(str(p).replace(NEW, OLD))
+
+def rewrite(text):
+    # Only known, managed text files are passed here. Do not rewrite certificate
+    # lineage names, user settings, images, database files or historical backups.
+    return (text.replace(str(OLD_DASH), str(DASH))
+            .replace("/opt/openrgb-" + OLD, "/opt/openrgb-" + NEW)
+            .replace("/home/downloads/" + OLD + "/", "/home/downloads/" + NEW + "/")
+            .replace("/var/lib/" + LEGACY_MONITOR, "/var/lib/" + MONITOR)
+            .replace("/var/www/" + OLD + "-acme", "/var/www/" + NEW + "-acme")
+            .replace("nodezero-local-ca", "proxmox-local-ca")
+            .replace("install-nodezero-ca-windows", "install-proxmox-ca-windows")
+            .replace(LEGACY_MONITOR, MONITOR)
+            .replace("nodezero_connection_upgrade", "proxmox_connection_upgrade")
+            .replace("nodezero-external-urls", "proxmox-external-urls")
+            .replace("nodezero-dashboard-views", "proxmox-dashboard-views")
+            .replace("nodezero-managed-updates", "proxmox-managed-updates")
+            .replace("nodezero-updates.json", "proxmox-updates.json")
+            .replace("NodeZero Dashboard", "Dashboard")
+            .replace("NodeZero Local CA", "Proxmox Local CA")
+            .replace("NodeZero", "Proxmox")
+            .replace("NODEZERO", "PROXMOX")
+            .replace("nodezero-views", "proxmox-views")
+            .replace("nodezero-branding", "proxmox-branding")
+            .replace("nodezero-installer-update", "proxmox-installer-update")
+            .replace("nodezeroSystemFooter", "proxmoxSystemFooter")
+            .replace("nodezeroFooter", "proxmoxFooter")
+            .replace("nodezeroHostInfoHidden", "proxmoxHostInfoHidden")
+            .replace("__nodezeroUiSettings", "__proxmoxUiSettings")
+            .replace("nz-", "view-"))
+
+def nginx_rewrite(text):
+    # Do NOT rename live/renewal/ archive certificate lineages.
+    return (text.replace(str(OLD_DASH), str(DASH))
+            .replace("/var/www/" + OLD + "-acme", "/var/www/" + NEW + "-acme")
+            .replace("nodezero_connection_upgrade", "proxmox_connection_upgrade")
+            .replace("nodezero-external-urls", "proxmox-external-urls")
+            .replace("NODEZERO-USV-SHORTCUT", "PROXMOX-USV-SHORTCUT"))
+
+class Transaction:
+    def __init__(self, backup):
+        self.backup = backup
+        self.undo = []
+        self.log = []
+    def move(self, old, new):
+        if not exists(old):
+            return
+        if exists(new):
+            raise RuntimeError("Ziel existiert bereits: " + str(new))
+        new.parent.mkdir(parents=True, exist_ok=True)
+        # Rename on the same filesystem. Cross-device moves are deliberately
+        # refused instead of silently copying a live tree.
+        old.rename(new)
+        self.undo.append(lambda: new.rename(old))
+        self.log.append([str(old), str(new)])
+    def write(self, path, data, mode=None):
+        if path.is_symlink():
+            raise RuntimeError("Symlink nicht ueberschreiben: " + str(path))
+        old = path.stat() if path.exists() else None
+        if old and not stat.S_ISREG(old.st_mode):
+            raise RuntimeError("Keine regulaere Datei: " + str(path))
+        if old and path.read_bytes() == data:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        saved = self.backup / ("file-" + str(len(self.undo)))
+        if old:
+            shutil.copy2(path, saved)
+        def restore():
+            if old:
+                atomic(path, saved.read_bytes(), stat.S_IMODE(old.st_mode), old.st_uid, old.st_gid)
+            else:
+                path.unlink(missing_ok=True)
+        atomic(path, data, mode if mode is not None else stat.S_IMODE(old.st_mode) if old else 0o644,
+               old.st_uid if old else 0, old.st_gid if old else 0)
+        self.undo.append(restore)
+        self.log.append([str(path), str(saved) if old else "new"])
+    def retarget(self, link, target):
+        old = os.readlink(link)
+        link.unlink()
+        try:
+            link.symlink_to(target)
+        except BaseException:
+            link.symlink_to(old)
+            raise
+        def restore():
+            link.unlink()
+            link.symlink_to(old)
+        self.undo.append(restore)
+    def rollback(self):
+        errors = []
+        for undo in reversed(self.undo):
+            try:
+                undo()
+            except BaseException as exc:
+                errors.append(str(exc))
+        return errors
+
+def atomic(path, data, mode, uid, gid):
+    fd, tmp = tempfile.mkstemp(prefix=".layout-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chown(tmp, uid, gid)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+def moves():
+    pairs = [(OLD_DASH, DASH),
+             (Path("/var/lib") / LEGACY_MONITOR, Path("/var/lib") / MONITOR),
+             (Path("/root/.config/proxmox-auto-updater") / (OLD + "-updates.json"),
+              Path("/root/.config/proxmox-auto-updater/proxmox-updates.json")),
+             (Path("/var/www") / (OLD+"-acme"), Path("/var/www/proxmox-acme")),
+             (Path("/opt") / ("openrgb-"+OLD), Path("/opt/openrgb-proxmox"))]
+    for name in ("local-ca.crt", "local-ca.key", "local-ca.srl"):
+        pairs.append((TLS / (OLD+"-"+name), TLS / (NEW+"-"+name)))
+    pairs += [(TLS / ("install-"+OLD+"-ca-windows.ps1"), TLS / "install-proxmox-ca-windows.ps1"),
+              (Path("/usr/local/share/ca-certificates") / (OLD+"-local-ca.crt"),
+               Path("/usr/local/share/ca-certificates/proxmox-local-ca.crt"))]
+    for suffix in ("external.conf", "external-acme.conf"):
+        pairs.append((Path("/etc/nginx/conf.d") / (OLD+"-"+suffix),
+                      Path("/etc/nginx/conf.d") / (NEW+"-"+suffix)))
+    pairs.append((Path("/etc/letsencrypt/renewal-hooks/deploy") / ("20-"+OLD+"-nginx-reload.sh"),
+                  Path("/etc/letsencrypt/renewal-hooks/deploy/20-proxmox-nginx-reload.sh")))
+    for suffix in ("dashboard-views", "external-urls", "managed-updates", "installer-monitor"):
+        pairs.append((Path("/usr/local/sbin") / (OLD+"-"+suffix), Path("/usr/local/sbin") / (NEW+"-"+suffix)))
+    for suffix in (".service", ".timer", ".service.d", ".timer.d"):
+        pairs.append((Path("/etc/systemd/system") / (LEGACY_MONITOR+suffix),
+                      Path("/etc/systemd/system") / (MONITOR+suffix)))
+    return [(old,new) for old,new in pairs if exists(old)]
+
+def active(unit):
+    return cmd("systemctl", "is-active", "--quiet", unit, check=False).returncode == 0
+
+def enabled(unit):
+    return cmd("systemctl", "is-enabled", "--quiet", unit, check=False).returncode == 0
+
+def rewrite_file(tx, p, fn=rewrite):
+    if p.is_file() and not p.is_symlink():
+        data = p.read_text(encoding="utf-8")
+        updated = fn(data)
+        if updated != data:
+            tx.write(p, updated.encode())
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--ref", help="exact GitHub commit; default main")
+    parser.add_argument("--apply", action="store_true", help="perform migration; otherwise preflight only")
+    args = parser.parse_args()
+    if os.geteuid() != 0 or not shutil.which("pveversion"):
+        raise RuntimeError("Nur als root auf einem Proxmox-Host ausfuehren.")
+    ref = args.ref or json.loads(request(API))["sha"]
+    if not re.fullmatch(r"[0-9a-f]{40}", ref):
+        raise ValueError("Ungueltige Commit-Referenz")
+    def download(p):
+        return request(RAW+ref+"/"+p)
+    master = download("proxmox/proxmox.sh")
+    version = re.search(rb"(?m)^# PROXMOX MODULARER KOMPLETT-INSTALLER V(\d+)$",master)
+    if not version or int(version.group(1)) < 164:
+        raise ValueError("V164 oder neuer erforderlich.")
+    cmd("bash","-n",input=master)
+    tools = {name:download("proxmox/tools/"+name) for name in TOOLS}
+    for name,data in tools.items():
+        if name in ("proxmox-managed-updates","proxmox-external-urls"):
+            compile(data,name,"exec")
+        else:
+            cmd("bash","-n",input=data)
+    pairs = moves()
+    for old,new in pairs:
+        if exists(new):
+            raise RuntimeError("Konflikt: "+str(old)+" und "+str(new)+"; nichts geaendert")
+        if old.is_symlink():
+            raise RuntimeError("Unerwarteter Symlink: "+str(old))
+    ca_cert,ca_key = TLS/"proxmox-local-ca.crt", TLS/"proxmox-local-ca.key"
+    cert_present = ca_cert.is_file() or (TLS/(OLD+"-local-ca.crt")).is_file()
+    key_present = ca_key.is_file() or (TLS/(OLD+"-local-ca.key")).is_file()
+    if cert_present != key_present:
+        raise RuntimeError("CA-Paar unvollstaendig; keine neue CA erzeugen.")
+    old_static = (OLD_DASH if OLD_DASH.is_dir() else DASH)/"static"
+    css=js=runtime=None
+    if (old_static/"index.html").is_file():
+        css=download("dashboard/branding-v154.css").decode()
+        js=download("dashboard/branding-v154.js").decode()
+        runtime=download("dashboard/views/runtime.js")
+    if shutil.which("nginx"):
+        cmd("nginx","-t")
+    print("Commit:",ref)
+    for a,b in pairs:
+        print("MOVE",a,"->",b)
+    print("Installer/Werkzeuge werden aktualisiert; Gast- und Datenbankdaten bleiben unberuehrt.")
+    if not args.apply:
+        print("Nur Vorpruefung. Mit --apply wird die Migration ausgefuehrt.")
+        return
+    root_backup=Path("/home/backups")
+    root_backup.mkdir(parents=True,exist_ok=True)
+    backup=Path(tempfile.mkdtemp(prefix="proxmox-layout-",dir=root_backup))
+    backup.chmod(0o700)
+    tx=Transaction(backup)
+    lock=open("/run/proxmox-auto-updater.lock","a")
+    try:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise RuntimeError("Auto-Updater laeuft; Migration nicht gestartet.")
+    units=["proxmox-auto-updater.timer","proxmox-master-tls-renew.timer",
+           LEGACY_MONITOR+".timer",LEGACY_MONITOR+".service",
+           "pve-sensor-collector.timer","pve-sensor-collector.service","pve-sensor-web.service"]
+    running=[u for u in units if active(u)]
+    old_enabled=enabled(LEGACY_MONITOR+".timer")
+    moved_monitor=any(a.name==LEGACY_MONITOR+".timer" for a,b in pairs)
+    try:
+        # Stop affected readers/writers before moving files, not any guest.
+        for unit in running:
+            cmd("systemctl","stop",unit)
+        if active("proxmox-auto-updater.service"):
+            raise RuntimeError("Auto-Updater ist noch aktiv.")
+        if old_enabled:
+            cmd("systemctl","disable",LEGACY_MONITOR+".timer")
+        for a,b in pairs:
+            tx.move(a,b)
+        link=Path("/opt/pve-sensor-dashboard")
+        if link.is_symlink() and os.readlink(link)==str(OLD_DASH):
+            tx.retarget(link,DASH)
+        # Legacy dashboard view directory is local managed state, not a cache.
+        old_view=DASH/"static"/(OLD+"-views")
+        new_view=DASH/"static"/"proxmox-views"
+        if old_view.is_dir():
+            tx.move(old_view,new_view)
+        legacy_ca=DASH/"static"/(OLD+"-local-ca.crt")
+        if legacy_ca.is_file():
+            tx.move(legacy_ca,DASH/"static/proxmox-local-ca.crt")
+        # Managed files only. Keep user logos, icons, settings, metrics and links.
+        for p in (DASH/"app.py",DASH/"collector.py",DASH/"static/index.html",
+                  DASH/"static/installer-update-v155.js",new_view/"active.css",
+                  new_view/"active.js",new_view/"runtime.js",
+                  TLS/"README-CA.txt",TLS/"install-proxmox-ca-windows.ps1",
+                  Path("/etc/sudoers.d/pve-sensor-dashboard")):
+            rewrite_file(tx,p)
+        for name in ("pve-dashboard-set-code","pve-dashboard-link","pve-dashboard-settings-helper",
+                     "pve-dashboard-pihole-helper","pve-pihole-dns-sync","proxmox-master-tls-renew",MONITOR):
+            rewrite_file(tx,Path("/usr/local/sbin")/name)
+        unit_root=Path("/etc/systemd/system")
+        for prefix in ("pve-sensor-","pve-dashboard-","pve-pihole-","proxmox-master-tls-renew",
+                       "openrgb-proxmox-",MONITOR):
+            for p in unit_root.glob(prefix+"*"):
+                if p.is_dir() and not p.is_symlink() and p.name.endswith(".d"):
+                    for child in p.glob("*.conf"):
+                        rewrite_file(tx,child)
+                elif p.suffix in (".service",".timer",".path"):
+                    rewrite_file(tx,p)
+        wrapper=Path("/usr/bin/openrgb")
+        if wrapper.is_file() and not wrapper.is_symlink():
+            prefix=wrapper.open("rb").read(4096)
+            if b"NODEZERO_OPENRGB_APPIMAGE_WRAPPER" in prefix:
+                rewrite_file(tx,wrapper)
+        for p in (Path("/etc/nginx/conf.d/proxmox-external.conf"),
+                  Path("/etc/nginx/conf.d/proxmox-external-acme.conf"),
+                  Path("/etc/nginx/sites-available/pve-sensor-dashboard")):
+            rewrite_file(tx,p,nginx_rewrite)
+        # Custom domain configurations are not re-generated. Only a known
+        # managed ACME webroot or upgrade-map reference may change.
+        for folder in (Path("/etc/nginx/conf.d"),Path("/etc/nginx/sites-available"),
+                       Path("/etc/letsencrypt/renewal")):
+            if folder.is_dir():
+                for p in folder.iterdir():
+                    if p.is_file() and not p.is_symlink() and not ".bak" in p.name:
+                        if folder.name=="renewal":
+                            rewrite_file(tx,p,lambda s:s.replace("/var/www/"+OLD+"-acme","/var/www/proxmox-acme"))
+                        else:
+                            rewrite_file(tx,p,nginx_rewrite)
+        rewrite_file(tx,Path("/etc/letsencrypt/renewal-hooks/deploy/20-proxmox-nginx-reload.sh"),nginx_rewrite)
+        # Replace the managed dashboard frontend with the exact release files.
+        if css is not None:
+            index=DASH/"static/index.html"
+            helper={"__name__":"layout_helper","__file__":"proxmox-managed-updates"}
+            exec(compile(tools["proxmox-managed-updates"],"managed-updates","exec"),helper)
+            text=index.read_text()
+            if text.count("/* PVE_DASHBOARD_BRANDING_V154_BEGIN */")==2:
+                tx.write(index,helper["dashboard_payload"](text,css,js).encode())
+            else:
+                print("WARNUNG: Dashboard ohne V154-Brandingmarker; Oberflaeche ggf. manuell aktualisieren.")
+            overlay=DASH/"static/installer-update-v155.js"
+            if overlay.is_file():
+                block=helper["extract"](master.decode(),'js="""(() => {\n','})();"""')
+                tx.write(overlay,("(() => {\n"+block+"})();").encode())
+            if (new_view/"runtime.js").is_file():
+                tx.write(new_view/"runtime.js",runtime)
+        state=Path("/var/lib")/MONITOR/"installer-path"
+        installer=Path("/root/proxmox.sh")
+        if state.is_file():
+            candidate=Path(state.read_text().strip())
+            if candidate in (Path("/root/proxmox.sh"),Path("/usr/local/sbin/proxmox.sh")):
+                installer=candidate
+        tx.write(installer,master,0o755)
+        for name,data in tools.items():
+            tx.write(Path("/usr/local/sbin")/name,data,0o700 if name=="proxmox-managed-updates" else 0o755)
+        if state.is_file() and state.read_text().strip()!=str(installer):
+            tx.write(state,(str(installer)+"\n").encode(),0o600)
+        # Existing browser preferences and service registrations remain intact.
+        if shutil.which("nginx"):
+            cmd("nginx","-t")
+        if shutil.which("visudo") and Path("/etc/sudoers.d/pve-sensor-dashboard").exists():
+            cmd("visudo","-cf","/etc/sudoers.d/pve-sensor-dashboard")
+        if cert_present and shutil.which("update-ca-certificates"):
+            cmd("update-ca-certificates")
+        cmd("systemctl","daemon-reload")
+        if moved_monitor and old_enabled:
+            cmd("systemctl","enable",MONITOR+".timer")
+        for unit in reversed(running):
+            if unit==LEGACY_MONITOR+".service" or unit=="pve-sensor-collector.service":
+                continue
+            replacement=unit.replace(LEGACY_MONITOR,MONITOR)
+            cmd("systemctl","start",replacement)
+        if "pve-sensor-web.service" in running and not active("pve-sensor-web.service"):
+            raise RuntimeError("Dashboard-Dienst nach Migration nicht aktiv.")
+        if shutil.which("nginx") and active("nginx.service"):
+            cmd("systemctl","reload","nginx")
+        (backup/"migration.json").write_text(json.dumps(tx.log,indent=2))
+    except BaseException:
+        print("Migration fehlgeschlagen; Ruecksicherung:",backup,file=sys.stderr)
+        for unit in (MONITOR+".timer","pve-sensor-web.service","pve-sensor-collector.timer",
+                     "proxmox-master-tls-renew.timer","proxmox-auto-updater.timer"):
+            if unit in running or unit==MONITOR+".timer":
+                cmd("systemctl","stop",unit,check=False)
+        if moved_monitor and old_enabled:
+            cmd("systemctl","disable",MONITOR+".timer",check=False)
+        errors=tx.rollback()
+        cmd("systemctl","daemon-reload",check=False)
+        if old_enabled:
+            cmd("systemctl","enable",LEGACY_MONITOR+".timer",check=False)
+        for unit in reversed(running):
+            cmd("systemctl","start",unit,check=False)
+        if cert_present and shutil.which("update-ca-certificates"):
+            cmd("update-ca-certificates",check=False)
+        if shutil.which("nginx") and cmd("nginx","-t",check=False).returncode==0 and active("nginx.service"):
+            cmd("systemctl","reload","nginx",check=False)
+        if errors:
+            print("Ruecksicherungsfehler:",errors,file=sys.stderr)
+        raise
+    print("OK: Layout migriert. Sicherung:",backup)
+    print("Bestehende CA-Identitaet und Let's-Encrypt-Zertifikate wurden nicht neu ausgestellt.")
+    print("Historische Sicherungen und eventuell fremde Projektverzeichnisse bleiben erhalten.")
+
+if __name__=="__main__":
+    try:
+        main()
+    except Exception as exc:
+        print("FEHLER:",exc,file=sys.stderr)
+        sys.exit(1)
