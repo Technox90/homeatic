@@ -252,11 +252,24 @@ async function info(){
   $('hostinfo').textContent=`${d.hostname} · ${d.pve} · ${d.cpu_model} · ${d.board_model}`;
   $('powerNote').textContent=d.power_note;
 }
+function localHostPower(d){
+  const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
+  if(valid(d.system_power_w))return {value:d.system_power_w,total:true,label:'Gesamtserver via IPMI/DCMI'};
+  const parts=[];
+  if(valid(d.cpu_power_w))parts.push(['CPU-Package',d.cpu_power_w]);
+  else if(valid(d.cpu_core_power_w))parts.push(['CPU-Kerne',d.cpu_core_power_w]);
+  else if(valid(d.uncore_power_w))parts.push(['Uncore',d.uncore_power_w]);
+  // This collector exposes the separate Intel RAPL DRAM domain.
+  if(valid(d.dram_power_w))parts.push(['DRAM',d.dram_power_w]);
+  // gpu_power_w may represent an integrated GPU. Never add an ambiguous
+  // GPU reading to CPU/RAPL measurements without independent provenance.
+  if(!parts.length&&valid(d.gpu_power_w))parts.push(['GPU',d.gpu_power_w]);
+  if(!parts.length)return {value:null,total:false,label:'Keine lokale Watt-Messquelle verfügbar'};
+  return {value:parts.reduce((sum,p)=>sum+p[1],0),total:false,label:'Teilmessung: '+parts.map(p=>p[0]).join(' + ')+' · Gesamtverbrauch nicht messbar'};
+}
 function bestPower(d){
-  if(d.system_power_w!=null)return [watts(d.system_power_w),'Gesamtserver via IPMI/DCMI'];
-  if(d.cpu_power_w!=null)return [watts(d.cpu_power_w),'CPU-Package via RAPL'];
-  if(d.gpu_power_w!=null)return [watts(d.gpu_power_w),'GPU-Telemetrie'];
-  return ['n/v','Keine Watt-Messquelle verfügbar'];
+  const p=localHostPower(d);
+  return [p.value===null?'n/v':watts(p.value),p.label];
 }
 async function current(){
   try{

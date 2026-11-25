@@ -29,6 +29,28 @@ function tabNumber(value,digits=0){
   if(typeof value!=='number'||!Number.isFinite(value)||value<0)return null;
   return value.toLocaleString('de-DE',{minimumFractionDigits:digits,maximumFractionDigits:digits});
 }
+function localHostPower(d){
+  const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
+  if(valid(d.system_power_w))return {value:d.system_power_w,total:true,label:'Gesamtserver via IPMI/DCMI'};
+  const parts=[];
+  if(valid(d.cpu_power_w))parts.push(['CPU-Package',d.cpu_power_w]);
+  else if(valid(d.cpu_core_power_w))parts.push(['CPU-Kerne',d.cpu_core_power_w]);
+  else if(valid(d.uncore_power_w))parts.push(['Uncore',d.uncore_power_w]);
+  // This collector exposes the separate Intel RAPL DRAM domain.
+  if(valid(d.dram_power_w))parts.push(['DRAM',d.dram_power_w]);
+  // gpu_power_w may represent an integrated GPU. Never add an ambiguous
+  // GPU reading to CPU/RAPL measurements without independent provenance.
+  if(!parts.length&&valid(d.gpu_power_w))parts.push(['GPU',d.gpu_power_w]);
+  if(!parts.length)return {value:null,total:false,label:'Keine lokale Watt-Messquelle verfügbar'};
+  return {value:parts.reduce((sum,p)=>sum+p[1],0),total:false,label:'Teilmessung: '+parts.map(p=>p[0]).join(' + ')+' · Gesamtverbrauch nicht messbar'};
+}
+if(typeof bestPower==='function'){
+  bestPower=function(d){
+    const p=localHostPower(d);
+    const value=p.value===null?'n/v':tabNumber(p.value,1)+' W';
+    return [value,p.label];
+  };
+}
 function buildTabFrames(mode,now=Date.now()){
   if(tabSettings.update&&tabUpdate&&now-tabUpdateTime<3600000){
     return ['Update verfügbar','Update V'+tabUpdate,tabName];
@@ -45,10 +67,9 @@ function buildTabFrames(mode,now=Date.now()){
   }
   if(usage.length)frames.push(usage.join(' | '));
   if(selected.includes('power')){
-    for(const [field,label] of [['system_power_w',''],['cpu_power_w','CPU '],['gpu_power_w','GPU ']]){
-      const value=tabNumber(d[field],2);
-      if(value!==null){frames.push(label+value+' W');break}
-    }
+    const p=localHostPower(d);
+    const value=tabNumber(p.value,2);
+    if(value!==null)frames.push((p.total?'':'Teil ')+value+' W');
   }
   return frames.length?frames:[tabName];
 }
