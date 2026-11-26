@@ -1562,6 +1562,14 @@ sys.exit(0 if status == "OK" else 1)
 PY_STRESS_V155
 )
 
+# Central IANA timezone; no change to the host clock.
+pve_host_timezone() {
+    local zone
+    zone="$(timedatectl show -p Timezone --value)"
+    [[ "$zone" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ && -f "/usr/share/zoneinfo/$zone" ]] || return 1
+    printf '%s\n' "$zone"
+}
+
 install_upper_public_status_v163() (
     local id="" candidate="" count=0
     for candidate in $(pct list | awk 'NR>1 {print $1}'); do
@@ -1578,16 +1586,22 @@ install_upper_public_status_v163() (
         warn "Uptime-Kuma-LXC ist nicht gestartet."
         return 1
     fi
-    pct exec "$id" -- bash -s <<'KUMA_STATUS_INSTALL'
+    pct exec "$id" -- bash -s -- "$(pve_host_timezone)" <<'KUMA_STATUS_INSTALL'
 set -Eeuo pipefail
 conf=/etc/nginx/conf.d/pve-master-standard-web.conf
 dir=/var/www/upper
 page="$dir/index.html"
 legacy=/var/www/nodezero-kuma-status
+zone="${1:?Host-Zeitzone fehlt}"
+[[ "$zone" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ && -f "/usr/share/zoneinfo/$zone" ]]
 test -f "$conf"
 curl -fsS --max-time 10 http://127.0.0.1:3001/ >/dev/null
 nginx -t
 install -d -m 0755 "$dir"
+zone_tmp="$(mktemp "$dir/.timezone.XXXXXX")"
+printf '{"timezone":"%s"}\n' "$zone" > "$zone_tmp"
+chmod 0644 "$zone_tmp"
+mv -f "$zone_tmp" "$dir/timezone.json"
 # Copy only missing personal images on migration; never replace them.
 for asset in logo.png favicon.png; do
     if [[ ! -e "$dir/$asset" && -f "$legacy/$asset" && ! -L "$legacy/$asset" ]]; then
@@ -1640,9 +1654,13 @@ const state=s=>s===1?["Online","up"]:s===0?["Offline","down"]:s===2?["Ausstehend
 const ms=p=>typeof p==="number"&&Number.isFinite(p)&&p>=0?p:null;
 const format=p=>p===null?"—":p.toFixed(1)+" ms";
 // Kuma heartbeat.time is UTC, including legacy timestamps without an offset.
-const upperZone="Europe/Berlin";
-const upperDateFormat=new Intl.DateTimeFormat("de-DE",{timeZone:upperZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
-const upperClockFormat=new Intl.DateTimeFormat("de-DE",{timeZone:upperZone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+let upperZone=null,upperDateFormat=null,upperClockFormat=null;
+function setUpperZone(zone){
+ if(typeof zone!=="string"||!zone)throw Error("Host-Zeitzone fehlt");
+ const date=new Intl.DateTimeFormat("de-DE",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+ const clock=new Intl.DateTimeFormat("de-DE",{timeZone:zone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+ upperZone=zone;upperDateFormat=date;upperClockFormat=clock;
+}
 function kumaEpoch(value){
  if(typeof value!=="string")return NaN;
  const raw=value.trim();
@@ -1650,7 +1668,7 @@ function kumaEpoch(value){
  const iso=raw.replace(" ","T");
  return Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)?iso:iso+"Z");
 }
-function kumaLocal(value){const epoch=kumaEpoch(value);return Number.isFinite(epoch)?upperDateFormat.format(epoch):"—"}
+function kumaLocal(value){const epoch=kumaEpoch(value);return Number.isFinite(epoch)&&upperDateFormat?upperDateFormat.format(epoch):"—"}
 function kumaSort(a,b){const x=kumaEpoch(a.time),y=kumaEpoch(b.time);return (Number.isFinite(x)?x:-Infinity)-(Number.isFinite(y)?y:-Infinity)||0}
 async function json(url){const response=await fetch(url,{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("HTTP "+response.status);return response.json()}
 function stat(parent,label,value){const n=el("div");n.append(el("span",label),el("strong",value));parent.append(n)}
@@ -1706,7 +1724,7 @@ function render(config,heartbeat){
 }
 async function refresh(){
  if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
- try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+upperClockFormat.format(new Date())+" · alle 60 Sekunden";}
+ try{const [config,heartbeat,tz]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug),json("/upper/timezone.json")]);if(token!==generation)return;setUpperZone(tz.timezone);if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+upperClockFormat.format(new Date())+" · alle 60 Sekunden";}
  catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
  finally{busy=false;if(token!==generation)refresh()}
 }
@@ -1735,7 +1753,7 @@ p=Path(sys.argv[1])
 s=p.read_text()
 # Remove only old managed routes (including the temporary /status/ route).
 s=re.sub(r'(?m)^[ \t]*# (?:NODEZERO KUMA PUBLIC STATUS V155|UPPER PUBLIC STATUS)[ \t]*\n[ \t]*location\s*=\s*/(?:nodezero-status|status|upper)/\s*\{[^}]*\}[ \t]*\n?', '', s)
-s=re.sub(r'(?m)^[ \t]*location\s*=\s*/upper(?:/|/logo\.png|/favicon\.png)?\s*\{[^}]*\}[ \t]*\n?', '', s)
+s=re.sub(r'(?m)^[ \t]*location\s*=\s*/upper(?:/|/logo\.png|/favicon\.png|/timezone\.json)?\s*\{[^}]*\}[ \t]*\n?', '', s)
 anchor="    location / {\n"
 if s.count(anchor)!=1:
     raise SystemExit("UPPER: nginx location nicht eindeutig")
@@ -1747,6 +1765,13 @@ block="""    # UPPER PUBLIC STATUS
         root /var/www/upper;
         try_files /index.html =404;
         default_type text/html;
+        add_header Cache-Control "no-store";
+        add_header X-Content-Type-Options nosniff;
+    }
+    location = /upper/timezone.json {
+        root /var/www/upper;
+        try_files /timezone.json =404;
+        default_type application/json;
         add_header Cache-Control "no-store";
         add_header X-Content-Type-Options nosniff;
     }
@@ -11241,7 +11266,7 @@ if (( INSTALL_PULSE )); then
     ui_section "Automatische Pulse-Einrichtung"
     ui_kv "Admin" "$PULSE_ADMIN_USER"
     ui_kv "Web" "https://${PULSE_IP}/"
-    ui_kv "Zeitzone" "Europe/Berlin"
+    ui_kv "Zeitzone" "$(pve_host_timezone)"
     ui_kv "Discovery-Netz" "${NETWORK_PREFIX}.0/24"
     ui_note "Der First-Run-/Bootstrap-Assistent wird automatisch übersprungen."
     ui_note "Der Proxmox-Host wird mit einem eigenen eingeschränkten Monitoring-Token registriert."
@@ -12246,7 +12271,7 @@ create_linux_cloud_vm_v61() {
 #cloud-config
 hostname: ${OS_NAME}
 manage_etc_hosts: true
-timezone: Europe/Berlin
+timezone: $(pve_host_timezone)
 ssh_pwauth: true
 
 users:
@@ -13022,7 +13047,7 @@ services:
       PAPERLESS_DBUSER: paperless
       PAPERLESS_DBPASS: "${DB_PASS}"
 
-      PAPERLESS_TIME_ZONE: Europe/Berlin
+      PAPERLESS_TIME_ZONE: "$(pve_host_timezone)"
       PAPERLESS_OCR_LANGUAGE: deu
       PAPERLESS_OCR_LANGUAGES: "deu eng"
 
@@ -14527,7 +14552,7 @@ services:
     restart: unless-stopped
 
     environment:
-      TZ: Europe/Berlin
+      TZ: "$(pve_host_timezone)"
 
       # V83: Web/API-Passwort ist aktiv.
       # Dadurch liefert Pi-hole v6 echte API-Sessions (SID) und ist
@@ -14933,7 +14958,7 @@ services:
     # Host-Netz des dedizierten LXC, nicht des Proxmox-Hosts.
     network_mode: host
     environment:
-      TZ: "Europe/Berlin"
+      TZ: "$(pve_host_timezone)"
       UPTIME_KUMA_HOST: "127.0.0.1"
       UPTIME_KUMA_PORT: "3001"
     volumes:
@@ -15281,8 +15306,8 @@ services:
       ADMIN_NAME: "Admin"
       ADMIN_EMAIL: "${SPEEDTEST_ADMIN_EMAIL}"
       ADMIN_PASSWORD: "${SPEEDTEST_ADMIN_PASS}"
-      APP_TIMEZONE: "Europe/Berlin"
-      DISPLAY_TIMEZONE: "Europe/Berlin"
+      APP_TIMEZONE: "$(pve_host_timezone)"
+      DISPLAY_TIMEZONE: "$(pve_host_timezone)"
     volumes:
       - speedtest-data:/config
 
@@ -15425,7 +15450,7 @@ services:
     ports:
       - "127.0.0.1:9000:9000"
     environment:
-      TZ: "Europe/Berlin"
+      TZ: "$(pve_host_timezone)"
       BASE_URL: "https://${MEALIE_IP}"
       ALLOW_SIGNUP: "false"
       PUID: "1000"
@@ -15972,7 +15997,7 @@ install_community_generated_lxc() {
     var_pw="$root_pw" \
     var_container_storage="$DISK_STORAGE" \
     var_template_storage="$IMAGE_CACHE_STORAGE" \
-    var_timezone="Europe/Berlin" \
+    var_timezone="$(pve_host_timezone)" \
     var_tags="community-script;proxmox-master" \
         bash "$tmp"
 
@@ -16033,7 +16058,7 @@ install_community_generated_lxc_v65() {
         "var_pw=${root_pw}"
         "var_container_storage=${DISK_STORAGE}"
         "var_template_storage=${IMAGE_CACHE_STORAGE}"
-        "var_timezone=Europe/Berlin"
+        "var_timezone=$(pve_host_timezone)"
         "var_os=debian"
         "var_version=13"
         "var_tags=community-script;proxmox-master;v107"
@@ -19271,7 +19296,7 @@ pveum user token permissions "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" || true
 # Apply timezone at OS level as well. This does not alter shutdown thresholds.
 # ---------------------------------------------------------------------------
 
-pct exec "$CTID" -- timedatectl set-timezone Europe/Berlin >/dev/null 2>&1 || true
+pct exec "$CTID" -- timedatectl set-timezone "$(pve_host_timezone)" >/dev/null 2>&1 || true
 
 # Reload the deliberately-safe dry-run config before the test.
 pct exec "$CTID" -- systemctl restart pve-usv.service
