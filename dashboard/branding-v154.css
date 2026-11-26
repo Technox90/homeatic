@@ -185,3 +185,35 @@ body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-w
 #settingsHubPanelUpdates a{color:var(--accent)}
 #settingsHubPanelUpdates [data-update-history]{max-height:180px;overflow:auto}
 #dashboardUpdateSoundSettings input[type=time]{min-width:0;width:auto!important}
+
+/* V174 compact cards and floating snooze */
+.v174Color{transition:color .8s ease}
+.v174Label{display:flex!important;align-items:center;gap:5px;min-width:0}
+.v174Icon{width:15px;height:15px;flex:none;vertical-align:middle}
+.v174Right{margin-left:auto;white-space:nowrap}
+.v174Line{display:block;line-height:1.25}
+.v174Guests{display:flex;align-items:baseline;gap:4px;white-space:nowrap;font-size:clamp(12px,1.5vw,20px)!important}
+.v174Guests>span:not(:first-child){font-size:.62em;font-weight:600}
+.card.v174Warning{border-color:#FFB020!important}
+.card.v174Critical{border-color:#EF4444!important}
+.card.v174Glow.v174Warning{box-shadow:0 0 13px #FFB02036}
+.card.v174Glow.v174Critical{box-shadow:0 0 16px #EF444450}
+.card{transition:border-color .8s ease,box-shadow .8s ease}
+#v174Snooze{position:fixed;bottom:16px;right:16px;z-index:140;display:flex;flex-direction:column;align-items:flex-end;gap:7px;color:var(--snooze-color,#22C55E)}
+#v174Snooze [hidden],#v174WarningList[hidden]{display:none!important}
+.v174SnoozeButton{display:flex;align-items:center;gap:5px;color:inherit!important;background:var(--panel,#102030)!important;border:1px solid currentColor!important;border-radius:30px!important;padding:5px 8px!important;font-variant-numeric:tabular-nums;transition:color .8s ease}
+.v174Bell{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;border:1px solid currentColor}
+.v174Bell.timed{background:conic-gradient(currentColor var(--snooze-progress),#263849 0);border:0}
+.v174Bell.timed svg{background:var(--panel,#102030);border-radius:50%;padding:6px;width:32px;height:32px}
+.v174Bell svg{width:23px;height:23px}
+.v174Z{position:relative;width:37px;height:30px;overflow:visible}
+.v174Z i{position:absolute;left:0;bottom:0;font-style:normal;font-weight:700;opacity:0;animation:v174Sleep 2.7s ease-in-out infinite}
+.v174Z i:nth-child(1){font-size:10px}.v174Z i:nth-child(2){font-size:13px;animation-delay:.9s}.v174Z i:nth-child(3){font-size:16px;animation-delay:1.8s}
+@keyframes v174Sleep{0%{opacity:0;transform:translate(0,0) scale(.65)}20%,65%{opacity:1}100%{opacity:0;transform:translate(24px,-23px) scale(1.15)}}
+.v174SnoozeMenu,#v174WarningList{background:var(--panel,#152433);border:1px solid var(--line,#344b60);border-radius:12px;padding:12px;color:var(--text,#eee)}
+.v174SnoozeMenu button{display:block;width:100%;text-align:left;margin:4px 0}
+#v174WarningList{position:fixed;top:85px;right:16px;z-index:145;max-width:90vw;max-height:70vh;overflow:auto}
+#v174SystemStatus{display:flex;align-items:center;gap:4px;background:transparent!important;border:0!important;font-size:12px}
+#proxmox-installer-update{bottom:78px!important}
+@media(max-width:600px){#v174SystemStatus span{display:none}.v174Guests{gap:2px;white-space:normal}}
+@media(prefers-reduced-motion:reduce){.v174Z i{animation:none;opacity:1}.v174Z i:nth-child(2){transform:translate(10px,-8px)}.v174Z i:nth-child(3){transform:translate(20px,-16px)}.v174Color,.card,.v174SnoozeButton{transition:none}}

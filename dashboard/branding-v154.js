@@ -117,12 +117,133 @@ function setTabUpdateStatus(data){
   tabUpdate=next;tabUpdateTime=timestamp;
   if(changed)restartTabRotation();else refreshTabTitle();
 }
+
+/* V174: live metric presentation and browser-local alarm state. */
+const v174Palette={white:'#FFFFFF',green:'#22C55E',yellow:'#EAB308',amber:'#FFB020',red:'#EF4444',blue:'#3B82F6',muted:'#94A3B8'};
+const v174Valid=v=>typeof v==='number'&&Number.isFinite(v);
+function v174Color(v,stops){
+ if(!v174Valid(v))return v174Palette.muted;
+ if(v<=stops[0][0])return stops[0][1];
+ for(let i=1;i<stops.length;i++){const [b,bc]=stops[i], [a,ac]=stops[i-1];if(v<=b){const t=(v-a)/(b-a);const rgb=h=>[1,3,5].map(j=>parseInt(h.slice(j,j+2),16));return 'rgb('+rgb(ac).map((x,j)=>Math.round(x+(rgb(bc)[j]-x)*t)).join(',')+')'}}
+ return stops[stops.length-1][1];
+}
+const vp=v174Palette;
+const usageStops=(a=55,b=80)=>[[a-10,vp.white],[a,vp.amber],[b-10,vp.amber],[b,vp.red]];
+const tempStops=(a=50,b=76)=>[[a-10,vp.green],[a,vp.amber],[b-10,vp.amber],[b,vp.red]];
+const pingStops=[[25,vp.green],[50,'#84CC16'],[100,vp.yellow],[150,vp.amber],[200,vp.red]];
+const warnKey='dashboard.warningSettingsV174',snoozeKey='dashboard.warningSnoozeV174';
+const warnDefaults={sound:true,volume:75,frames:true,icons:true,glow:true,ping:true,pingInterval:15,providers:['Google','Quad9','Cloudflare'],pingColors:true};
+function readLocal(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}}
+function saveLocal(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
+let warnPrefs={...warnDefaults,...readLocal(warnKey,{})},snooze=readLocal(snoozeKey,null);
+let lastMetrics=null,lastMetricsAt=0,lastPing=null,pingIndex=0,pingRotated=0,activeWarnings=new Map(),warningHistory=readLocal('dashboard.warningHistoryV174',[]);
+let alarmContext=null,alarmNodes=[],alarmBusy=0;
+const svgPaths={cpu:'<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/>',disk:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 13h18m-5 3h2"/>',ram:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 9v6m5-6v6m5-6v6M6 18v3m6-3v3m6-3v3"/>',net:'<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-4h14v4"/>',server:'<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h1m-1 10h1"/>',shield:'<path d="M12 2 3 6v6c0 5 5 8 9 10 4-2 9-5 9-10V6z"/><path d="m8 12 3 3 5-6"/>',alert:'<path d="M12 3 2 21h20zM12 9v5m0 3v1"/>',bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',off:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M3 3l18 18"/>'};
+function v174Icon(name){const el=document.createElementNS('http://www.w3.org/2000/svg','svg');el.setAttribute('viewBox','0 0 24 24');el.setAttribute('fill','none');el.setAttribute('stroke','currentColor');el.setAttribute('stroke-width','1.6');el.setAttribute('aria-hidden','true');el.classList.add('v174Icon');el.innerHTML=svgPaths[name]||svgPaths.shield;return el}
+function v174Span(text,color){const e=document.createElement('span');e.textContent=text;if(color){e.className='v174Color';e.style.color=color}return e}
+function v174Card(id,title,icon,right=''){
+ const val=document.getElementById(id),card=val?.closest('.card');if(!card)return null;
+ const label=card.querySelector('.label');if(label){label.classList.add('v174Label');label.replaceChildren();if(warnPrefs.icons)label.append(v174Icon(icon));label.append(v174Span(title));if(right){const r=v174Span(right);r.className='v174Right';label.append(r)}}
+ return card;
+}
+function v174Value(id,v,stops){const e=document.getElementById(id);if(e){e.classList.add('v174Color');e.style.color=v174Color(v,stops)}}
+function v174Sub(id,...parts){const e=document.getElementById(id);if(e)e.replaceChildren(...parts)}
+function v174Line(text,color){const e=v174Span(text,color);e.classList.add('v174Line');return e}
+function v174Temp(v){return v174Valid(v)?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' °C':'n/v'}
+function v174Bytes(v){return v174Valid(v)?(v/1073741824).toLocaleString('de-DE',{maximumFractionDigits:1})+' GiB':'n/v'}
+function v174Frame(card,level){if(!card)return;card.classList.toggle('v174Warning',warnPrefs.frames&&level===1);card.classList.toggle('v174Critical',warnPrefs.frames&&level===2);card.classList.toggle('v174Glow',warnPrefs.glow&&warnPrefs.frames&&level>0)}
+const level=(v,a,b)=>!v174Valid(v)?0:v>=b?2:v>=a?1:0;
+function renderMetrics(d){
+ const cpu=v174Card('cpu','CPU','cpu',v174Valid(d.cpu_freq)?(d.cpu_freq/1000).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' GHz':'');
+ v174Value('cpu',d.cpu_percent,usageStops());v174Sub('cpuSub',v174Line('CPU '+v174Temp(d.cpu_temp),v174Color(d.cpu_temp,tempStops())),v174Line('Board '+v174Temp(d.board_temp),v174Color(d.board_temp,tempStops())));
+ v174Frame(cpu,Math.max(level(d.cpu_percent,55,80),level(d.cpu_temp,50,76),level(d.board_temp,50,76)));
+ const disk=v174Card('disk','Speicher','disk',v174Bytes(d.root_total));v174Value('disk',d.root_percent,usageStops());
+ v174Sub('diskSub',v174Line('Belegt: '+v174Bytes(d.root_used)),v174Line('SSD '+v174Temp(d.drive_temp),v174Color(d.drive_temp,tempStops(50,70))));
+ v174Frame(disk,Math.max(level(d.root_percent,55,80),level(d.drive_temp,50,70)));
+ const ram=v174Card('ram','RAM / Swap','ram');v174Value('ram',d.ram_percent,usageStops(70,90));v174Frame(ram,Math.max(level(d.ram_percent,70,90),level(d.swap_percent,30,60)));
+ const guests=v174Card('guests','VM / LXC','server');
+ const valid=[d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid);
+ if(valid){const a=d.vm_running+d.ct_running,total=d.vm_total+d.ct_total,vm=d.vm_running===d.vm_total,ct=d.ct_running===d.ct_total;const e=document.getElementById('guests');e.replaceChildren(v174Span(a+' Aktiv',a===total?vp.green:a===0?vp.red:vp.yellow),v174Span(' · '+d.vm_running+'/'+d.vm_total+' VM',vm?vp.green:vp.red),v174Span(' · '+d.ct_running+'/'+d.ct_total+' CT',ct?vp.green:vp.red));e.classList.add('v174Guests');v174Sub('guestSub');v174Frame(guests,a===total?0:a===0?2:1)}
+ const pi=v174Card('piholeBlockedPct','Pi-hole · Geblockt','shield');v174Value('piholeBlockedPct',d.pihole_blocked_percent,[[50,vp.white],[60,vp.red]]);v174Frame(pi,level(d.pihole_blocked_percent,60,60));
+ v174Card('net','Netzwerk','net');renderPing();
+ evaluateWarnings(d);
+}
+function renderPing(){
+ const e=document.getElementById('netSub');if(!e)return;
+ let line=document.getElementById('v174Ping');if(!line){line=v174Line('');line.id='v174Ping';e.append(line)}
+ if(!warnPrefs.ping){line.hidden=true;return}line.hidden=false;
+ const providers=Array.isArray(warnPrefs.providers)?warnPrefs.providers.filter(x=>['Google','Quad9','Cloudflare'].includes(x)):warnDefaults.providers;
+ if(!providers.length){line.textContent='Ping: keine Ziele';return}
+ const now=Date.now();if(now-pingRotated>=(Number(warnPrefs.pingInterval)||15)*1000){pingIndex=(pingIndex+1)%providers.length;pingRotated=now}
+ const name=providers[pingIndex%providers.length],fresh=lastPing&&now-Date.parse(lastPing.checked)<35000,v=fresh?lastPing.targets?.[name]:undefined;
+ line.textContent='Ping: '+name+' · '+(v174Valid(v)?Math.round(v)+' ms':v===null?'Timeout':'n/v');line.style.color=!warnPrefs.pingColors?vp.white:v===null?vp.red:v174Color(v,pingStops);
+}
+async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}renderPing();if(lastMetrics)evaluateWarnings(lastMetrics)}
+function evaluateWarnings(d){
+ const now=Date.now(),checks=[['CPU-Auslastung',d.cpu_percent,80,60],['RAM-Auslastung',d.ram_percent,90,60],['Swap-Auslastung',d.swap_percent,60,60],['CPU-Temperatur',d.cpu_temp,76,10],['Board-Temperatur',d.board_temp,76,10],['SSD-Temperatur',d.drive_temp,70,10],['Speicherbelegung',d.root_percent,80,30],['Pi-hole-Blockrate',d.pihole_blocked_percent,60,30]];
+ if([d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid))checks.push(['VM / LXC offline',d.vm_total+d.ct_total-d.vm_running-d.ct_running,1,30]);
+ if(lastPing&&now-Date.parse(lastPing.checked)<35000&&lastPing.targets)checks.push(['Internet-Ping',Object.values(lastPing.targets).length===3&&Object.values(lastPing.targets).every(v=>v===null)?1:0,1,30]);
+ if(now-lastMetricsAt>45000){checks.length=0;checks.push(['Messdaten veraltet',1,1,0])}
+ for(const [name,v,limit,delay] of checks){const bad=v174Valid(v)&&v>=limit;let w=activeWarnings.get(name);if(!bad){if(w?.confirmed){warningHistory.unshift({name,at:new Date().toISOString(),event:'Behoben'});saveLocal('dashboard.warningHistoryV174',warningHistory=warningHistory.slice(0,50))}activeWarnings.delete(name);continue}if(!w){w={since:now,confirmed:false,heard:false};activeWarnings.set(name,w)}if(!w.confirmed&&now-w.since>=delay*1000){w.confirmed=true;warningHistory.unshift({name,at:new Date().toISOString(),event:'Aktiv'});saveLocal('dashboard.warningHistoryV174',warningHistory=warningHistory.slice(0,50))}}
+ const confirmed=[...activeWarnings].filter(([n,w])=>w.confirmed);renderSystemStatus(confirmed);if(confirmed.some(([n,w])=>!w.heard)&&!isSnoozed()&&warnPrefs.sound&&playAlarm())confirmed.forEach(([n,w])=>w.heard=true);
+}
+function stopAlarm(){for(const n of alarmNodes){try{n.stop()}catch{}}alarmNodes=[];alarmBusy=0}
+function unlockAlarm(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;if(!alarmContext)alarmContext=new A();if(alarmContext.state!=='running')alarmContext.resume().catch(()=>{})}catch{}}
+function playAlarm(){
+ if(!alarmContext||alarmContext.state!=='running'||alarmContext.currentTime<alarmBusy||window.__dashboardUpdateAudioBusy?.())return false;
+ const c=alarmContext,t=c.currentTime+.02;alarmBusy=t+2.5;
+ for(const [offset,hz] of [[0,440],[.55,554.37],[1.1,659.25]]){const o=c.createOscillator(),g=c.createGain();o.frequency.value=hz;o.type='sine';g.gain.setValueAtTime(.0001,t+offset);g.gain.exponentialRampToValueAtTime(Math.max(.0002,.12*Math.max(0,Math.min(100,Number(warnPrefs.volume)||0))/100),t+offset+.05);g.gain.exponentialRampToValueAtTime(.0001,t+offset+1.2);o.connect(g);g.connect(c.destination);o.start(t+offset);o.stop(t+offset+1.25);alarmNodes.push(o);o.onended=()=>{o.disconnect();g.disconnect();alarmNodes=alarmNodes.filter(n=>n!==o)}}return true;
+}
+window.__dashboardWarningAudioBusy=()=>!!alarmContext&&alarmContext.currentTime<alarmBusy;
+document.addEventListener('pointerdown',unlockAlarm);document.addEventListener('keydown',unlockAlarm);
+function isSnoozed(){return snooze?.permanent===true||Number(snooze?.until)>Date.now()}
+function setSnooze(minutes){snooze=minutes===0?null:minutes===-1?{permanent:true}:{until:Date.now()+minutes*60000,duration:minutes*60000};saveLocal(snoozeKey,snooze);if(isSnoozed())stopAlarm();else activeWarnings.forEach(w=>w.heard=false);renderSnooze()}
+function installSnooze(){
+ if(document.getElementById('v174Snooze'))return;
+ const wrap=document.createElement('div');wrap.id='v174Snooze';wrap.innerHTML='<div class="v174SnoozeMenu" hidden><strong>Systemwarntöne</strong><div data-snooze-options></div></div><button type="button" class="v174SnoozeButton" aria-label="Systemwarntöne schlummern" aria-expanded="false"><span data-snooze-time></span><span class="v174Z" hidden><i>z</i><i>Z</i><i>Z</i></span><span class="v174Bell"></span></button>';
+ const menu=wrap.querySelector('.v174SnoozeMenu'),button=wrap.querySelector('button');
+ for(const [n,label] of [[5,'5 Minuten'],[10,'10 Minuten'],[30,'30 Minuten'],[60,'60 Minuten'],[-1,'Dauerhaft deaktivieren'],[0,'Warntöne aktivieren']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{setSnooze(n);menu.hidden=true;button.setAttribute('aria-expanded','false')});wrap.querySelector('[data-snooze-options]').append(b)}
+ button.addEventListener('click',()=>{menu.hidden=!menu.hidden;button.setAttribute('aria-expanded',String(!menu.hidden))});document.body.append(wrap);
+}
+function renderSnooze(){
+ installSnooze();const wrap=document.getElementById('v174Snooze'),now=Date.now();if(snooze&&!snooze.permanent&&snooze.until<=now){snooze=null;saveLocal(snoozeKey,null);activeWarnings.forEach(w=>w.heard=false)}
+ const timed=isSnoozed()&&!snooze.permanent,permanent=snooze?.permanent===true,remaining=timed?Math.max(0,snooze.until-now):0,ratio=timed?remaining/snooze.duration:0;
+ const color=timed?v174Color(100-ratio*100,[[0,vp.amber],[25,vp.yellow],[50,vp.green],[75,'#22D3EE'],[85,vp.blue],[100,vp.blue]]):permanent||!warnPrefs.sound?vp.red:vp.green;
+ wrap.style.setProperty('--snooze-color',color);wrap.style.setProperty('--snooze-progress',Math.max(0,Math.min(1,ratio))*360+'deg');
+ const seconds=Math.ceil(remaining/1000);wrap.querySelector('[data-snooze-time]').textContent=timed?String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0'):permanent?'Stumm':'';
+ wrap.querySelector('.v174Z').hidden=!timed;const bell=wrap.querySelector('.v174Bell');bell.classList.toggle('timed',timed);const state=timed||permanent||!warnPrefs.sound?'off':'bell';if(bell.dataset.state!==state){bell.dataset.state=state;bell.replaceChildren(v174Icon(state))}
+}
+function renderSystemStatus(confirmed){
+ const host=document.querySelector('.toolbarCenter');if(!host)return;
+ let b=document.getElementById('v174SystemStatus');if(!b){b=document.createElement('button');b.type='button';b.id='v174SystemStatus';b.addEventListener('click',()=>{const p=document.getElementById('v174WarningList');if(p)p.hidden=!p.hidden});host.append(b)}
+ b.replaceChildren(v174Icon(confirmed.length?'alert':'shield'),v174Span(confirmed.length?confirmed.length+' Kritisch':'System OK'));b.style.color=confirmed.length?vp.red:vp.green;
+ let list=document.getElementById('v174WarningList');if(!list){list=document.createElement('aside');list.id='v174WarningList';list.hidden=true;document.body.append(list)}list.replaceChildren(v174Line('Systemwarnungen'));for(const [name,w] of confirmed)list.append(v174Line(name+' · seit '+new Date(w.since).toLocaleTimeString('de-DE'),vp.red));if(!confirmed.length)list.append(v174Line('Keine bestätigten kritischen Warnungen',vp.green));
+}
+function installWarningSettings(){
+ if(document.getElementById('v174WarningSettings'))return;
+ const anchor=document.getElementById('settingsSave')?.closest('.modalButtons');if(!anchor)return;
+ const panel=document.createElement('section');panel.id='v174WarningSettings';panel.className='browserTabSettings';
+ panel.innerHTML='<h3>Systemwarnungen und Ping</h3><div data-v174-options></div><label>Lautstärke System Alert <input type="range" min="0" max="100" step="1" data-v174-volume><span data-v174-volume-label></span></label><label>Ping-Wechsel <select data-v174-interval><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>60</option></select> Sekunden</label><div data-v174-providers></div><button type="button" data-v174-test>Systemwarnton testen</button><details><summary>Warnungshistorie (Browser)</summary><div data-v174-history></div></details>';
+ const opts=panel.querySelector('[data-v174-options]');for(const [key,label] of [['sound','Systemwarnton'],['frames','Dynamische Rahmen'],['icons','Kachel-Symbole'],['glow','Leuchteffekt'],['ping','Ping-Anzeige'],['pingColors','Ping-Farbverlauf']]){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=!!warnPrefs[key];i.addEventListener('change',()=>{warnPrefs[key]=i.checked;if(!warnPrefs.sound)stopAlarm();saveLocal(warnKey,warnPrefs)});l.append(i,document.createTextNode(label));opts.append(l)}
+ const vol=panel.querySelector('[data-v174-volume]'),vl=panel.querySelector('[data-v174-volume-label]');vol.value=warnPrefs.volume;vl.textContent=vol.value+' %';vol.addEventListener('input',()=>{warnPrefs.volume=Number(vol.value);vl.textContent=vol.value+' %';saveLocal(warnKey,warnPrefs)});
+ const interval=panel.querySelector('[data-v174-interval]');interval.value=warnPrefs.pingInterval;interval.addEventListener('change',()=>{warnPrefs.pingInterval=Number(interval.value);saveLocal(warnKey,warnPrefs)});
+ for(const name of warnDefaults.providers){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=warnPrefs.providers.includes(name);i.addEventListener('change',()=>{warnPrefs.providers=i.checked?[...new Set([...warnPrefs.providers,name])]:warnPrefs.providers.filter(n=>n!==name);saveLocal(warnKey,warnPrefs);renderPing()});l.append(i,document.createTextNode(name));panel.querySelector('[data-v174-providers]').append(l)}
+ panel.querySelector('[data-v174-test]').addEventListener('click',()=>{unlockAlarm();if(!isSnoozed())playAlarm()});
+ const h=panel.querySelector('[data-v174-history]');for(const w of warningHistory.slice(0,20))h.append(v174Line(w.event+' · '+w.name+' · '+new Date(w.at).toLocaleString('de-DE')));
+ anchor.before(panel);
+}
+function v174Tick(){renderSnooze();installWarningSettings();renderPing();if(lastMetrics)evaluateWarnings(lastMetrics)}
+window.addEventListener('storage',e=>{if(e.key===snoozeKey){snooze=readLocal(snoozeKey,null);if(isSnoozed())stopAlarm();renderSnooze()}if(e.key===warnKey){warnPrefs={...warnDefaults,...readLocal(warnKey,{})};if(!warnPrefs.sound)stopAlarm()}});
+window.setInterval(v174Tick,1000);window.setInterval(fetchPing,10000);
+window.setTimeout(()=>{v174Tick();fetchPing()},0);
+
 if(typeof getJSON==='function'){
   const originalGetJSON=getJSON;
   getJSON=async function(url,...args){
     const data=await originalGetJSON.call(this,url,...args);
     if(typeof url==='string'&&url.split('?')[0]==='/api/current'&&data&&typeof data==='object'){
       tabMetrics=data;tabMetricsTime=Date.now();refreshTabTitle();
+      lastMetrics=data;lastMetricsAt=Date.now();window.setTimeout(()=>{if(lastMetrics===data)renderMetrics(data)},0);
     }
     return data;
   };

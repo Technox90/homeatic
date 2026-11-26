@@ -1,0 +1,12 @@
+[Unit]
+Description=Dashboard Internet Ping V174
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/sbin/proxmox-dashboard-ping
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+[Install]
+WantedBy=multi-user.target
