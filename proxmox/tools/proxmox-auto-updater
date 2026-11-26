@@ -850,27 +850,15 @@ restore_pihole_language() {
 qga_output() {
     local vmid="$1"
     shift
-
-    timeout 120 qm guest exec "$vmid" \
-        --output-format json \
-        -- "$@" 2>/dev/null |
-    jq -r '."out-data" // empty' 2>/dev/null
+    timeout 120 qm guest exec "$vmid" -- "$@" |
+        jq -er 'select(.exited == 1 and .exitcode == 0 and (.["out-truncated"] // 0) == 0) | .["out-data"]'
 }
 
 ha_update_available() {
-    local vmid="$1"
-    local component="$2"
-    local info
-
-    info="$(qga_output "$vmid" sh -lc "ha ${component} info --raw-json" || true)"
-    [[ -n "$info" ]] || return 2
-
-    if printf '%s' "$info" |
-       jq -e '.. | objects | select(.update_available == true)' >/dev/null 2>&1; then
-        return 0
-    fi
-
-    return 1
+    local vmid="$1" component="$2" info flag
+    info="$(qga_output "$vmid" ha "$component" info --raw-json)" || return 2
+    flag="$(jq -er 'select(.result == "ok") | .data.update_available | select(type == "boolean") | tostring' <<< "$info")" || return 2
+    case "$flag" in true) return 0 ;; false) return 1 ;; *) return 2 ;; esac
 }
 
 update_home_assistant() {
@@ -1159,6 +1147,87 @@ update_proxmox_components_v156() {
     fi
 }
 
+# Daily conservative maintenance, executed under the existing updater lock.
+maintenance_guest_script() {
+    cat <<'GUEST'
+set -eu
+df -h /
+# Never operate on a separately mounted cache or Docker data directory.
+on_root() {
+    [ "$(findmnt -n -o TARGET -T "$1")" = / ]
+}
+if command -v docker >/dev/null 2>&1; then
+    root=$(docker info --format '{{.DockerRootDir}}')
+    if on_root "$root"; then
+        ids=$(docker ps -q)
+        healthy=1
+        for id in $ids; do
+            state=$(docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id")
+            case "$state" in "running healthy"|"running none") ;; *) healthy=0 ;; esac
+        done
+        if [ "$healthy" = 1 ]; then
+            docker image prune -f
+            docker builder prune -f --filter until=168h
+        else
+            echo "Docker health check failed; image and build cleanup skipped."
+            exit 1
+        fi
+    else
+        echo "Docker data is mounted separately; skipped."
+    fi
+fi
+if command -v apt-get >/dev/null 2>&1 && on_root /var/cache/apt/archives; then
+    apt-get autoclean
+fi
+df -h /
+GUEST
+}
+
+maintenance_daily() {
+    local id os script before after
+    echo "=== DAILY STORAGE MAINTENANCE ==="
+    before="$(pvesm status)" || before=""
+    printf '%s\n' "$before"
+    script="$(maintenance_guest_script)"
+    for id in $(pct list | awk '$2=="running" {print $1}'); do
+        echo "=== CT $id maintenance ==="
+        if timeout 300 pct exec "$id" -- sh -c "$script"; then
+            timeout 300 pct fstrim "$id" --ignore-mountpoints 1 || add_failure "CT $id: TRIM fehlgeschlagen"
+        else
+            add_failure "CT $id: Bereinigung übersprungen/fehlgeschlagen"
+        fi
+    done
+    for id in $(qm list | awk '$3=="running" {print $1}'); do
+        echo "=== VM $id maintenance ==="
+        if ! os="$(timeout 20 qm guest cmd "$id" get-osinfo 2>/dev/null | jq -er '.id')"; then
+            echo "VM $id: Gastbetriebssystem nicht erreichbar; übersprungen."
+            continue
+        fi
+        case "$os" in
+            haos) echo "VM $id: HAOS, Docker vom Supervisor verwaltet." ;;
+            debian|ubuntu|fedora|centos|rhel|rocky|almalinux|opensuse*|arch)
+                if ! timeout 300 qm guest exec "$id" -- sh -c "$script" | jq -e '.exited == 1 and .exitcode == 0'; then
+                    add_failure "VM $id: Gastbereinigung fehlgeschlagen"
+                    continue
+                fi ;;
+            *) echo "VM $id: nicht unterstütztes System $os"; continue ;;
+        esac
+        if [[ "$os" == haos ]]; then
+            timeout 300 qm guest cmd "$id" fstrim || add_failure "VM $id: TRIM fehlgeschlagen"
+        else
+            # Only trim the root filesystem; never external guest mounts.
+            timeout 300 qm guest exec "$id" -- fstrim / | jq -e '.exited == 1 and .exitcode == 0' || add_manual "VM $id: Root-TRIM nicht verfügbar"
+        fi
+    done
+    after="$(pvesm status)" || after=""
+    printf '%s\n' "$after"
+    while read -r name use; do
+        [[ "$use" =~ ^[0-9]+$ ]] || continue
+        if (( use >= 90 )); then add_manual "Speicher kritisch: $name $use %"; elif (( use >= 75 )); then add_manual "Speicherwarnung: $name $use %"; fi
+    done < <(printf '%s\n' "$after" | awk 'NR>1 {sub(/%/,"",$NF); print $1,int($NF)}')
+    lvs -o lv_name,lv_size,data_percent,metadata_percent || true
+}
+
 # =============================================================================
 # START
 # =============================================================================
@@ -1184,6 +1253,12 @@ update_home_assistant
 # Host zuletzt, damit PVE-Paketupdates die laufende CT-Aktualisierung nicht stören.
 update_proxmox_host
 check_host_services
+
+if (( ${#FAILED_ITEMS[@]} == 0 )); then
+    maintenance_daily
+else
+    echo 'Wartung nach Updatefehlern sicherheitshalber übersprungen.'
+fi
 
 send_summary
 
