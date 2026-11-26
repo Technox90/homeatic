@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V178 · 26.11.2026**  
+> **Aktueller Stand: V179 · 26.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+26.11.2026 – V179 · CPU/RAM-Icon und Update-Timer
+--------------------------------------------------------
+- Redundanten CPU-Kartenkopf vollständig entfernt; CPU- und RAM-Symbole bleiben jeweils einmal mit sauberem Abstand sichtbar. Installer-Monitor prüft zu festen 5-Minuten-Zeitpunkten; bestehende Timer werden beim verwalteten Update migriert. Der reguläre Installationszeitpunkt bleibt unverändert.
 
 26.11.2026 – V178 · Speicherwartung und Auto-Release
 --------------------------------------------------------
