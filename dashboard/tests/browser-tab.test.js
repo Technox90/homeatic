@@ -10,13 +10,13 @@ const originalBytes=v=>v+' MiB';
 const ctx=vm.createContext({
   document:doc,
   localStorage:{getItem(){return saved},setItem(k,v){saved=v}},
-  window:{setTimeout(){return ++timer},clearTimeout(){},addEventListener(){}},
+  window:{setTimeout(){return ++timer},clearTimeout(){},setInterval(){return ++timer},clearInterval(){},addEventListener(){}},
   bytes:originalBytes,rate:v=>'legacy',draw:(id,series,opt)=>opt.y(1000000),
   setTimeout(){},console
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -83,3 +83,9 @@ assert.equal(ctx.draw('cIO',[],{}),'1 MB/s');
 assert.equal(ctx.draw('cMem',[],{y:originalBytes}),'1000000 MiB');
 assert.equal(ctx.bytes,originalBytes);
 console.log('Decimal transfer rates passed');
+
+assert.equal(t.v174Color(49,[[50,'#FFFFFF'],[60,'#EF4444']]),'#FFFFFF');
+assert.equal(t.v174Color(55,[[50,'#FFFFFF'],[60,'#EF4444']]),'rgb(247,162,162)');
+assert.equal(t.v174Color(60,[[50,'#FFFFFF'],[60,'#EF4444']]),'rgb(239,68,68)');
+assert.equal(t.v174Color(85,[[0,'#FFB020'],[85,'#3B82F6'],[100,'#3B82F6']]),'rgb(59,130,246)');
+console.log('V174 color interpolation tests passed');
