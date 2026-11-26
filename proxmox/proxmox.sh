@@ -6320,7 +6320,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="675e1cc25cf83f73524ae317b92f60f81332f4e7"
+TOOLS_REF="830ec8addf6686a09eba818ed16e43d25ae3f741"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
