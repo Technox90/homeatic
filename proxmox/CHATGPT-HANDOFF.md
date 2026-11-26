@@ -9,12 +9,14 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V177
+- Aktueller Installationskandidat: V178
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
 
 Produktive Namen und Pfade nicht ohne ausdrücklichen Wunsch ändern.
+
+V178: Tägliche konservative Speicherwartung für laufende CTs und unterstützte Linux-VMs, Docker-Image- und Build-Cache-Bereinigung, lokaler APT-Autoclean, Journal-Vacuum, TRIM, Speicherwarnungen und HAOS-Sonderbehandlung. Externe Caches bleiben erhalten. Docker-Logrotation wird zunächst geprüft und gemeldet. CPU-/RAM-Kachel ohne doppelte Überschrift und mit eigenen Symbolen; direkte Home-Assistant-JSON-Abfragen und stabile GitHub-Releases für verwaltete Updates.
 
 V177: CPU und RAM gleich groß nebeneinander mit separaten Balken; CPU-, Board- und SSD-Temperaturen kompakt darunter. Die bisherige RAM/SSD/Swap-Kachel zeigt die physische System-SSD mit Gesamtkapazität, belegten und direkt verfügbaren dezimalen MB, reserviertem Rest und separaten Root-/Thin-Pool-Balken. Automatische Erkennung für eindeutige Single-Disk-Root-LVM-Layouts, ohne doppelt gezählte Storage-Verzeichnisse oder NAS; bei fehlenden/mehrdeutigen Messwerten n/v. Thin-Pool-Belegung ist blockbasiert und gerundet, nicht NAND-Auslastung. Swap entfällt aus der Übersicht, Swap-Partition bleibt unverändert. Keine Änderung an Partitionen, Gästen, Branding oder Fail2Ban.
 
