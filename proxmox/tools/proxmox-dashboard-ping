@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import concurrent.futures, datetime, json, os, re, subprocess, tempfile, time
+from decimal import Decimal
 from pathlib import Path
 targets={"Google":"8.8.8.8","Quad9":"9.9.9.9","Cloudflare":"1.1.1.1"}
 out=Path("/opt/dashboard/static/dashboard-ping-v174.json")
@@ -47,16 +48,83 @@ def protection():
         result["jails"][jail]=row
     return result
 
-with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-    while True:
-        start=time.monotonic()
-        values=dict(zip(targets,pool.map(ping,targets.values())))
-        security=protection()
-        if out.parent.is_dir():
-            fd,name=tempfile.mkstemp(dir=out.parent,prefix=".ping-")
-            try:
-                with os.fdopen(fd,"w") as fp:json.dump({"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"targets":values,"security":security,"timezone":host_timezone()},fp)
-                os.chmod(name,0o644);os.replace(name,out)
-            finally:
-                if os.path.exists(name):os.unlink(name)
-        time.sleep(max(0,10-(time.monotonic()-start)))
+
+def storage_sample():
+    """Only account a directly identifiable single-disk root LVM layout.
+    Logical free capacity, not physical NAND usage. No network mounts or thin-LV double counts."""
+    try:
+        def query(args):
+            p=subprocess.run(args,capture_output=True,text=True,timeout=5,check=True,env={**os.environ,"LC_ALL":"C"})
+            return json.loads(p.stdout)
+        def number(v):
+            d=Decimal(str(v).strip())
+            if not d.is_finite() or d<0: raise ValueError("invalid number")
+            return d
+        def size(v):
+            d=number(v)
+            if d!=d.to_integral_value():raise ValueError("not bytes")
+            return int(d)
+        # Root device and its major:minor identity, not a hardcoded VG or /dev/sda.
+        root=query(["findmnt","-J","-o","MAJ:MIN","--target","/"])["filesystems"][0]["maj:min"]
+        st=os.statvfs("/")
+        root_total=st.f_blocks*st.f_frsize
+        root_used=(st.f_blocks-st.f_bfree)*st.f_frsize
+        root_free=st.f_bavail*st.f_frsize
+        if not 0<=root_used+root_free<=root_total:raise ValueError("filesystem accounting")
+        lvs=query(["lvs","-a","--reportformat","json","--units","b","--nosuffix","-o","vg_name,lv_name,lv_size,segtype,data_percent,lv_kernel_major,lv_kernel_minor"])["report"][0]["lv"]
+        roots=[l for l in lvs if str(l["lv_kernel_major"]).strip()+":"+str(l["lv_kernel_minor"]).strip()==root and l["segtype"].strip()=="linear"]
+        if len(roots)!=1:return None
+        r=roots[0]; vg=r["vg_name"].strip()
+        pvs=query(["pvs","--reportformat","json","--units","b","--nosuffix","-o","pv_name,vg_name,pv_size,pv_free"])["report"][0]["pv"]
+        pv=[p for p in pvs if p["vg_name"].strip()==vg]
+        if len(pv)!=1:return None
+        # Reject other partitions/filesystems on the backing disk rather than
+        # misrepresenting their capacity as free or unaccounted overhead.
+        rows=query(["lsblk","-b","-J","-p","-o","NAME,PKNAME,TYPE,SIZE,FSTYPE,ROTA","--nodeps",pv[0]["pv_name"].strip()])["blockdevices"]
+        if len(rows)!=1:return None
+        part=rows[0]
+        if part["type"]!="part" or not part.get("pkname"):return None
+        dev=part["pkname"];dev=dev if dev.startswith("/dev/") else "/dev/"+dev
+        disks=query(["lsblk","-b","-J","-p","-o","NAME,TYPE,SIZE,FSTYPE,ROTA","--tree",dev])["blockdevices"]
+        if len(disks)!=1 or disks[0]["type"]!="disk":return None
+        disk=disks[0]
+        if any(p["name"]!=part["name"] and (p["type"]!="part" or p.get("fstype") not in (None,"","vfat","fat","fat32")) for p in disk.get("children",[])):return None
+        # Reject a disk shared with other active PVs.
+        if any(os.path.realpath(p["pv_name"].strip())!=os.path.realpath(pv[0]["pv_name"].strip()) and any(os.path.realpath(p["pv_name"].strip())==os.path.realpath(ch["name"]) for ch in disk.get("children",[])) for p in pvs):return None
+        total=size(disk["size"])
+        pools=[l for l in lvs if l["vg_name"].strip()==vg and l["segtype"].strip()=="thin-pool"]
+        if len(pools)!=1:return {"total":total,"kind":"SSD" if disk["rota"] in (False,0,"0") else "Datenträger","complete":False}
+        pool=pools[0]; pool_total=size(pool["lv_size"]); pct=number(pool["data_percent"])
+        if pct>100:raise ValueError("pool percent")
+        pool_used=int(Decimal(pool_total)*pct/100)
+        pool_free=pool_total-pool_used
+        used=root_used+pool_used
+        available=root_free+pool_free
+        reserved=total-used-available
+        if min(total,root_total,pool_total)<=0 or reserved<0:raise ValueError("inconsistent layout")
+        return {"complete":True,"kind":"SSD" if disk["rota"] in (False,0,"0") else "Datenträger","total":total,"used":used,"available":available,"reserved":reserved,"root_percent":100*root_used/(root_used+root_free) if root_used+root_free else None,"pool_percent":float(pct),"vg_free":size(pv[0]["pv_free"])}
+    except (OSError,ValueError,KeyError,IndexError,TypeError,ArithmeticError,subprocess.SubprocessError):
+        return None
+
+def main():
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        storage=None; storage_checked=None; next_storage=0
+        while True:
+            start=time.monotonic()
+            values=dict(zip(targets,pool.map(ping,targets.values())))
+            security=protection()
+            if start>=next_storage:
+                storage=storage_sample()
+                storage_checked=datetime.datetime.now(datetime.timezone.utc).isoformat()
+                next_storage=start+30
+            if out.parent.is_dir():
+                fd,name=tempfile.mkstemp(dir=out.parent,prefix=".ping-")
+                try:
+                    with os.fdopen(fd,"w") as fp:json.dump({"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"targets":values,"security":security,"timezone":host_timezone(),"storage":storage,"storage_checked":storage_checked},fp)
+                    os.chmod(name,0o644);os.replace(name,out)
+                finally:
+                    if os.path.exists(name):os.unlink(name)
+            time.sleep(max(0,10-(time.monotonic()-start)))
+
+if __name__ == '__main__':
+    main()
