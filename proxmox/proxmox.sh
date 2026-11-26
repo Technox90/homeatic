@@ -1592,7 +1592,7 @@ conf=/etc/nginx/conf.d/pve-master-standard-web.conf
 dir=/var/www/upper
 page="$dir/index.html"
 legacy=/var/www/nodezero-kuma-status
-zone="${1:?Host-Zeitzone fehlt}"
+zone="${1:-$(timedatectl show -p Timezone --value)}"
 [[ "$zone" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ && -f "/usr/share/zoneinfo/$zone" ]]
 test -f "$conf"
 curl -fsS --max-time 10 http://127.0.0.1:3001/ >/dev/null
@@ -11721,6 +11721,7 @@ install_docker_in_ct() {
     # V119: Remote-Script als literal heredoc an bash -lc übergeben.
     # Dadurch können awk/sed/printf im Container normale einfache Quotes
     # enthalten, ohne den äußeren Installer-String vorzeitig zu beenden.
+    pct exec "$ctid" -- timedatectl set-timezone "$(pve_host_timezone)" || warn "CT $ctid: Zeitzone konnte nicht übernommen werden."
     pct exec "$ctid" -- bash -lc "$(cat <<'PROXMOX_DOCKER_CT_V119'
         set -Eeuo pipefail
         export DEBIAN_FRONTEND=noninteractive
@@ -11776,7 +11777,6 @@ EOF
             docker-compose-plugin
 
         systemctl enable --now docker
-        timedatectl set-timezone Europe/Berlin || true
 
         ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
         if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 3072 )); then
@@ -16621,7 +16621,7 @@ configure_pulse_headless() {
         "$admin_user" \
         "$admin_pass" \
         "$api_token" \
-        "$discovery_subnet" <<'EOS'
+        "$discovery_subnet" "$(pve_host_timezone)" <<'EOS'
 set -Eeuo pipefail
 
 PULSE_IP="$1"
@@ -16629,6 +16629,7 @@ ADMIN_USER="$2"
 ADMIN_PASS="$3"
 API_TOKEN="$4"
 DISCOVERY_SUBNET="$5"
+HOST_TIMEZONE="$6"
 
 DATA_DIR="/etc/pulse"
 ENV_FILE="${DATA_DIR}/.env"
@@ -16687,7 +16688,7 @@ PULSE_TRUSTED_PROXY_CIDRS=127.0.0.1/32
 DISCOVERY_SUBNET=${DISCOVERY_SUBNET}
 FRONTEND_PORT=7655
 BIND_ADDRESS=0.0.0.0
-TZ=Europe/Berlin
+TZ=${HOST_TIMEZONE}
 EOF
 
 if id "$SERVICE_USER" >/dev/null 2>&1; then
@@ -17273,9 +17274,10 @@ pct exec "$CTID" -- bash -s -- \
     "$IP" \
     "$ADMIN_USER" \
     "$ADMIN_PASS" \
-    "$API_TOKEN" <<'EOS'
+    "$API_TOKEN" "$(timedatectl show -p Timezone --value)" <<'EOS'
 set -Eeuo pipefail
 
+HOST_TIMEZONE="$5"
 IP="$1"
 ADMIN_USER="$2"
 ADMIN_PASS="$3"
@@ -17325,7 +17327,7 @@ PULSE_PUBLIC_URL=http://${IP}:7655
 ALLOWED_ORIGINS=http://${IP}:7655
 FRONTEND_PORT=7655
 BIND_ADDRESS=0.0.0.0
-TZ=Europe/Berlin
+TZ=${HOST_TIMEZONE}
 EOF
 
 if id "$SERVICE_USER" >/dev/null 2>&1; then
@@ -17661,7 +17663,7 @@ echo "  Host-Shutdown-Timeout 60 s"
 echo "  Wieder scharf nach 5 Min. stabilem Netz"
 echo
 echo "Statusbericht:"
-echo "  08:00 + 20:00 Europe/Berlin"
+echo "  08:00 + 20:00 (lokale Zeitzone)"
 echo "  interner systemd-Timer im PVE-UPS-LXC"
 echo "  kein externer Cronjob"
 echo
@@ -17748,6 +17750,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import sys
 
 from app.config import (
@@ -17771,7 +17774,9 @@ cfg = load_config()
 cfg.dry_run = True
 
 if hasattr(cfg, "timezone"):
-    cfg.timezone = "Europe/Berlin"
+    cfg.timezone = str(Path("/etc/localtime").resolve()).split("/zoneinfo/",1)[-1]
+    if not Path("/usr/share/zoneinfo", cfg.timezone).is_file() or cfg.timezone.startswith("/"):
+        raise ValueError("LXC-Zeitzone nicht ermittelbar")
 
 if hasattr(cfg, "ntp_server"):
     cfg.ntp_server = ""
@@ -18128,7 +18133,10 @@ from app import db, notify
 from app.config import load_config
 
 TITLE = "[PVE-UPS] USV-Statusbericht"
-TZ = ZoneInfo("Europe/Berlin")
+def report_timezone():
+    with open("/etc/localtime", "rb") as fp:
+        return ZoneInfo.from_file(fp)
+TZ = report_timezone()
 
 STATE_PATH = Path(
     "/var/lib/pve-usv/status-report-state.json"
@@ -19096,11 +19104,11 @@ SERVICE_EOF
 
 cat > "$TIMER" <<'TIMER_EOF'
 [Unit]
-Description=PVE-UPS Statusbericht 08:00 und 20:00 Europe/Berlin
+Description=PVE-UPS Statusbericht 08:00 und 20:00 (lokale Zeitzone)
 
 [Timer]
-OnCalendar=*-*-* 08:00:00 Europe/Berlin
-OnCalendar=*-*-* 20:00:00 Europe/Berlin
+OnCalendar=*-*-* 08:00:00
+OnCalendar=*-*-* 20:00:00
 Persistent=true
 AccuracySec=1min
 RandomizedDelaySec=0
@@ -19123,6 +19131,7 @@ pct push "$CTID" "$TIMER" /etc/systemd/system/pve-usv-status-report.timer -perms
 
 # ---------------------------------------------------------------------------
 # First config pass: preserve existing host token.
+pct exec "$CTID" -- timedatectl set-timezone "$(timedatectl show -p Timezone --value)"
 # ---------------------------------------------------------------------------
 
 echo
@@ -19296,7 +19305,7 @@ pveum user token permissions "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" || true
 # Apply timezone at OS level as well. This does not alter shutdown thresholds.
 # ---------------------------------------------------------------------------
 
-pct exec "$CTID" -- timedatectl set-timezone "$(pve_host_timezone)" >/dev/null 2>&1 || true
+# Zeitzone bereits vor dem ersten Konfigurationslauf übernommen.
 
 # Reload the deliberately-safe dry-run config before the test.
 pct exec "$CTID" -- systemctl restart pve-usv.service
@@ -19425,7 +19434,7 @@ echo "PVE-UPS-LXC:"
 echo "  CT $CTID"
 echo
 echo "Statusbericht intern:"
-echo "  08:00 + 20:00 Europe/Berlin"
+echo "  08:00 + 20:00 (lokale Zeitzone)"
 echo "  /etc/systemd/system/pve-usv-status-report.timer"
 echo "  /usr/local/lib/pve-usv-status-report.py"
 echo
@@ -19861,7 +19870,7 @@ install_pve_ups_community() {
     echo "Web: http://${PVEUPS_IP}/"
     echo "Intern: HTTP 8080 hinter nginx."
     echo "NUT: 192.168.178.20:3493 / ups"
-    echo "Statusbericht: 08:00 + 20:00 Europe/Berlin"
+    echo "Statusbericht: 08:00 + 20:00 (lokale Zeitzone)"
 }
 
 # =============================================================================
@@ -20641,7 +20650,8 @@ loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-
 spec=importlib.util.spec_from_loader(loader.name,loader)
 mod=importlib.util.module_from_spec(spec)
 loader.exec_module(mod)
-mod.timezone_update()
+mod.install_timezone_timer()
+mod.run(["systemctl","start","proxmox-timezone-sync.service"],capture_output=True)
 PVE_TIMEZONE_V176
 fi
 
