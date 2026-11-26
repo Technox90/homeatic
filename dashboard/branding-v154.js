@@ -187,17 +187,45 @@ function v175RenderUps(){const u=v175Ups;if(!u?.ok)return;const card=document.ge
 
 function v174Frame(card,level){if(!card)return;card.classList.toggle('v174Warning',warnPrefs.frames&&level===1);card.classList.toggle('v174Critical',warnPrefs.frames&&level===2);card.classList.toggle('v174Glow',warnPrefs.glow&&warnPrefs.frames&&level>0)}
 const level=(v,a,b)=>!v174Valid(v)?0:v>=b?2:v>=a?1:0;
+function v177Storage(sample,now=Date.now()){
+ const age=now-Date.parse(sample?.storage_checked||''),s=sample?.storage;
+ if(!Number.isFinite(age)||age<0||age>90000||!s||!v174Valid(s.total)||s.total<=0)return null;
+ if(!s.complete)return {total:s.total,kind:s.kind==='SSD'?'SSD':'Datenträger',complete:false};
+ if(![s.used,s.available,s.reserved,s.root_percent,s.pool_percent].every(v174Valid)||[s.used,s.available,s.reserved].some(x=>x<0)||s.used+s.available+s.reserved!==s.total||[s.root_percent,s.pool_percent].some(x=>x<0||x>100))return null;
+ return {...s,kind:s.kind==='SSD'?'SSD':'Datenträger',percent:s.used/s.total*100};
+}
+function v177Capacity(n){return v174Valid(n)?(n/1000000000).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' GB':'n/v'}
+function v177Metric(label,detail,pct,color,foot){
+ const e=document.createElement('div');e.className='v177Metric';
+ const value=v174Span(v175Percent(pct),color);value.classList.add('v177Big');
+ e.append(v175Row(label,detail),value,v175Bar(pct,color));if(foot)e.append(v174Line(foot));return e;
+}
+function v177RenderCompute(d){
+ const card=v174Card('cpu','CPU / RAM','cpu');if(!card)return;
+ card.classList.add('v177Compute');
+ const cc=v174Color(d.cpu_percent,usageStops()),rc=v174Color(d.ram_percent,usageStops(70,90));
+ v175Set('cpu',v175Percent(d.cpu_percent),cc);
+ const top=document.createElement('div');top.className='v177Metrics';
+ top.append(v177Metric('CPU',v174Valid(d.cpu_freq)?(d.cpu_freq/1000).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' GHz':'n/v',d.cpu_percent,cc,''),v177Metric('RAM',v174Bytes(d.ram_total),d.ram_percent,rc,'Belegt: '+v174Bytes(d.ram_used)));
+ const temps=document.createElement('div');temps.className='v177Temps';
+ for(const [name,value,stops] of [['CPU',d.cpu_temp,tempStops()],['Board',d.board_temp,tempStops()],['SSD',d.drive_temp,tempStops(50,70)]]){
+ const t=document.createElement('div');t.append(v174Span(name),v174Span(v174Temp(value),v174Color(value,stops)));temps.append(t)}
+ v174Sub('cpuSub',top,temps);
+ v174Frame(card,Math.max(level(d.cpu_percent,55,80),level(d.ram_percent,70,90),level(d.cpu_temp,50,76),level(d.board_temp,50,76),level(d.drive_temp,50,70)));
+}
+function v177RenderStorage(){
+ const s=v177Storage(lastPing),card=v174Card('ram',(s?.kind||'SSD')+'-Speicher','disk',v177Capacity(s?.total));if(!card)return;
+ card.classList.add('v177StorageCard');
+ const color=v174Color(s?.percent,usageStops());
+ v175Set('ram',v175Percent(s?.percent),color);
+ if(!s?.complete){v174Sub('ramSub',v174Line('Physische Belegung nicht verfügbar'));v174Frame(card,0);return}
+ const rootColor=v174Color(s.root_percent,usageStops()),poolColor=v174Color(s.pool_percent,usageStops());
+ v174Sub('ramSub',v175Bar(s.percent,color),v175Row('Belegt',v176MB(s.used)),v175Row('Verfügbar',v176MB(s.available)),v175Row('Reserviert / Sonstiges',v176MB(s.reserved)),v175Row('Systempartition',v175Percent(s.root_percent),rootColor),v175Bar(s.root_percent,rootColor),v175Row('VM / LXC Speicher',v175Percent(s.pool_percent),poolColor),v175Bar(s.pool_percent,poolColor));
+ v174Frame(card,Math.max(level(s.percent,55,80),level(s.root_percent,55,80),level(s.pool_percent,55,80)));
+}
 function renderMetrics(d){
  v175Observer?.disconnect();try{
- const cpu=v174Card('cpu','CPU','cpu',v174Valid(d.cpu_freq)?(d.cpu_freq/1000).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' GHz':'');
- v175Set('cpu',v175Percent(d.cpu_percent),v174Color(d.cpu_percent,usageStops()));v174Sub('cpuSub',v175Bar(d.cpu_percent,v174Color(d.cpu_percent,usageStops())),v175Row('CPU',v174Temp(d.cpu_temp),v174Color(d.cpu_temp,tempStops())),v175Row('Board',v174Temp(d.board_temp),v174Color(d.board_temp,tempStops())),v175Row('SSD',v174Temp(d.drive_temp),v174Color(d.drive_temp,tempStops(50,70))));
- v174Frame(cpu,Math.max(level(d.cpu_percent,55,80),level(d.cpu_temp,50,76),level(d.board_temp,50,76),level(d.drive_temp,50,70)));
- v176RenderSecurity();
- const ram=v174Card('ram','RAM / SSD / Swap','ram',v174Bytes(d.ram_total));
- v175Set('ram',v175Percent(d.ram_percent),v174Color(d.ram_percent,usageStops(70,90)));
- const diskColor=v174Color(d.root_percent,usageStops());
- v174Sub('ramSub',v175Bar(d.ram_percent,v174Color(d.ram_percent,usageStops(70,90))),v175Row('RAM belegt',v174Bytes(d.ram_used)),v175Row('SSD (System)',v175Percent(d.root_percent),diskColor),v175Bar(d.root_percent,diskColor),v175Row('SSD belegt',v176MB(d.root_used)),v175Row('Swap',v175Percent(d.swap_percent),v174Color(d.swap_percent,usageStops(30,60))),v175Bar(d.swap_percent,v174Color(d.swap_percent,usageStops(30,60))));
- v174Frame(ram,Math.max(level(d.ram_percent,70,90),level(d.root_percent,55,80),level(d.swap_percent,30,60)));
+ v177RenderCompute(d);v176RenderSecurity();v177RenderStorage();
  const guests=v174Card('guests','VM / LXC','server');
  const valid=[d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid);
  if(valid){const a=d.vm_running+d.ct_running,total=d.vm_total+d.ct_total,vm=d.vm_running===d.vm_total,ct=d.ct_running===d.ct_total;const e=document.getElementById('guests');e.classList.remove('v174Guests');v175Set('guests',a+' Aktiv',a===total?vp.green:a===0?vp.red:vp.yellow);v174Sub('guestSub',v175Row('Virtuelle Maschinen',d.vm_running+'/'+d.vm_total,vm?vp.green:vp.red),v175Bar(v175Ratio(d.vm_running,d.vm_total),vp.green,vp.red),v175Row('LXC-Container',d.ct_running+'/'+d.ct_total,ct?vp.green:vp.red),v175Bar(v175Ratio(d.ct_running,d.ct_total),vp.green,vp.red));v174Frame(guests,a===total?0:a===0?2:1)}
@@ -216,9 +244,9 @@ function renderPing(){
  const name=providers[pingIndex%providers.length],fresh=lastPing&&now-Date.parse(lastPing.checked)<35000,v=fresh?lastPing.targets?.[name]:undefined;
  line.textContent='Ping: '+name+' · '+(v174Valid(v)?Math.round(v)+' ms':v===null?'Timeout':'n/v');line.style.color=!warnPrefs.pingColors?vp.white:v===null?vp.red:v174Color(v,pingStops);
 }
-async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}v175Observer?.disconnect();try{renderPing();v176RenderSecurity()}finally{v175Watch()}if(lastMetrics)evaluateWarnings(lastMetrics)}
+async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}v175Observer?.disconnect();try{renderPing();v176RenderSecurity();v177RenderStorage()}finally{v175Watch()}if(lastMetrics)evaluateWarnings(lastMetrics)}
 function evaluateWarnings(d){
- const now=Date.now(),checks=[['CPU-Auslastung',d.cpu_percent,80,60],['RAM-Auslastung',d.ram_percent,90,60],['Swap-Auslastung',d.swap_percent,60,60],['CPU-Temperatur',d.cpu_temp,76,10],['Board-Temperatur',d.board_temp,76,10],['SSD-Temperatur',d.drive_temp,70,10],['Speicherbelegung',d.root_percent,80,30],['Pi-hole-Blockrate',d.pihole_blocked_percent,60,30]];
+ const now=Date.now(),checks=[['CPU-Auslastung',d.cpu_percent,80,60],['RAM-Auslastung',d.ram_percent,90,60],['CPU-Temperatur',d.cpu_temp,76,10],['Board-Temperatur',d.board_temp,76,10],['SSD-Temperatur',d.drive_temp,70,10],['Systempartition',d.root_percent,80,30],['SSD-Belegung',v177Storage(lastPing)?.percent,80,30],['VM / LXC Speicher',v177Storage(lastPing)?.pool_percent,80,30],['Pi-hole-Blockrate',d.pihole_blocked_percent,60,30]];
  if([d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid))checks.push(['VM / LXC offline',d.vm_total+d.ct_total-d.vm_running-d.ct_running,1,30]);
  if(lastPing&&now-Date.parse(lastPing.checked)<35000&&lastPing.targets)checks.push(['Internet-Ping',Object.values(lastPing.targets).length===3&&Object.values(lastPing.targets).every(v=>v===null)?1:0,1,30]);
  if(now-lastMetricsAt>45000){checks.length=0;checks.push(['Messdaten veraltet',1,1,0])}
@@ -274,7 +302,7 @@ function installWarningSettings(){
 let v175Observer=null,v175Pending=false;
 function v175Observe(){if(v175Observer||typeof MutationObserver!=='function')return;v175Observer=new MutationObserver(()=>{if(v175Pending)return;v175Pending=true;window.setTimeout(()=>{v175Pending=false;if(lastMetrics&&Date.now()-lastMetricsAt<45000)renderMetrics(lastMetrics)},0)});v175Watch()}
 function v175Watch(){if(!v175Observer)return;for(const id of ['cpu','cpuSub','disk','diskSub','ram','ramSub','guests','guestSub','piholeBlockedPct','piholeBlockedSub','net','netSub','power','powerSub','upsValue','upsSub']){const e=document.getElementById(id);if(e)v175Observer.observe(e,{childList:true,characterData:true,subtree:true})}}
-function v174Tick(){renderSnooze();installWarningSettings();v175Observe();if(lastMetrics){v175Observer?.disconnect();try{renderPing();v176RenderSecurity()}finally{v175Watch()}evaluateWarnings(lastMetrics)}}
+function v174Tick(){renderSnooze();installWarningSettings();v175Observe();if(lastMetrics){v175Observer?.disconnect();try{renderPing();v176RenderSecurity();v177RenderStorage()}finally{v175Watch()}evaluateWarnings(lastMetrics)}}
 window.addEventListener('storage',e=>{if(e.key===snoozeKey){snooze=readLocal(snoozeKey,null);if(isSnoozed())stopAlarm();renderSnooze()}if(e.key===warnKey){warnPrefs={...warnDefaults,...readLocal(warnKey,{})};if(!warnPrefs.sound)stopAlarm()}});
 window.setInterval(v174Tick,1000);window.setInterval(fetchPing,10000);
 window.setTimeout(()=>{v174Tick();fetchPing()},0);
