@@ -1168,6 +1168,11 @@ if command -v docker >/dev/null 2>&1; then
         if [ "$healthy" = 1 ]; then
             docker image prune -f
             docker builder prune -f --filter until=168h
+            # Existing containers retain their logging settings until recreated.
+            for id in $ids; do
+                logging=$(docker inspect --format '{{.HostConfig.LogConfig.Type}} {{index .HostConfig.LogConfig.Config "max-size"}} {{index .HostConfig.LogConfig.Config "max-file"}}' "$id")
+                case "$logging" in "json-file  "*) echo "Logrotation fehlt: $(docker inspect --format '{{.Name}}' "$id")";; esac
+            done
         else
             echo "Docker health check failed; image and build cleanup skipped."
             exit 1
@@ -1234,6 +1239,10 @@ maintenance_daily() {
         if (( use >= 90 )); then add_manual "Speicher kritisch: $name $use %"; elif (( use >= 75 )); then add_manual "Speicherwarnung: $name $use %"; fi
     done < <(printf '%s\n' "$after" | awk 'NR>1 {sub(/%/,"",$NF); print $1,int($NF)}')
     lvs -o lv_name,lv_size,data_percent,metadata_percent || true
+    while read -r name meta; do
+        [[ "$meta" =~ ^[0-9]+$ ]] || continue
+        if (( meta >= 85 )); then add_manual "LVM-Metadaten kritisch: $name $meta %"; elif (( meta >= 70 )); then add_manual "LVM-Metadaten: $name $meta %"; fi
+    done < <(LC_ALL=C lvs --noheadings -o lv_name,metadata_percent | awk 'NF==2 {print $1,int($2)}')
 }
 
 # =============================================================================
