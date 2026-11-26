@@ -268,6 +268,126 @@ if ! cmp -s "$tmp" "$file"; then mv -f "$tmp" "$file"; fi
             report("MANUAL","CT "+ct+" Zeitzone prüfen: "+type(exc).__name__)
     report("INFO","VM- und Docker-Anwendungszeitzonen separat prüfen; keine Neustarts")
 
+# App-specific timezone settings, only for known installer Compose projects.
+# Existing databases and their UTC storage are not changed.
+DOCKER_TIMEZONES={
+    "uptime-kuma":("/opt/uptime-kuma","uptime-kuma",("TZ",)),
+    "pihole":("/opt/pihole","pihole",("TZ",)),
+    "paperless":("/opt/paperless","webserver",("PAPERLESS_TIME_ZONE",)),
+    "speedtest-tracker":("/opt/speedtest-tracker","speedtest-tracker",("APP_TIMEZONE","DISPLAY_TIMEZONE")),
+    "mealie":("/opt/mealie","mealie",("TZ",)),
+}
+
+DOCKER_ZONE_SCRIPT=r'''
+import copy, json, os, pathlib, re, shutil, stat, subprocess, sys, tempfile, time
+directory,service,zone,*keys=sys.argv[1:]
+base=pathlib.Path(directory)
+os.chdir(base)
+files=[base/name for name in ("compose.yaml","compose.yml","docker-compose.yaml","docker-compose.yml") if (base/name).exists()]
+overrides=[base/name for name in ("compose.override.yaml","compose.override.yml","docker-compose.override.yaml","docker-compose.override.yml") if (base/name).exists()]
+if len(files)!=1 or overrides or os.environ.get("COMPOSE_FILE"):
+    raise SystemExit("Compose-Layout nicht eindeutig")
+path=files[0]
+st=path.lstat()
+if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_mode & 0o022 or path.resolve()!=path:
+    raise SystemExit("Compose-Datei nicht root-geschützt")
+def docker(*args):
+    p=subprocess.run(["docker",*args],capture_output=True,text=True,timeout=60)
+    if p.returncode: raise RuntimeError("Docker-Befehl fehlgeschlagen: "+args[0])
+    return p.stdout
+def config():
+    return json.loads(docker("compose","config","--format","json"))
+before=config()
+expected=copy.deepcopy(before)
+services=expected.get("services",{})
+if service not in services: raise SystemExit("Compose-Dienst fehlt")
+env=services[service].get("environment")
+if not isinstance(env,dict): raise SystemExit("Environment-Mapping fehlt")
+ids=docker("compose","ps","-q",service).split()
+if len(ids)!=1: raise SystemExit("Genau ein laufender Dienst erforderlich")
+details=json.loads(docker("inspect",ids[0]))[0]
+labels=details["Config"].get("Labels") or {}
+if labels.get("com.docker.compose.service")!=service or labels.get("com.docker.compose.project.working_dir")!=directory or labels.get("com.docker.compose.project.config_files")!=str(path):
+    raise SystemExit("Laufender Docker-Dienst passt nicht zur verwalteten Compose-Datei")
+runtime=dict(entry.split("=",1) for entry in details["Config"].get("Env",[]) if "=" in entry)
+desired={key:zone for key in keys}
+if all(env.get(k)==v and runtime.get(k)==v for k,v in desired.items()):
+    print("CURRENT")
+    sys.exit(0)
+old=path.read_text()
+new=old
+if any(env.get(k)!=v for k,v in desired.items()):
+    lines=old.splitlines(keepends=True)
+    starts=[i for i,l in enumerate(lines) if re.fullmatch(r"  "+re.escape(service)+r":\s*",l)]
+    if len(starts)!=1: raise SystemExit("Dienst-Block nicht eindeutig")
+    start=starts[0]+1
+    end=next((i for i in range(start,len(lines)) if re.match(r"^(?:  \S|[^ \t\r\n#])",lines[i])),len(lines))
+    anchors=[i for i in range(start,end) if re.fullmatch(r"    environment:\s*",lines[i])]
+    if len(anchors)!=1: raise SystemExit("Environment-Block nicht eindeutig")
+    anchor=anchors[0]
+    stop=next((i for i in range(anchor+1,end) if re.match(r"^    \S",lines[i])),end)
+    for k,v in desired.items():
+        matches=[i for i in range(anchor+1,stop) if re.match(r"^      "+re.escape(k)+r":",lines[i])]
+        if len(matches)>1: raise SystemExit("Doppelter Zeitzonenschlüssel")
+        value="      "+k+": "+json.dumps(v)+"\n"
+        if matches: lines[matches[0]]=value
+        else:
+            lines.insert(anchor+1,value)
+            stop+=1
+    new="".join(lines)
+    env.update(desired)
+backup=None
+def atomic(text):
+    fd,tmp=tempfile.mkstemp(prefix=".timezone-",dir=base)
+    try:
+        with os.fdopen(fd,"w") as out:out.write(text)
+        os.chown(tmp,st.st_uid,st.st_gid)
+        os.chmod(tmp,stat.S_IMODE(st.st_mode))
+        os.replace(tmp,path)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
+if new!=old:
+    fd,bak=tempfile.mkstemp(prefix=".timezone-backup-",dir=base)
+    os.close(fd)
+    backup=pathlib.Path(bak)
+    # Backups may contain credentials, keep mode 0600.
+    backup.write_text(old)
+    try:
+        atomic(new)
+        if config()!=expected: raise RuntimeError("Andere Compose-Einstellungen würden sich ändern")
+    except Exception:
+        atomic(old)
+        raise
+# Do not pull images or restart unrelated containers. The routine runs only
+# during the normal scheduled Docker-update path, not every 15 minutes.
+try:
+    docker("compose","up","-d","--no-deps","--pull","never","--no-build",service)
+    current=docker("compose","ps","-q",service).split()
+    if len(current)!=1: raise RuntimeError("Dienst nach Änderung nicht aktiv")
+    info=json.loads(docker("inspect",current[0]))[0]
+    current_env=dict(e.split("=",1) for e in info["Config"].get("Env",[]) if "=" in e)
+    if not all(current_env.get(k)==v for k,v in desired.items()):raise RuntimeError("Zeitzonenwerte nicht übernommen")
+except Exception:
+    if backup is not None: atomic(old)
+    # Do not mask the failed service update; the normal updater reports it.
+    raise
+print("UPDATED")
+'''
+
+def timezone_docker(ct,hostname):
+    spec=DOCKER_TIMEZONES.get(hostname)
+    if spec is None:
+        return
+    directory,service,keys=spec
+    zone,_=host_timezone()
+    result=subprocess.run(["pct","exec",ct,"--","python3","-",directory,service,zone,*keys],input=DOCKER_ZONE_SCRIPT,text=True,capture_output=True,timeout=180)
+    if result.returncode:
+        # Never log compose config, tokens, or arbitrary child output.
+        raise RuntimeError("Docker-Zeitzonenabgleich fehlgeschlagen; Compose-Projekt prüfen")
+    state=result.stdout.strip()
+    if state not in ("CURRENT","UPDATED"):raise ValueError("Unbekannter Zeitzonenstatus")
+    report(state if state=="UPDATED" else "INFO",hostname+" Docker-Zeitzone: "+zone)
+
 def install_timezone_timer():
     units={
         "proxmox-timezone-sync.service":"""[Unit]
@@ -373,6 +493,9 @@ if __name__=="__main__":
     try:
         if sys.argv[1:]==["--timezone-only"]:
             timezone_update()
+            raise SystemExit(0)
+        if len(sys.argv)==4 and sys.argv[1]=="--timezone-docker" and sys.argv[2].isdigit():
+            timezone_docker(sys.argv[2],sys.argv[3])
             raise SystemExit(0)
         if sys.argv[1:]:
             raise SystemExit("Unbekannte Option")
