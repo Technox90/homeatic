@@ -16,7 +16,7 @@ const ctx=vm.createContext({
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,v176MB,v176SecuritySummary,v176HostDate,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,v176MB,v176SecuritySummary,v176HostDate,v177Storage,v177Capacity,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -146,3 +146,50 @@ const python = require('node:child_process').spawnSync('python3',['-c',
 ],{encoding:'utf8'});
 assert.equal(python.status,0,python.stderr);
 console.log('V176 dashboard host timezone and managed Docker script syntax tests passed');
+
+const storageTime=Date.now();
+const storageSample={storage_checked:new Date(storageTime).toISOString(),storage:{complete:true,kind:'SSD',total:1000204886016,used:189090630000,available:758933280000,reserved:52180976016,root_percent:39.9,pool_percent:17.71}};
+const sd=t.v177Storage(storageSample,storageTime);
+assert.ok(sd);
+assert.equal(sd.total,1000204886016);
+assert.equal(t.v177Capacity(sd.total),'1.000,20 GB');
+assert.equal(t.v175Percent(sd.percent),'18,9 %');
+assert.equal(t.v177Storage(storageSample,storageTime+91000),null);
+assert.equal(t.v177Storage({...storageSample,storage:{...storageSample.storage,used:0}},storageTime),null);
+assert.equal(t.v177Storage({...storageSample,storage:{total:1000204886016,kind:'SSD',complete:false}},storageTime).complete,false);
+console.log('V177 physical storage UI validation passed');
+
+const storagePython=require('node:child_process').spawnSync('python3',['-c',String.raw`
+import runpy, json
+from types import SimpleNamespace
+from unittest.mock import patch
+m=runpy.run_path('proxmox/tools/proxmox-dashboard-ping')
+g=m['storage_sample'].__globals__
+disk=1000204886016
+root=103079215104
+pool=852332904448
+def reply(args,**kw):
+    name=args[0]
+    if name=='findmnt': data={'filesystems':[{'maj:min':'253:1'}]}
+    elif name=='lvs': data={'report':[{'lv':[
+      {'vg_name':'pve','lv_name':'root','lv_size':str(root),'segtype':'linear','lv_kernel_major':'253','lv_kernel_minor':'1'},
+      {'vg_name':'pve','lv_name':'data','lv_size':str(pool),'segtype':'thin-pool','data_percent':'17.71','lv_kernel_major':'253','lv_kernel_minor':'2'},
+      {'vg_name':'pve','lv_name':'vm-102-disk-0','lv_size':str(64*1024**3),'segtype':'thin','lv_kernel_major':'253','lv_kernel_minor':'3'}]}]}
+    elif name=='pvs': data={'report':[{'pv':[{'pv_name':'/dev/sda3','vg_name':'pve','pv_free':str(16*1024**3)}]}]}
+    elif name=='lsblk' and '--nodeps' in args: data={'blockdevices':[{'name':'/dev/sda3','type':'part','pkname':'/dev/sda'}]}
+    elif name=='lsblk': data={'blockdevices':[{'name':'/dev/sda','type':'disk','size':disk,'rota':False,'children':[{'name':'/dev/sda1','type':'part','fstype':None},{'name':'/dev/sda2','type':'part','fstype':'vfat'},{'name':'/dev/sda3','type':'part','fstype':'LVM2_member'}]}]}
+    else: raise AssertionError(args)
+    return SimpleNamespace(stdout=json.dumps(data))
+with patch.object(g['subprocess'],'run',side_effect=reply),patch.object(g['os'],'statvfs',return_value=SimpleNamespace(f_blocks=98497780,f_bfree=61249288,f_bavail=56199740,f_frsize=1024)):
+    s=m['storage_sample']()
+    assert s is not None, s
+    assert s['total']==disk and s['kind']=='SSD' and s['complete']
+    assert s['used']==37248492*1024+int(pool*0.1771), s
+    assert s['used']+s['available']+s['reserved']==disk, s
+    assert s['pool_percent']==17.71 and s['vg_free']==16*1024**3
+    assert s['root_percent']>39 and s['root_percent']<40
+with patch.object(g['subprocess'],'run',side_effect=OSError()):
+    assert m['storage_sample']() is None
+`],{encoding:'utf8'});
+assert.equal(storagePython.status,0,storagePython.stderr);
+console.log('V177 physical LVM storage collection tests passed');
