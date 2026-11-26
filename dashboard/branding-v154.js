@@ -155,7 +155,7 @@ function v176HostDate(value,zone=lastPing?.timezone,clock=false){
  const t=new Date(value);if(!zone||!Number.isFinite(t.getTime()))return 'n/v';
  try{return new Intl.DateTimeFormat('de-DE',clock?{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}:{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(t)}catch{return 'n/v'}
 }
-function v176MB(v){return v174Valid(v)&&v>=0?(v/1000000).toLocaleString('de-DE',{maximumFractionDigits:0})+' MB':'n/v'}
+function v176MB(v){if(!v174Valid(v)||v<0)return 'n/v';if(v>=950000000)return (v/1000000000).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' GB';return (v/1000000).toLocaleString('de-DE',{maximumFractionDigits:2})+' MB'}
 function v176SecuritySummary(sample,now=Date.now()){
  const age=now-Date.parse(sample?.checked||'');const s=sample?.security;
  if(!Number.isFinite(age)||age<0||age>35000||!s)return {state:'unknown',label:'n/v',rows:[]};
@@ -194,7 +194,7 @@ function v177Storage(sample,now=Date.now()){
  if(![s.used,s.available,s.reserved,s.root_percent,s.pool_percent].every(v174Valid)||[s.used,s.available,s.reserved].some(x=>x<0)||s.used+s.available+s.reserved!==s.total||[s.root_percent,s.pool_percent].some(x=>x<0||x>100))return null;
  return {...s,kind:s.kind==='SSD'?'SSD':'Datenträger',percent:s.used/s.total*100};
 }
-function v177Capacity(n){return v174Valid(n)?(n/1000000000).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' GB':'n/v'}
+function v177Capacity(n){return v176MB(n)}
 function v177Metric(label,detail,pct,color,foot){
  const e=document.createElement('div');e.className='v177Metric';
  const value=v174Span(v175Percent(pct),color);value.classList.add('v177Big');
