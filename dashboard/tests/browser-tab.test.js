@@ -16,7 +16,7 @@ const ctx=vm.createContext({
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,v176MB,v176SecuritySummary,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,v176MB,v176SecuritySummary,v176HostDate,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -136,3 +136,13 @@ u.setUpperZone('UTC');
 assert.match(u.kumaLocal('2026-11-26 18:05:35'),/18:05:35/);
 assert.throws(()=>u.setUpperZone('not-a-zone'));
 console.log('V176 UPPER host timezone conversion and DST tests passed');
+
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z','Europe/Berlin',true),'19:05:35');
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z','UTC',true),'18:05:35');
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z','invalid',true),'n/v');
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z',null,true),'n/v');
+const python = require('node:child_process').spawnSync('python3',['-c',
+  "import runpy; m=runpy.run_path('proxmox/tools/proxmox-managed-updates'); compile(m['DOCKER_ZONE_SCRIPT'],'docker-zone-script','exec'); assert m['DOCKER_TIMEZONES']['uptime-kuma'][2] == ('TZ',)"
+],{encoding:'utf8'});
+assert.equal(python.status,0,python.stderr);
+console.log('V176 dashboard host timezone and managed Docker script syntax tests passed');
