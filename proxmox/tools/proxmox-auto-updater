@@ -629,6 +629,22 @@ update_ct_compose() {
         fi
     fi
 
+    # Central timezone from the Proxmox host; apply known app settings only
+    # inside the existing scheduled Docker update, never in the sync timer.
+    if [[ -x /usr/local/sbin/proxmox-managed-updates ]]; then
+        local zone_output
+        if zone_output="$(/usr/local/sbin/proxmox-managed-updates --timezone-docker "$ctid" "$hostname" 2>/dev/null)"; then
+            if [[ "$zone_output" == UPDATED\|* ]]; then
+                add_update "${label}: ${zone_output#*|}"
+                if [[ "$hostname" == "pihole" ]]; then PIHOLE_DOCKER_CHANGED=1; fi
+            elif [[ "$zone_output" == INFO\|* ]]; then
+                echo "[INFO] ${zone_output#*|}"
+            fi
+        else
+            add_manual "${label}: zentralen Docker-Zeitzonenabgleich prüfen"
+        fi
+    fi
+
     before="$(compose_state "$ctid" "$dir" || true)"
 
     if pct exec "$ctid" -- bash -lc "
