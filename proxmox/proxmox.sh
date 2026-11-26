@@ -1639,6 +1639,19 @@ let active="", generation=0, busy=false;
 const state=s=>s===1?["Online","up"]:s===0?["Offline","down"]:s===2?["Ausstehend","pending"]:s===3?["Wartung","pending"]:["Unbekannt",""];
 const ms=p=>typeof p==="number"&&Number.isFinite(p)&&p>=0?p:null;
 const format=p=>p===null?"—":p.toFixed(1)+" ms";
+// Kuma heartbeat.time is UTC, including legacy timestamps without an offset.
+const upperZone="Europe/Berlin";
+const upperDateFormat=new Intl.DateTimeFormat("de-DE",{timeZone:upperZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+const upperClockFormat=new Intl.DateTimeFormat("de-DE",{timeZone:upperZone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+function kumaEpoch(value){
+ if(typeof value!=="string")return NaN;
+ const raw=value.trim();
+ if(!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/i.test(raw))return NaN;
+ const iso=raw.replace(" ","T");
+ return Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)?iso:iso+"Z");
+}
+function kumaLocal(value){const epoch=kumaEpoch(value);return Number.isFinite(epoch)?upperDateFormat.format(epoch):"—"}
+function kumaSort(a,b){const x=kumaEpoch(a.time),y=kumaEpoch(b.time);return (Number.isFinite(x)?x:-Infinity)-(Number.isFinite(y)?y:-Infinity)||0}
 async function json(url){const response=await fetch(url,{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("HTTP "+response.status);return response.json()}
 function stat(parent,label,value){const n=el("div");n.append(el("span",label),el("strong",value));parent.append(n)}
 function graph(rows){
@@ -1661,7 +1674,7 @@ function graph(rows){
    guide.setAttribute("x1",x);guide.setAttribute("x2",x);guide.setAttribute("visibility","visible");
    dot.setAttribute("cx",x);dot.setAttribute("cy",p===null?105:105-p/max*90);dot.setAttribute("visibility",p===null?"hidden":"visible");
    const [label]=state(row.status);
-   tip.replaceChildren(el("strong",String(row.time||"—")),el("div","Antwortzeit: "+format(p)),el("div","Status: "+label));
+   tip.replaceChildren(el("strong",kumaLocal(row.time)),el("div","Antwortzeit: "+format(p)),el("div","Status: "+label));
    tip.hidden=false;tip.style.top="0px";
    tip.style.left=Math.max(0,Math.min(wrap.clientWidth-tip.offsetWidth,x/640*svg.clientWidth+8))+"px";
  }
@@ -1679,21 +1692,21 @@ function render(config,heartbeat){
  for(const group of Array.isArray(config.publicGroupList)?config.publicGroupList:[]){
   const section=el("section");section.append(el("h2",String(group.name||"Monitore")));
   for(const monitor of Array.isArray(group.monitorList)?group.monitorList:[]){
-   const id=String(monitor.id);const rows=(Array.isArray(heartbeat.heartbeatList?.[id])?heartbeat.heartbeatList[id]:[]).slice(-100).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+   const id=String(monitor.id);const rows=(Array.isArray(heartbeat.heartbeatList?.[id])?heartbeat.heartbeatList[id]:[]).slice(-100).sort(kumaSort);
    const latest=rows.at(-1);const [status,cls]=state(latest?.status);
    const card=el("article");const heading=el("h3",String(monitor.name||"Monitor")+" · ");heading.append(el("span",status,cls));card.append(heading);
-   const bars=el("div",undefined,"bars");for(const row of rows.slice(-50)){const [label,c]=state(row.status);const bar=el("i",undefined,c);bar.title=String(row.time||"")+" · "+label+" · "+format(ms(row.ping));bars.append(bar)}card.append(bars);
+   const bars=el("div",undefined,"bars");for(const row of rows.slice(-50)){const [label,c]=state(row.status);const bar=el("i",undefined,c);bar.title=kumaLocal(row.time)+" · "+label+" · "+format(ms(row.ping));bars.append(bar)}card.append(bars);
    const stats=el("div",undefined,"stats");const values=rows.map(r=>ms(r.ping)).filter(v=>v!==null);
    stat(stats,"Letzte Antwort",format(ms(latest?.ping)));stat(stats,"Ø sichtbarer Verlauf",format(values.length?values.reduce((a,b)=>a+b,0)/values.length:null));
    const uptime=heartbeat.uptimeList?.[id+"_24"];stat(stats,"Verfügbarkeit 24h",typeof uptime==="number"?(uptime*100).toFixed(2)+" %":"—");card.append(stats,graph(rows));
-   card.append(el("p",latest?"Letzte Messung (Kuma): "+String(latest.time||"—")+" · "+rows.length+" Messpunkte":"Noch keine Messwerte","muted"));section.append(card);
+   card.append(el("p",latest?"Letzte Messung (Kuma): "+kumaLocal(latest.time)+" · "+rows.length+" Messpunkte":"Noch keine Messwerte","muted"));section.append(card);
   }root.append(section);
  }
  $("groups").replaceChildren(root);$("title").textContent=String(config.config?.title||"Status")+" · Antwortzeiten";
 }
 async function refresh(){
  if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
- try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+new Date().toLocaleTimeString()+" · alle 60 Sekunden";}
+ try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+upperClockFormat.format(new Date())+" · alle 60 Sekunden";}
  catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
  finally{busy=false;if(token!==generation)refresh()}
 }
@@ -14920,6 +14933,7 @@ services:
     # Host-Netz des dedizierten LXC, nicht des Proxmox-Hosts.
     network_mode: host
     environment:
+      TZ: "Europe/Berlin"
       UPTIME_KUMA_HOST: "127.0.0.1"
       UPTIME_KUMA_PORT: "3001"
     volumes:
