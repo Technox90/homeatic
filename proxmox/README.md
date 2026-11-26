@@ -4,7 +4,11 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V175 · 25.11.2026**
+**Installationskandidat: V176 · 26.11.2026**
+
+## V176 · Schutz und Speicher
+
+- Schutz-Kachel ersetzt die bisherige Speicher-Kachel: Fail2Ban-Dienst, SSH- und Proxmox-Jail, aktive IP-Sperren, Fehlversuche seit Dienststart und konfigurierte Pushover-Aktion. Der vorhandene Ping-Dienst liefert alle 10 Sekunden nur aggregierte Schutzdaten; keine IP-Adressen, Tokens oder administrativen Aktionen. Fehlende oder veraltete Daten werden als n/v angezeigt. SSD-Temperatur in der CPU-Kachel neben CPU und Board; Speicher-Kachel RAM / SSD / Swap in dieser Reihenfolge, System-SSD mit Prozent, Balken und belegten dezimalen MB (nur Root-Dateisystem, nicht local-lvm). Bestehende Fail2Ban-, SSH-, Pushover- und Branding-Konfiguration unverändert.
 
 ## V175 · Fortschrittsbalken
 
