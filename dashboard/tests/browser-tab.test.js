@@ -114,11 +114,13 @@ assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:true,jails:{s
 console.log('V176 SSD MB and protection status tests passed');
 
 const master=fs.readFileSync('proxmox/proxmox.sh','utf8');
-const upperStart=master.indexOf('const upperZone='),upperEnd=master.indexOf('async function json(url)',upperStart);
+const upperStart=master.indexOf('let upperZone='),upperEnd=master.indexOf('async function json(url)',upperStart);
 assert.ok(upperStart>0&&upperEnd>upperStart);
 const upper=vm.createContext({});
-vm.runInContext(master.slice(upperStart,upperEnd)+'\n globalThis.upperTest={kumaEpoch,kumaLocal,kumaSort,upperClockFormat};',upper);
+vm.runInContext(master.slice(upperStart,upperEnd)+'\n globalThis.upperTest={kumaEpoch,kumaLocal,kumaSort,setUpperZone};',upper);
 const u=upper.upperTest;
+assert.equal(u.kumaLocal('2026-11-26 18:05:35'),'—');
+u.setUpperZone('Europe/Berlin');
 assert.equal(u.kumaEpoch('2026-11-26 18:05:35'),Date.parse('2026-11-26T18:05:35Z'));
 assert.equal(u.kumaEpoch('2026-11-26T19:05:35+01:00'),Date.parse('2026-11-26T18:05:35Z'));
 assert.equal(u.kumaEpoch('2026-07-26T18:05:35.123Z'),Date.parse('2026-07-26T18:05:35.123Z'));
@@ -128,4 +130,9 @@ assert.match(u.kumaLocal('2026-03-29 01:00:00'),/03:00:00/);
 assert.match(u.kumaLocal('2026-10-25 01:00:00'),/02:00:00/);
 assert.equal(u.kumaLocal('invalid'),'—');
 assert.ok(u.kumaSort({time:'2026-11-26T19:00:00+01:00'},{time:'2026-11-26 18:01:00'})<0);
-console.log('V176 UPPER UTC conversion and DST tests passed');
+u.setUpperZone('America/New_York');
+assert.match(u.kumaLocal('2026-11-26 18:05:35'),/13:05:35/);
+u.setUpperZone('UTC');
+assert.match(u.kumaLocal('2026-11-26 18:05:35'),/18:05:35/);
+assert.throws(()=>u.setUpperZone('not-a-zone'));
+console.log('V176 UPPER host timezone conversion and DST tests passed');
