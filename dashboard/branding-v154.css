@@ -220,3 +220,19 @@ body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-w
 
 /* V175 compact aligned rows and percentage bars */
 .v175Row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;line-height:1.22;font-size:inherit}.v175Row>span:last-child{text-align:right;white-space:nowrap}.v175Bar{height:5px;background:#263849;border-radius:8px;overflow:hidden;margin:3px 0}.v175Bar[hidden]{display:none!important}.v175Bar>span{display:block;height:100%;border-radius:8px;transition:width .8s ease,background-color .8s ease}.v175Graph{width:100%;height:24px;display:block}.card:has(.v175Row) .sub{line-height:1.25}.card:has(.v175Row) .value{margin-bottom:3px}.card:has(.v175Row) .v175Bar+.v175Row{margin-top:3px}@media(prefers-reduced-motion:reduce){.v175Bar>span{transition:none}}
+
+/* V177 compact CPU/RAM card and physical storage */
+.v177Compute #cpu{display:none!important}
+.v177Compute #cpuSub{display:block}
+.v177Metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.v177Metric{min-width:0;display:flex;flex-direction:column;gap:3px}
+.v177Metric+.v177Metric{border-left:1px solid var(--line,#28485e);padding-left:12px}
+.v177Metric .v175Row{font-size:12px;flex-wrap:wrap}
+.v177Big{font-size:clamp(20px,1.65vw,28px);font-weight:750;line-height:1.2;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v177Metric .v174Line{font-size:11px;white-space:normal}
+.v177Temps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line,#28485e);margin-top:10px;padding-top:8px;gap:6px}
+.v177Temps>div{display:flex;flex-direction:column;text-align:center;gap:4px;font-size:12px}
+.v177Temps>div+div{border-left:1px solid var(--line,#28485e)}
+.v177Temps>div>span:last-child{font-weight:650;font-size:14px}
+.v177StorageCard .v175Row{font-size:11px}
+@media(max-width:600px){.v177Big{font-size:22px}.v177Metric+.v177Metric{padding-left:8px}.v177Metrics{gap:8px}}
