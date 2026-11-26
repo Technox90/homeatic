@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V179 · 26.11.2026**  
+> **Aktueller Stand: V180 · 26.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+26.11.2026 – V180 · Automatische SSD-Speichereinheiten
+--------------------------------------------------------
+- SSD-Gesamtkapazität, belegter, verfügbarer und reservierter Speicher werden unter 950 MB in MB und ab 950 MB in GB angezeigt; dezimale Einheiten und deutsche Zahlenformatierung. Prozentwerte bleiben unverändert.
 
 26.11.2026 – V179 · CPU/RAM-Icon und Update-Timer
 --------------------------------------------------------
