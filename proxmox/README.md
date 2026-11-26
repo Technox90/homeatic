@@ -4,7 +4,11 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V179 · 26.11.2026**
+**Installationskandidat: V180 · 26.11.2026**
+
+## V180 · Automatische SSD-Speichereinheiten
+
+- SSD-Gesamtkapazität, belegter, verfügbarer und reservierter Speicher werden unter 950 MB in MB und ab 950 MB in GB angezeigt; dezimale Einheiten und deutsche Zahlenformatierung. Prozentwerte bleiben unverändert.
 
 ## V179 · CPU/RAM-Icon und Update-Timer
 
