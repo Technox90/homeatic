@@ -10,14 +10,45 @@ def ping(ip):
         return float(match.group(1)) if p.returncode==0 and match else None
     except (OSError,subprocess.TimeoutExpired):
         return None
+def command(args):
+    try:
+        return subprocess.run(args,capture_output=True,text=True,timeout=2,env={**os.environ,"LC_ALL":"C"})
+    except (OSError,subprocess.TimeoutExpired):
+        return None
+
+def protection():
+    state=command(["systemctl","is-active","fail2ban.service"])
+    if state is None:
+        return {"active":None,"jails":{}}
+    if state.stdout.strip()!="active":
+        return {"active":False if state.stdout.strip() in ("inactive","failed","unknown","deactivating") else None,"jails":{}}
+    result={"active":True,"jails":{}}
+    for jail in ("sshd","proxmox-nginx"):
+        status=command(["fail2ban-client","status",jail])
+        actions=command(["fail2ban-client","get",jail,"actions"])
+        row={"ok":False,"actions_known":False,"banned":None,"failed":None,"nftables":False,"pushover":False}
+        if status is not None and status.returncode==0:
+            row["ok"]=True
+            for key,label in (("banned","Currently banned"),("failed","Total failed")):
+                m=re.search(r"(?m)"+label+r":\s*(\d+)\s*$",status.stdout)
+                if m:row[key]=int(m.group(1))
+        if actions is not None and actions.returncode==0:
+            row["actions_known"]=True
+            names=set(re.findall(r"[\w-]+",actions.stdout.splitlines()[-1])) if actions.stdout.strip() else set()
+            row["nftables"]=any(n=="nftables" or n.startswith("nftables-") for n in names)
+            row["pushover"]="pushover-security" in names
+        result["jails"][jail]=row
+    return result
+
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
     while True:
         start=time.monotonic()
         values=dict(zip(targets,pool.map(ping,targets.values())))
+        security=protection()
         if out.parent.is_dir():
             fd,name=tempfile.mkstemp(dir=out.parent,prefix=".ping-")
             try:
-                with os.fdopen(fd,"w") as fp:json.dump({"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"targets":values},fp)
+                with os.fdopen(fd,"w") as fp:json.dump({"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"targets":values,"security":security},fp)
                 os.chmod(name,0o644);os.replace(name,out)
             finally:
                 if os.path.exists(name):os.unlink(name)
