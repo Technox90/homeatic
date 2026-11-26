@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+26.11.2026 – V176 · Schutz und Speicher
+--------------------------------------------------------
+- Schutz-Kachel ersetzt die bisherige Speicher-Kachel: Fail2Ban-Dienst, SSH- und Proxmox-Jail, aktive IP-Sperren, Fehlversuche seit Dienststart und konfigurierte Pushover-Aktion. Der vorhandene Ping-Dienst liefert alle 10 Sekunden nur aggregierte Schutzdaten; keine IP-Adressen, Tokens oder administrativen Aktionen. Fehlende oder veraltete Daten werden als n/v angezeigt. SSD-Temperatur in der CPU-Kachel neben CPU und Board; Speicher-Kachel RAM / SSD / Swap in dieser Reihenfolge, System-SSD mit Prozent, Balken und belegten dezimalen MB (nur Root-Dateisystem, nicht local-lvm). Bestehende Fail2Ban-, SSH-, Pushover- und Branding-Konfiguration unverändert.
+
 26.11.2026 – V175 · Fortschrittsbalken und Ping-Dienst
 --------------------------------------------------------
 - Fortschrittsbalken für CPU, RAM/Swap, Speicher, VM/LXC, Pi-hole, Netzwerk und USV; Leistungs-Mini-Verlauf aus tatsächlich beobachteten Messwerten. Dezimale Speichergrößen, deutsche Prozentwerte und Schutz vor alten Live-Renderern. Netzwerk-Maxima frei konfigurierbar (0 = Balken aus), Ping-Dienst bei Dashboard-Installation und verwalteten Updates. Bestehende Logos und Einstellungen bleiben erhalten.
