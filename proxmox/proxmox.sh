@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V173
+# PROXMOX MODULARER KOMPLETT-INSTALLER V174
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V173"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V173"
+TUI_TITLE="PROXMOX INSTALLER V174"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V174"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1883,7 +1883,7 @@ tui_main_menu() {
             result="$(
                 whiptail \
                     --backtitle "$TUI_BACKTITLE" \
-                    --title "HAUPTMENÜ · Version 173" \
+                    --title "HAUPTMENÜ · Version 174" \
                     --ok-button "Öffnen" \
                     --cancel-button "Beenden" \
                     --menu "${status}\n\nBereich auswählen" \
@@ -8207,7 +8207,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V173",
+    "installer_version": "V174",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8681,7 +8681,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V173 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V174 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -8922,9 +8922,10 @@ function getContext(){
  return context;
 }
 let busyUntil=0;
+window.__dashboardUpdateAudioBusy=()=>!!context&&context.currentTime<busyUntil;
 function playSound(){
  const ctx=getContext();
- if(!ctx||ctx.state!=='running'||prefs.volume===0||ctx.currentTime<busyUntil)return false;
+ if(!ctx||ctx.state!=='running'||prefs.volume===0||ctx.currentTime<busyUntil||window.__dashboardWarningAudioBusy?.())return false;
  const tone=tones[prefs.tone],start=ctx.currentTime+.03;
  const master=ctx.createGain();
  master.gain.value=.12*prefs.volume/100;

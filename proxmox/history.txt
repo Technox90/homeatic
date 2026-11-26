@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+26.11.2026 – V174 · Monitoring-Kacheln und Schlummermodus
+--------------------------------------------------------
+- Kompakte CPU-, Speicher-, VM/LXC- und Pi-hole-Kacheln, farbige Messwerte mit Goldorange und fließenden Übergängen, SVG-Symbole und Warnrahmen. Systemstatus, browserlokale Warnhistorie und System Alert (75 %), Schlummermodus 5/10/30/60 Minuten oder dauerhaft mit Countdown, blauem Endabschnitt und animierten Z. Netzwerk-Ping-Anzeige liest optional die Host-Messdatei; Host-Sampler separat aktivieren. Keine Änderungen an Logos oder DNS.
+
 25.11.2026 – V173 · Update-Verwaltung und Browser-Einstellungen
 --------------------------------------------------------
 - Modern Chime mit 100 % als neuer Standard; gespeicherte Einstellungen bleiben erhalten. Eigener Update-Reiter mit Versionsstatus, Zeitpunkt der Host-Prüfung, beobachteter lokaler Versionshistorie, Diagnose, GitHub-Verlauf und erneutem Statusabruf. Update-Badge am Menü, Ruhezeiten (optional), Export/Import der Browser-Ton- und Tab-Einstellungen, erneuter Abruf bei Wiederverbindung. Keine privilegierten Host-Aktionen aus dem Browser.
