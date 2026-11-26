@@ -217,3 +217,6 @@ body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-w
 #proxmox-installer-update{bottom:78px!important}
 @media(max-width:600px){#v174SystemStatus span{display:none}.v174Guests{gap:2px;white-space:normal}}
 @media(prefers-reduced-motion:reduce){.v174Z i{animation:none;opacity:1}.v174Z i:nth-child(2){transform:translate(10px,-8px)}.v174Z i:nth-child(3){transform:translate(20px,-16px)}.v174Color,.card,.v174SnoozeButton{transition:none}}
+
+/* V175 compact aligned rows and percentage bars */
+.v175Row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;line-height:1.22;font-size:inherit}.v175Row>span:last-child{text-align:right;white-space:nowrap}.v175Bar{height:5px;background:#263849;border-radius:8px;overflow:hidden;margin:3px 0}.v175Bar[hidden]{display:none!important}.v175Bar>span{display:block;height:100%;border-radius:8px;transition:width .8s ease,background-color .8s ease}.v175Graph{width:100%;height:24px;display:block}.card:has(.v175Row) .sub{line-height:1.25}.card:has(.v175Row) .value{margin-bottom:3px}.card:has(.v175Row) .v175Bar+.v175Row{margin-top:3px}@media(prefers-reduced-motion:reduce){.v175Bar>span{transition:none}}

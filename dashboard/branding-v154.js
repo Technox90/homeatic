@@ -132,7 +132,7 @@ const usageStops=(a=55,b=80)=>[[a-10,vp.white],[a,vp.amber],[b-10,vp.amber],[b,v
 const tempStops=(a=50,b=76)=>[[a-10,vp.green],[a,vp.amber],[b-10,vp.amber],[b,vp.red]];
 const pingStops=[[25,vp.green],[50,'#84CC16'],[100,vp.yellow],[150,vp.amber],[200,vp.red]];
 const warnKey='dashboard.warningSettingsV174',snoozeKey='dashboard.warningSnoozeV174';
-const warnDefaults={sound:true,volume:75,frames:true,icons:true,glow:true,ping:true,pingInterval:15,providers:['Google','Quad9','Cloudflare'],pingColors:true};
+const warnDefaults={sound:true,volume:75,frames:true,icons:true,glow:true,ping:true,pingInterval:15,providers:['Google','Quad9','Cloudflare'],pingColors:true,bars:true,netDown:0,netUp:0,netUnit:'mb'};
 function readLocal(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}}
 function saveLocal(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
 let warnPrefs={...warnDefaults,...readLocal(warnKey,{})},snooze=readLocal(snoozeKey,null);
@@ -150,23 +150,35 @@ function v174Value(id,v,stops){const e=document.getElementById(id);if(e){e.class
 function v174Sub(id,...parts){const e=document.getElementById(id);if(e)e.replaceChildren(...parts)}
 function v174Line(text,color){const e=v174Span(text,color);e.classList.add('v174Line');return e}
 function v174Temp(v){return v174Valid(v)?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' °C':'n/v'}
-function v174Bytes(v){return v174Valid(v)?(v/1073741824).toLocaleString('de-DE',{maximumFractionDigits:1})+' GiB':'n/v'}
+function v174Bytes(v){if(!v174Valid(v)||v<0)return 'n/v';const units=['B','kB','MB','GB','TB'];let i=0;while(v>=1000&&i<4){v/=1000;i++}return v.toLocaleString('de-DE',{maximumFractionDigits:1})+' '+units[i]}
+function v175Percent(v){return v174Valid(v)?v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'n/v'}
+function v175Ratio(v,max){return v174Valid(v)&&v174Valid(max)&&max>0?Math.max(0,Math.min(100,v/max*100)):null}
+function v175Row(label,value,color){const e=document.createElement('div');e.className='v175Row';e.append(v174Span(label),v174Span(value,color));return e}
+function v175Bar(value,color,track){const e=document.createElement('div');e.className='v175Bar';e.hidden=!warnPrefs.bars||!v174Valid(value);e.setAttribute('aria-hidden','true');if(track)e.style.background=track;const b=document.createElement('span');b.style.width=Math.max(0,Math.min(100,value||0))+'%';b.style.background=color;e.append(b);return e}
+function v175Set(id,text,color){const e=document.getElementById(id);if(e){e.textContent=text;e.classList.add('v174Color');if(color)e.style.color=color}}
+function v175NetRate(v){return v174Valid(v)?warnPrefs.netUnit==='mbit'?(v*8/1000000).toLocaleString('de-DE',{maximumFractionDigits:2})+' Mbit/s':decimalTransferRate(v):'n/v'}
+let v175PowerHistory=[],v175LastPower=0,v175Ups=null;
+function v175PowerGraph(d){const p=localHostPower(d);if(lastMetricsAt!==v175LastPower){v175LastPower=lastMetricsAt;if(v174Valid(p.value))v175PowerHistory.push({v:p.value,t:lastMetricsAt,total:p.total});v175PowerHistory=v175PowerHistory.filter(x=>Date.now()-x.t<=900000).slice(-120)}const rows=v175PowerHistory.filter(x=>x.total===p.total);const c=v174Card('power','Leistung','cpu');if(!c)return;v175Set('power',v174Valid(p.value)?p.value.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' W':'n/v',vp.white);const detail=v174Line(p.label);if(rows.length<2){v174Sub('powerSub',detail);return}const min=Math.min(...rows.map(x=>x.v)),max=Math.max(...rows.map(x=>x.v));const graph=document.createElementNS('http://www.w3.org/2000/svg','svg');graph.setAttribute('viewBox','0 0 240 24');graph.setAttribute('preserveAspectRatio','none');graph.classList.add('v175Graph');const path=document.createElementNS(graph.namespaceURI,'polyline');path.setAttribute('points',rows.map((x,i)=>(i/(rows.length-1)*240)+','+(22-(x.v-min)/(max-min||1)*20)).join(' '));path.setAttribute('fill','none');path.setAttribute('stroke','#60A5FA');path.setAttribute('stroke-width','1.5');graph.append(path);v174Sub('powerSub',detail,graph,v175Row('Min. / Max. (15 Min.)',min.toFixed(1).replace('.',',')+' / '+max.toFixed(1).replace('.',',')+' W'))}
+function v175RenderUps(){const u=v175Ups;if(!u?.ok)return;const card=document.getElementById('upsCard'),sub=document.getElementById('upsSub'),meter=document.getElementById('upsMeter');if(!card||!sub)return;const charge=u.battery_charge_pct==null?null:Number(u.battery_charge_pct),load=u.load_pct==null?null:Number(u.load_pct),runtime=u.runtime_remaining_min==null?null:Number(u.runtime_remaining_min);const color=v174Valid(charge)?v174Color(charge,[[15,vp.red],[30,vp.amber],[40,vp.green]]):vp.muted;if(meter){meter.style.background=color;meter.parentElement.hidden=!warnPrefs.bars}v175Set('upsValue',v175Percent(charge),color);const source=typeof upsSourceText==='function'?upsSourceText(u.power_source):String(u.power_source||'n/v');sub.replaceChildren(v175Row('Quelle',source),v175Row('Auslastung',v175Percent(load)),v175Bar(load,vp.white),v175Row('Restlaufzeit',v174Valid(runtime)?Math.round(runtime)+' Min.':'n/v'));v174Frame(card,v174Valid(charge)&&charge<15?2:v174Valid(charge)&&charge<30?1:0)}
+
 function v174Frame(card,level){if(!card)return;card.classList.toggle('v174Warning',warnPrefs.frames&&level===1);card.classList.toggle('v174Critical',warnPrefs.frames&&level===2);card.classList.toggle('v174Glow',warnPrefs.glow&&warnPrefs.frames&&level>0)}
 const level=(v,a,b)=>!v174Valid(v)?0:v>=b?2:v>=a?1:0;
 function renderMetrics(d){
+ v175Observer?.disconnect();try{
  const cpu=v174Card('cpu','CPU','cpu',v174Valid(d.cpu_freq)?(d.cpu_freq/1000).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' GHz':'');
- v174Value('cpu',d.cpu_percent,usageStops());v174Sub('cpuSub',v174Line('CPU '+v174Temp(d.cpu_temp),v174Color(d.cpu_temp,tempStops())),v174Line('Board '+v174Temp(d.board_temp),v174Color(d.board_temp,tempStops())));
+ v175Set('cpu',v175Percent(d.cpu_percent),v174Color(d.cpu_percent,usageStops()));v174Sub('cpuSub',v175Bar(d.cpu_percent,v174Color(d.cpu_percent,usageStops())),v175Row('CPU',v174Temp(d.cpu_temp),v174Color(d.cpu_temp,tempStops())),v175Row('Board',v174Temp(d.board_temp),v174Color(d.board_temp,tempStops())));
  v174Frame(cpu,Math.max(level(d.cpu_percent,55,80),level(d.cpu_temp,50,76),level(d.board_temp,50,76)));
- const disk=v174Card('disk','Speicher','disk',v174Bytes(d.root_total));v174Value('disk',d.root_percent,usageStops());
- v174Sub('diskSub',v174Line('Belegt: '+v174Bytes(d.root_used)),v174Line('SSD '+v174Temp(d.drive_temp),v174Color(d.drive_temp,tempStops(50,70))));
+ const disk=v174Card('disk','Speicher','disk',v174Bytes(d.root_total));v175Set('disk',v175Percent(d.root_percent),v174Color(d.root_percent,usageStops()));
+ v174Sub('diskSub',v175Bar(d.root_percent,v174Color(d.root_percent,usageStops())),v175Row('Belegt',v174Bytes(d.root_used)),v175Row('SSD',v174Temp(d.drive_temp),v174Color(d.drive_temp,tempStops(50,70))));
  v174Frame(disk,Math.max(level(d.root_percent,55,80),level(d.drive_temp,50,70)));
- const ram=v174Card('ram','RAM / Swap','ram');v174Value('ram',d.ram_percent,usageStops(70,90));v174Frame(ram,Math.max(level(d.ram_percent,70,90),level(d.swap_percent,30,60)));
+ const ram=v174Card('ram','RAM / Swap','ram',v174Bytes(d.ram_total));v175Set('ram',v175Percent(d.ram_percent),v174Color(d.ram_percent,usageStops(70,90)));v174Sub('ramSub',v175Bar(d.ram_percent,v174Color(d.ram_percent,usageStops(70,90))),v175Row('Belegt',v174Bytes(d.ram_used)),v175Row('Swap',v175Percent(d.swap_percent),v174Color(d.swap_percent,usageStops(30,60))),v175Bar(d.swap_percent,v174Color(d.swap_percent,usageStops(30,60))));v174Frame(ram,Math.max(level(d.ram_percent,70,90),level(d.swap_percent,30,60)));
  const guests=v174Card('guests','VM / LXC','server');
  const valid=[d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid);
- if(valid){const a=d.vm_running+d.ct_running,total=d.vm_total+d.ct_total,vm=d.vm_running===d.vm_total,ct=d.ct_running===d.ct_total;const e=document.getElementById('guests');e.replaceChildren(v174Span(a+' Aktiv',a===total?vp.green:a===0?vp.red:vp.yellow),v174Span(' · '+d.vm_running+'/'+d.vm_total+' VM',vm?vp.green:vp.red),v174Span(' · '+d.ct_running+'/'+d.ct_total+' CT',ct?vp.green:vp.red));e.classList.add('v174Guests');v174Sub('guestSub');v174Frame(guests,a===total?0:a===0?2:1)}
- const pi=v174Card('piholeBlockedPct','Pi-hole · Geblockt','shield');v174Value('piholeBlockedPct',d.pihole_blocked_percent,[[50,vp.white],[60,vp.red]]);v174Frame(pi,level(d.pihole_blocked_percent,60,60));
- v174Card('net','Netzwerk','net');renderPing();
- evaluateWarnings(d);
+ if(valid){const a=d.vm_running+d.ct_running,total=d.vm_total+d.ct_total,vm=d.vm_running===d.vm_total,ct=d.ct_running===d.ct_total;const e=document.getElementById('guests');e.classList.remove('v174Guests');v175Set('guests',a+' Aktiv',a===total?vp.green:a===0?vp.red:vp.yellow);v174Sub('guestSub',v175Row('Virtuelle Maschinen',d.vm_running+'/'+d.vm_total,vm?vp.green:vp.red),v175Bar(v175Ratio(d.vm_running,d.vm_total),vp.green,vp.red),v175Row('LXC-Container',d.ct_running+'/'+d.ct_total,ct?vp.green:vp.red),v175Bar(v175Ratio(d.ct_running,d.ct_total),vp.green,vp.red));v174Frame(guests,a===total?0:a===0?2:1)}
+ const pi=v174Card('piholeBlockedPct','Pi-hole','shield',v174Valid(d.pihole_queries_total)?'Daten verfügbar':'n/v'),pct=d.pihole_blocked_percent,pc=v174Color(pct,[[50,vp.white],[60,vp.red]]),number=v=>v174Valid(v)?v.toLocaleString('de-DE'):'n/v';v175Set('piholeBlockedPct',v175Percent(pct),pc);v174Sub('piholeBlockedSub',v175Bar(pct,pc),v175Row('Anfragen',number(d.pihole_queries_total)),v175Row('Blockiert',number(d.pihole_queries_blocked),pc),v175Row('Zugelassen',v174Valid(d.pihole_queries_total)&&v174Valid(d.pihole_queries_blocked)?number(Math.max(0,d.pihole_queries_total-d.pihole_queries_blocked)):'n/v',vp.green));v174Frame(pi,level(pct,60,60));
+ v174Card('net','Netzwerk','net');v175Set('net','↓ '+v175NetRate(d.net_rx_bps),vp.white);v174Sub('netSub',v175Bar(v175Ratio(d.net_rx_bps,Number(warnPrefs.netDown)*125000),vp.green),v175Row('↑ Upload',v175NetRate(d.net_tx_bps),'#60A5FA'),v175Bar(v175Ratio(d.net_tx_bps,Number(warnPrefs.netUp)*125000),'#60A5FA'));renderPing();
+ v175PowerGraph(d);v175RenderUps();evaluateWarnings(d);
+ }finally{v175Watch()}
 }
 function renderPing(){
  const e=document.getElementById('netSub');if(!e)return;
@@ -178,7 +190,7 @@ function renderPing(){
  const name=providers[pingIndex%providers.length],fresh=lastPing&&now-Date.parse(lastPing.checked)<35000,v=fresh?lastPing.targets?.[name]:undefined;
  line.textContent='Ping: '+name+' · '+(v174Valid(v)?Math.round(v)+' ms':v===null?'Timeout':'n/v');line.style.color=!warnPrefs.pingColors?vp.white:v===null?vp.red:v174Color(v,pingStops);
 }
-async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}renderPing();if(lastMetrics)evaluateWarnings(lastMetrics)}
+async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}v175Observer?.disconnect();try{renderPing()}finally{v175Watch()}if(lastMetrics)evaluateWarnings(lastMetrics)}
 function evaluateWarnings(d){
  const now=Date.now(),checks=[['CPU-Auslastung',d.cpu_percent,80,60],['RAM-Auslastung',d.ram_percent,90,60],['Swap-Auslastung',d.swap_percent,60,60],['CPU-Temperatur',d.cpu_temp,76,10],['Board-Temperatur',d.board_temp,76,10],['SSD-Temperatur',d.drive_temp,70,10],['Speicherbelegung',d.root_percent,80,30],['Pi-hole-Blockrate',d.pihole_blocked_percent,60,30]];
  if([d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid))checks.push(['VM / LXC offline',d.vm_total+d.ct_total-d.vm_running-d.ct_running,1,30]);
@@ -224,15 +236,19 @@ function installWarningSettings(){
  const anchor=document.getElementById('settingsSave')?.closest('.modalButtons');if(!anchor)return;
  const panel=document.createElement('section');panel.id='v174WarningSettings';panel.className='browserTabSettings';
  panel.innerHTML='<h3>Systemwarnungen und Ping</h3><div data-v174-options></div><label>Lautstärke System Alert <input type="range" min="0" max="100" step="1" data-v174-volume><span data-v174-volume-label></span></label><label>Ping-Wechsel <select data-v174-interval><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>60</option></select> Sekunden</label><div data-v174-providers></div><button type="button" data-v174-test>Systemwarnton testen</button><details><summary>Warnungshistorie (Browser)</summary><div data-v174-history></div></details>';
- const opts=panel.querySelector('[data-v174-options]');for(const [key,label] of [['sound','Systemwarnton'],['frames','Dynamische Rahmen'],['icons','Kachel-Symbole'],['glow','Leuchteffekt'],['ping','Ping-Anzeige'],['pingColors','Ping-Farbverlauf']]){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=!!warnPrefs[key];i.addEventListener('change',()=>{warnPrefs[key]=i.checked;if(!warnPrefs.sound)stopAlarm();saveLocal(warnKey,warnPrefs)});l.append(i,document.createTextNode(label));opts.append(l)}
+ const opts=panel.querySelector('[data-v174-options]');for(const [key,label] of [['sound','Systemwarnton'],['frames','Dynamische Rahmen'],['icons','Kachel-Symbole'],['glow','Leuchteffekt'],['ping','Ping-Anzeige'],['pingColors','Ping-Farbverlauf'],['bars','Fortschrittsbalken']]){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=!!warnPrefs[key];i.addEventListener('change',()=>{warnPrefs[key]=i.checked;if(!warnPrefs.sound)stopAlarm();saveLocal(warnKey,warnPrefs);if(lastMetrics)renderMetrics(lastMetrics)});l.append(i,document.createTextNode(label));opts.append(l)}
  const vol=panel.querySelector('[data-v174-volume]'),vl=panel.querySelector('[data-v174-volume-label]');vol.value=warnPrefs.volume;vl.textContent=vol.value+' %';vol.addEventListener('input',()=>{warnPrefs.volume=Number(vol.value);vl.textContent=vol.value+' %';saveLocal(warnKey,warnPrefs)});
  const interval=panel.querySelector('[data-v174-interval]');interval.value=warnPrefs.pingInterval;interval.addEventListener('change',()=>{warnPrefs.pingInterval=Number(interval.value);saveLocal(warnKey,warnPrefs)});
  for(const name of warnDefaults.providers){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=warnPrefs.providers.includes(name);i.addEventListener('change',()=>{warnPrefs.providers=i.checked?[...new Set([...warnPrefs.providers,name])]:warnPrefs.providers.filter(n=>n!==name);saveLocal(warnKey,warnPrefs);renderPing()});l.append(i,document.createTextNode(name));panel.querySelector('[data-v174-providers]').append(l)}
  panel.querySelector('[data-v174-test]').addEventListener('click',()=>{unlockAlarm();if(!isSnoozed())playAlarm()});
  const h=panel.querySelector('[data-v174-history]');for(const w of warningHistory.slice(0,20))h.append(v174Line(w.event+' · '+w.name+' · '+new Date(w.at).toLocaleString('de-DE')));
+ const net=document.createElement('div');net.innerHTML='<label>Download-Maximum (Mbit/s, 0 = kein Balken) <input type="number" min="0" max="1000000" data-down></label><label>Upload-Maximum (Mbit/s, 0 = kein Balken) <input type="number" min="0" max="1000000" data-up></label><label>Netzwerkeinheit <select data-unit><option value="mb">MB/s</option><option value="mbit">Mbit/s</option></select></label>';for(const [sel,key] of [['[data-down]','netDown'],['[data-up]','netUp'],['[data-unit]','netUnit']]){const e=net.querySelector(sel);e.value=warnPrefs[key];e.addEventListener('change',()=>{warnPrefs[key]=key==='netUnit'?e.value:Math.max(0,Math.min(1000000,Number(e.value)||0));saveLocal(warnKey,warnPrefs);if(lastMetrics)renderMetrics(lastMetrics)})}panel.append(net);
  anchor.before(panel);
 }
-function v174Tick(){renderSnooze();installWarningSettings();renderPing();if(lastMetrics)evaluateWarnings(lastMetrics)}
+let v175Observer=null,v175Pending=false;
+function v175Observe(){if(v175Observer||typeof MutationObserver!=='function')return;v175Observer=new MutationObserver(()=>{if(v175Pending)return;v175Pending=true;window.setTimeout(()=>{v175Pending=false;if(lastMetrics&&Date.now()-lastMetricsAt<45000)renderMetrics(lastMetrics)},0)});v175Watch()}
+function v175Watch(){if(!v175Observer)return;for(const id of ['cpu','cpuSub','disk','diskSub','ram','ramSub','guests','guestSub','piholeBlockedPct','piholeBlockedSub','net','netSub','power','powerSub','upsValue','upsSub']){const e=document.getElementById(id);if(e)v175Observer.observe(e,{childList:true,characterData:true,subtree:true})}}
+function v174Tick(){renderSnooze();installWarningSettings();v175Observe();if(lastMetrics){v175Observer?.disconnect();try{renderPing()}finally{v175Watch()}evaluateWarnings(lastMetrics)}}
 window.addEventListener('storage',e=>{if(e.key===snoozeKey){snooze=readLocal(snoozeKey,null);if(isSnoozed())stopAlarm();renderSnooze()}if(e.key===warnKey){warnPrefs={...warnDefaults,...readLocal(warnKey,{})};if(!warnPrefs.sound)stopAlarm()}});
 window.setInterval(v174Tick,1000);window.setInterval(fetchPing,10000);
 window.setTimeout(()=>{v174Tick();fetchPing()},0);
@@ -243,10 +259,15 @@ if(typeof getJSON==='function'){
     const data=await originalGetJSON.call(this,url,...args);
     if(typeof url==='string'&&url.split('?')[0]==='/api/current'&&data&&typeof data==='object'){
       tabMetrics=data;tabMetricsTime=Date.now();refreshTabTitle();
-      lastMetrics=data;lastMetricsAt=Date.now();window.setTimeout(()=>{if(lastMetrics===data)renderMetrics(data)},0);
+      lastMetrics=data;lastMetricsAt=Date.now();
     }
+    if(typeof url==='string'&&url.split('?')[0]==='/api/ups')v175Ups=data;
     return data;
   };
+}
+if(typeof current==='function'){
+ const originalCurrent=current;
+ current=async function(...args){try{return await originalCurrent.apply(this,args)}finally{if(lastMetrics&&Date.now()-lastMetricsAt<45000)renderMetrics(lastMetrics)}};
 }
 function installTabSettings(){
   if(document.getElementById('browserTabSettings'))return;
