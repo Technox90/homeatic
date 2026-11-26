@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen Homelab
 
 ## Aktueller Stand
 
-**Aktueller Stand: V175 · Proxmox Master Installer · 25.11.2026**
+**Aktueller Stand: V176 · Proxmox Master Installer · 26.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -136,6 +136,10 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 > Reset-/Neuaufbau-Funktionen können VMs/LXC oder Dashboard-Daten entfernen. Vor destruktiven Aktionen Backups prüfen.
 
 ## Versionsverlauf – letzte 5 Versionen
+
+### V176
+
+- Schutz-Kachel ersetzt die bisherige Speicher-Kachel: Fail2Ban-Dienst, SSH- und Proxmox-Jail, aktive IP-Sperren, Fehlversuche seit Dienststart und konfigurierte Pushover-Aktion. Der vorhandene Ping-Dienst liefert alle 10 Sekunden nur aggregierte Schutzdaten; keine IP-Adressen, Tokens oder administrativen Aktionen. Fehlende oder veraltete Daten werden als n/v angezeigt. SSD-Temperatur in der CPU-Kachel neben CPU und Board; Speicher-Kachel RAM / SSD / Swap in dieser Reihenfolge, System-SSD mit Prozent, Balken und belegten dezimalen MB (nur Root-Dateisystem, nicht local-lvm). Bestehende Fail2Ban-, SSH-, Pushover- und Branding-Konfiguration unverändert. Zentrale Zeit: Nur die IANA-Zeitzone des Proxmox-Hosts ist maßgeblich (z. B. `timedatectl set-timezone Europe/Berlin`). UPPER liest sie über `/upper/timezone.json`, konvertiert Kuma-UTC-Zeitstempel einschließlich expliziter Offsets und Sommer-/Winterzeit, und verwendet für den Aktualisierungszeitpunkt den HTTP-Date-Header. Der Timer `proxmox-timezone-sync.timer` gleicht laufende verwaltete LXCs und die UPPER-Zeitzonendatei alle 15 Minuten ab, ohne Gastneustart; Host-NTP wird geprüft, nicht erzwungen. Neue unterstützte Anwendungsinstallationen übernehmen die Host-Zeitzone. Der normale Docker-Update-Lauf gleicht bei eindeutigem Compose-Projekt die Zeitzonenparameter von Kuma, Pi-hole, Paperless, Speedtest-Tracker und Mealie ab und startet bei tatsächlicher Konfigurationsabweichung nur den betreffenden Docker-Dienst neu (ohne Image-Pull in diesem Teilschritt). Mehrdeutige Layouts werden gemeldet statt überschrieben; Konfigurationssicherung und Rücksetzversuch bei Fehlern. Datenbank-UTC bleibt unverändert. Dashboard-Warn-/USV-Zeitdarstellung nutzt die Host-Zeitzone. Bestehende VMs, nicht unterstützte App-Zeitzonen, alte USV-Sonderkonfigurationen und gestoppte Gäste sind separat zu prüfen; der Wechsel von V175 auf V176 kann einen weiteren regulären Updater-Lauf benötigen.
 
 ### V175
 

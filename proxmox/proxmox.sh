@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V175
+# PROXMOX MODULARER KOMPLETT-INSTALLER V176
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V175"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V175"
+TUI_TITLE="PROXMOX INSTALLER V176"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V176"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -1562,6 +1562,14 @@ sys.exit(0 if status == "OK" else 1)
 PY_STRESS_V155
 )
 
+# Central IANA timezone; no change to the host clock.
+pve_host_timezone() {
+    local zone
+    zone="$(timedatectl show -p Timezone --value)"
+    [[ "$zone" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ && -f "/usr/share/zoneinfo/$zone" ]] || return 1
+    printf '%s\n' "$zone"
+}
+
 install_upper_public_status_v163() (
     local id="" candidate="" count=0
     for candidate in $(pct list | awk 'NR>1 {print $1}'); do
@@ -1578,16 +1586,22 @@ install_upper_public_status_v163() (
         warn "Uptime-Kuma-LXC ist nicht gestartet."
         return 1
     fi
-    pct exec "$id" -- bash -s <<'KUMA_STATUS_INSTALL'
+    pct exec "$id" -- bash -s -- "$(pve_host_timezone)" <<'KUMA_STATUS_INSTALL'
 set -Eeuo pipefail
 conf=/etc/nginx/conf.d/pve-master-standard-web.conf
 dir=/var/www/upper
 page="$dir/index.html"
 legacy=/var/www/nodezero-kuma-status
+zone="${1:-$(timedatectl show -p Timezone --value)}"
+[[ "$zone" =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ && -f "/usr/share/zoneinfo/$zone" ]]
 test -f "$conf"
 curl -fsS --max-time 10 http://127.0.0.1:3001/ >/dev/null
 nginx -t
 install -d -m 0755 "$dir"
+zone_tmp="$(mktemp "$dir/.timezone.XXXXXX")"
+printf '{"timezone":"%s"}\n' "$zone" > "$zone_tmp"
+chmod 0644 "$zone_tmp"
+mv -f "$zone_tmp" "$dir/timezone.json"
 # Copy only missing personal images on migration; never replace them.
 for asset in logo.png favicon.png; do
     if [[ ! -e "$dir/$asset" && -f "$legacy/$asset" && ! -L "$legacy/$asset" ]]; then
@@ -1639,7 +1653,25 @@ let active="", generation=0, busy=false;
 const state=s=>s===1?["Online","up"]:s===0?["Offline","down"]:s===2?["Ausstehend","pending"]:s===3?["Wartung","pending"]:["Unbekannt",""];
 const ms=p=>typeof p==="number"&&Number.isFinite(p)&&p>=0?p:null;
 const format=p=>p===null?"—":p.toFixed(1)+" ms";
+// Kuma heartbeat.time is UTC, including legacy timestamps without an offset.
+let upperZone=null,upperDateFormat=null,upperClockFormat=null;
+function setUpperZone(zone){
+ if(typeof zone!=="string"||!zone)throw Error("Host-Zeitzone fehlt");
+ const date=new Intl.DateTimeFormat("de-DE",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+ const clock=new Intl.DateTimeFormat("de-DE",{timeZone:zone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZoneName:"short"});
+ upperZone=zone;upperDateFormat=date;upperClockFormat=clock;
+}
+function kumaEpoch(value){
+ if(typeof value!=="string")return NaN;
+ const raw=value.trim();
+ if(!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/i.test(raw))return NaN;
+ const iso=raw.replace(" ","T");
+ return Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)?iso:iso+"Z");
+}
+function kumaLocal(value){const epoch=kumaEpoch(value);return Number.isFinite(epoch)&&upperDateFormat?upperDateFormat.format(epoch):"—"}
+function kumaSort(a,b){const x=kumaEpoch(a.time),y=kumaEpoch(b.time);return (Number.isFinite(x)?x:-Infinity)-(Number.isFinite(y)?y:-Infinity)||0}
 async function json(url){const response=await fetch(url,{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("HTTP "+response.status);return response.json()}
+async function upperTime(){const response=await fetch("/upper/timezone.json",{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("Host-Zeit HTTP "+response.status);const data=await response.json();return {timezone:data.timezone,epoch:Date.parse(response.headers.get("Date")||"")}}
 function stat(parent,label,value){const n=el("div");n.append(el("span",label),el("strong",value));parent.append(n)}
 function graph(rows){
  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 640 130");svg.setAttribute("role","img");svg.setAttribute("aria-label","Antwortzeitverlauf in Millisekunden");
@@ -1661,7 +1693,7 @@ function graph(rows){
    guide.setAttribute("x1",x);guide.setAttribute("x2",x);guide.setAttribute("visibility","visible");
    dot.setAttribute("cx",x);dot.setAttribute("cy",p===null?105:105-p/max*90);dot.setAttribute("visibility",p===null?"hidden":"visible");
    const [label]=state(row.status);
-   tip.replaceChildren(el("strong",String(row.time||"—")),el("div","Antwortzeit: "+format(p)),el("div","Status: "+label));
+   tip.replaceChildren(el("strong",kumaLocal(row.time)),el("div","Antwortzeit: "+format(p)),el("div","Status: "+label));
    tip.hidden=false;tip.style.top="0px";
    tip.style.left=Math.max(0,Math.min(wrap.clientWidth-tip.offsetWidth,x/640*svg.clientWidth+8))+"px";
  }
@@ -1679,21 +1711,21 @@ function render(config,heartbeat){
  for(const group of Array.isArray(config.publicGroupList)?config.publicGroupList:[]){
   const section=el("section");section.append(el("h2",String(group.name||"Monitore")));
   for(const monitor of Array.isArray(group.monitorList)?group.monitorList:[]){
-   const id=String(monitor.id);const rows=(Array.isArray(heartbeat.heartbeatList?.[id])?heartbeat.heartbeatList[id]:[]).slice(-100).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+   const id=String(monitor.id);const rows=(Array.isArray(heartbeat.heartbeatList?.[id])?heartbeat.heartbeatList[id]:[]).slice(-100).sort(kumaSort);
    const latest=rows.at(-1);const [status,cls]=state(latest?.status);
    const card=el("article");const heading=el("h3",String(monitor.name||"Monitor")+" · ");heading.append(el("span",status,cls));card.append(heading);
-   const bars=el("div",undefined,"bars");for(const row of rows.slice(-50)){const [label,c]=state(row.status);const bar=el("i",undefined,c);bar.title=String(row.time||"")+" · "+label+" · "+format(ms(row.ping));bars.append(bar)}card.append(bars);
+   const bars=el("div",undefined,"bars");for(const row of rows.slice(-50)){const [label,c]=state(row.status);const bar=el("i",undefined,c);bar.title=kumaLocal(row.time)+" · "+label+" · "+format(ms(row.ping));bars.append(bar)}card.append(bars);
    const stats=el("div",undefined,"stats");const values=rows.map(r=>ms(r.ping)).filter(v=>v!==null);
    stat(stats,"Letzte Antwort",format(ms(latest?.ping)));stat(stats,"Ø sichtbarer Verlauf",format(values.length?values.reduce((a,b)=>a+b,0)/values.length:null));
    const uptime=heartbeat.uptimeList?.[id+"_24"];stat(stats,"Verfügbarkeit 24h",typeof uptime==="number"?(uptime*100).toFixed(2)+" %":"—");card.append(stats,graph(rows));
-   card.append(el("p",latest?"Letzte Messung (Kuma): "+String(latest.time||"—")+" · "+rows.length+" Messpunkte":"Noch keine Messwerte","muted"));section.append(card);
+   card.append(el("p",latest?"Letzte Messung (Kuma): "+kumaLocal(latest.time)+" · "+rows.length+" Messpunkte":"Noch keine Messwerte","muted"));section.append(card);
   }root.append(section);
  }
  $("groups").replaceChildren(root);$("title").textContent=String(config.config?.title||"Status")+" · Antwortzeiten";
 }
 async function refresh(){
  if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
- try{const [config,heartbeat]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug)]);if(token!==generation)return;if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+new Date().toLocaleTimeString()+" · alle 60 Sekunden";}
+ try{const [config,heartbeat,tz]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug),upperTime()]);if(token!==generation)return;setUpperZone(tz.timezone);if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+(Number.isFinite(tz.epoch)?upperClockFormat.format(tz.epoch):"n/v")+" · alle 60 Sekunden";}
  catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
  finally{busy=false;if(token!==generation)refresh()}
 }
@@ -1722,7 +1754,7 @@ p=Path(sys.argv[1])
 s=p.read_text()
 # Remove only old managed routes (including the temporary /status/ route).
 s=re.sub(r'(?m)^[ \t]*# (?:NODEZERO KUMA PUBLIC STATUS V155|UPPER PUBLIC STATUS)[ \t]*\n[ \t]*location\s*=\s*/(?:nodezero-status|status|upper)/\s*\{[^}]*\}[ \t]*\n?', '', s)
-s=re.sub(r'(?m)^[ \t]*location\s*=\s*/upper(?:/|/logo\.png|/favicon\.png)?\s*\{[^}]*\}[ \t]*\n?', '', s)
+s=re.sub(r'(?m)^[ \t]*location\s*=\s*/upper(?:/|/logo\.png|/favicon\.png|/timezone\.json)?\s*\{[^}]*\}[ \t]*\n?', '', s)
 anchor="    location / {\n"
 if s.count(anchor)!=1:
     raise SystemExit("UPPER: nginx location nicht eindeutig")
@@ -1734,6 +1766,13 @@ block="""    # UPPER PUBLIC STATUS
         root /var/www/upper;
         try_files /index.html =404;
         default_type text/html;
+        add_header Cache-Control "no-store";
+        add_header X-Content-Type-Options nosniff;
+    }
+    location = /upper/timezone.json {
+        root /var/www/upper;
+        try_files /timezone.json =404;
+        default_type application/json;
         add_header Cache-Control "no-store";
         add_header X-Content-Type-Options nosniff;
     }
@@ -6281,7 +6320,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="e1b1bfadf27ded45012bf5ff4177ce230d50ca05"
+TOOLS_REF="830ec8addf6686a09eba818ed16e43d25ae3f741"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
@@ -8207,7 +8246,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V175",
+    "installer_version": "V176",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8681,7 +8720,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V175 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V176 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -11228,7 +11267,7 @@ if (( INSTALL_PULSE )); then
     ui_section "Automatische Pulse-Einrichtung"
     ui_kv "Admin" "$PULSE_ADMIN_USER"
     ui_kv "Web" "https://${PULSE_IP}/"
-    ui_kv "Zeitzone" "Europe/Berlin"
+    ui_kv "Zeitzone" "$(pve_host_timezone)"
     ui_kv "Discovery-Netz" "${NETWORK_PREFIX}.0/24"
     ui_note "Der First-Run-/Bootstrap-Assistent wird automatisch übersprungen."
     ui_note "Der Proxmox-Host wird mit einem eigenen eingeschränkten Monitoring-Token registriert."
@@ -11683,6 +11722,7 @@ install_docker_in_ct() {
     # V119: Remote-Script als literal heredoc an bash -lc übergeben.
     # Dadurch können awk/sed/printf im Container normale einfache Quotes
     # enthalten, ohne den äußeren Installer-String vorzeitig zu beenden.
+    pct exec "$ctid" -- timedatectl set-timezone "$(pve_host_timezone)" || warn "CT $ctid: Zeitzone konnte nicht übernommen werden."
     pct exec "$ctid" -- bash -lc "$(cat <<'PROXMOX_DOCKER_CT_V119'
         set -Eeuo pipefail
         export DEBIAN_FRONTEND=noninteractive
@@ -11738,7 +11778,6 @@ EOF
             docker-compose-plugin
 
         systemctl enable --now docker
-        timedatectl set-timezone Europe/Berlin || true
 
         ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
         if [[ ! "$ROOT_FREE_MB" =~ ^[0-9]+$ ]] || (( ROOT_FREE_MB < 3072 )); then
@@ -12233,7 +12272,7 @@ create_linux_cloud_vm_v61() {
 #cloud-config
 hostname: ${OS_NAME}
 manage_etc_hosts: true
-timezone: Europe/Berlin
+timezone: $(pve_host_timezone)
 ssh_pwauth: true
 
 users:
@@ -13009,7 +13048,7 @@ services:
       PAPERLESS_DBUSER: paperless
       PAPERLESS_DBPASS: "${DB_PASS}"
 
-      PAPERLESS_TIME_ZONE: Europe/Berlin
+      PAPERLESS_TIME_ZONE: "$(pve_host_timezone)"
       PAPERLESS_OCR_LANGUAGE: deu
       PAPERLESS_OCR_LANGUAGES: "deu eng"
 
@@ -14514,7 +14553,7 @@ services:
     restart: unless-stopped
 
     environment:
-      TZ: Europe/Berlin
+      TZ: "$(pve_host_timezone)"
 
       # V83: Web/API-Passwort ist aktiv.
       # Dadurch liefert Pi-hole v6 echte API-Sessions (SID) und ist
@@ -14920,6 +14959,7 @@ services:
     # Host-Netz des dedizierten LXC, nicht des Proxmox-Hosts.
     network_mode: host
     environment:
+      TZ: "$(pve_host_timezone)"
       UPTIME_KUMA_HOST: "127.0.0.1"
       UPTIME_KUMA_PORT: "3001"
     volumes:
@@ -15267,8 +15307,8 @@ services:
       ADMIN_NAME: "Admin"
       ADMIN_EMAIL: "${SPEEDTEST_ADMIN_EMAIL}"
       ADMIN_PASSWORD: "${SPEEDTEST_ADMIN_PASS}"
-      APP_TIMEZONE: "Europe/Berlin"
-      DISPLAY_TIMEZONE: "Europe/Berlin"
+      APP_TIMEZONE: "$(pve_host_timezone)"
+      DISPLAY_TIMEZONE: "$(pve_host_timezone)"
     volumes:
       - speedtest-data:/config
 
@@ -15411,7 +15451,7 @@ services:
     ports:
       - "127.0.0.1:9000:9000"
     environment:
-      TZ: "Europe/Berlin"
+      TZ: "$(pve_host_timezone)"
       BASE_URL: "https://${MEALIE_IP}"
       ALLOW_SIGNUP: "false"
       PUID: "1000"
@@ -15958,7 +15998,7 @@ install_community_generated_lxc() {
     var_pw="$root_pw" \
     var_container_storage="$DISK_STORAGE" \
     var_template_storage="$IMAGE_CACHE_STORAGE" \
-    var_timezone="Europe/Berlin" \
+    var_timezone="$(pve_host_timezone)" \
     var_tags="community-script;proxmox-master" \
         bash "$tmp"
 
@@ -16019,7 +16059,7 @@ install_community_generated_lxc_v65() {
         "var_pw=${root_pw}"
         "var_container_storage=${DISK_STORAGE}"
         "var_template_storage=${IMAGE_CACHE_STORAGE}"
-        "var_timezone=Europe/Berlin"
+        "var_timezone=$(pve_host_timezone)"
         "var_os=debian"
         "var_version=13"
         "var_tags=community-script;proxmox-master;v107"
@@ -16582,7 +16622,7 @@ configure_pulse_headless() {
         "$admin_user" \
         "$admin_pass" \
         "$api_token" \
-        "$discovery_subnet" <<'EOS'
+        "$discovery_subnet" "$(pve_host_timezone)" <<'EOS'
 set -Eeuo pipefail
 
 PULSE_IP="$1"
@@ -16590,6 +16630,7 @@ ADMIN_USER="$2"
 ADMIN_PASS="$3"
 API_TOKEN="$4"
 DISCOVERY_SUBNET="$5"
+HOST_TIMEZONE="$6"
 
 DATA_DIR="/etc/pulse"
 ENV_FILE="${DATA_DIR}/.env"
@@ -16648,7 +16689,7 @@ PULSE_TRUSTED_PROXY_CIDRS=127.0.0.1/32
 DISCOVERY_SUBNET=${DISCOVERY_SUBNET}
 FRONTEND_PORT=7655
 BIND_ADDRESS=0.0.0.0
-TZ=Europe/Berlin
+TZ=${HOST_TIMEZONE}
 EOF
 
 if id "$SERVICE_USER" >/dev/null 2>&1; then
@@ -17234,9 +17275,10 @@ pct exec "$CTID" -- bash -s -- \
     "$IP" \
     "$ADMIN_USER" \
     "$ADMIN_PASS" \
-    "$API_TOKEN" <<'EOS'
+    "$API_TOKEN" "$(timedatectl show -p Timezone --value)" <<'EOS'
 set -Eeuo pipefail
 
+HOST_TIMEZONE="$5"
 IP="$1"
 ADMIN_USER="$2"
 ADMIN_PASS="$3"
@@ -17286,7 +17328,7 @@ PULSE_PUBLIC_URL=http://${IP}:7655
 ALLOWED_ORIGINS=http://${IP}:7655
 FRONTEND_PORT=7655
 BIND_ADDRESS=0.0.0.0
-TZ=Europe/Berlin
+TZ=${HOST_TIMEZONE}
 EOF
 
 if id "$SERVICE_USER" >/dev/null 2>&1; then
@@ -17622,7 +17664,7 @@ echo "  Host-Shutdown-Timeout 60 s"
 echo "  Wieder scharf nach 5 Min. stabilem Netz"
 echo
 echo "Statusbericht:"
-echo "  08:00 + 20:00 Europe/Berlin"
+echo "  08:00 + 20:00 (lokale Zeitzone)"
 echo "  interner systemd-Timer im PVE-UPS-LXC"
 echo "  kein externer Cronjob"
 echo
@@ -17709,6 +17751,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import sys
 
 from app.config import (
@@ -17732,7 +17775,9 @@ cfg = load_config()
 cfg.dry_run = True
 
 if hasattr(cfg, "timezone"):
-    cfg.timezone = "Europe/Berlin"
+    cfg.timezone = str(Path("/etc/localtime").resolve()).split("/zoneinfo/",1)[-1]
+    if not Path("/usr/share/zoneinfo", cfg.timezone).is_file() or cfg.timezone.startswith("/"):
+        raise ValueError("LXC-Zeitzone nicht ermittelbar")
 
 if hasattr(cfg, "ntp_server"):
     cfg.ntp_server = ""
@@ -18089,7 +18134,10 @@ from app import db, notify
 from app.config import load_config
 
 TITLE = "[PVE-UPS] USV-Statusbericht"
-TZ = ZoneInfo("Europe/Berlin")
+def report_timezone():
+    with open("/etc/localtime", "rb") as fp:
+        return ZoneInfo.from_file(fp)
+TZ = report_timezone()
 
 STATE_PATH = Path(
     "/var/lib/pve-usv/status-report-state.json"
@@ -19057,11 +19105,11 @@ SERVICE_EOF
 
 cat > "$TIMER" <<'TIMER_EOF'
 [Unit]
-Description=PVE-UPS Statusbericht 08:00 und 20:00 Europe/Berlin
+Description=PVE-UPS Statusbericht 08:00 und 20:00 (lokale Zeitzone)
 
 [Timer]
-OnCalendar=*-*-* 08:00:00 Europe/Berlin
-OnCalendar=*-*-* 20:00:00 Europe/Berlin
+OnCalendar=*-*-* 08:00:00
+OnCalendar=*-*-* 20:00:00
 Persistent=true
 AccuracySec=1min
 RandomizedDelaySec=0
@@ -19084,6 +19132,7 @@ pct push "$CTID" "$TIMER" /etc/systemd/system/pve-usv-status-report.timer -perms
 
 # ---------------------------------------------------------------------------
 # First config pass: preserve existing host token.
+pct exec "$CTID" -- timedatectl set-timezone "$(timedatectl show -p Timezone --value)"
 # ---------------------------------------------------------------------------
 
 echo
@@ -19257,7 +19306,7 @@ pveum user token permissions "$PVEUPS_USER_ID" "$PVEUPS_TOKEN_NAME" || true
 # Apply timezone at OS level as well. This does not alter shutdown thresholds.
 # ---------------------------------------------------------------------------
 
-pct exec "$CTID" -- timedatectl set-timezone Europe/Berlin >/dev/null 2>&1 || true
+# Zeitzone bereits vor dem ersten Konfigurationslauf übernommen.
 
 # Reload the deliberately-safe dry-run config before the test.
 pct exec "$CTID" -- systemctl restart pve-usv.service
@@ -19386,7 +19435,7 @@ echo "PVE-UPS-LXC:"
 echo "  CT $CTID"
 echo
 echo "Statusbericht intern:"
-echo "  08:00 + 20:00 Europe/Berlin"
+echo "  08:00 + 20:00 (lokale Zeitzone)"
 echo "  /etc/systemd/system/pve-usv-status-report.timer"
 echo "  /usr/local/lib/pve-usv-status-report.py"
 echo
@@ -19822,7 +19871,7 @@ install_pve_ups_community() {
     echo "Web: http://${PVEUPS_IP}/"
     echo "Intern: HTTP 8080 hinter nginx."
     echo "NUT: 192.168.178.20:3493 / ups"
-    echo "Statusbericht: 08:00 + 20:00 Europe/Berlin"
+    echo "Statusbericht: 08:00 + 20:00 (lokale Zeitzone)"
 }
 
 # =============================================================================
@@ -20549,7 +20598,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     (( INSTALL_DASHBOARD )) && install_dashboard_branding_v154
     install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige fehlt."
     if (( INSTALL_DASHBOARD )); then
-        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V175'
+        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V176'
 import importlib.machinery, importlib.util, sys
 from pathlib import Path
 loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-managed-updates")
@@ -20561,9 +20610,9 @@ def download(path): return mod.request(mod.RAW+ref+"/"+path)
 index=mod.DASH/"index.html"
 css=download("dashboard/branding-v154.css").decode()
 js=download("dashboard/branding-v154.js").decode()
-mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v175")
+mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v176")
 mod.install_dashboard_ping(download)
-PVE_DASHBOARD_V175
+PVE_DASHBOARD_V176
     fi
 fi
 
@@ -20592,6 +20641,19 @@ if (( INSTALL_DASHBOARD )); then
     else
         die "Dashboard-Ansichtsauswahl konnte nicht geladen werden."
     fi
+fi
+
+# V176: Zeitzonen des laufenden verwalteten Linux-Stacks an den Host angleichen.
+if [[ -f /usr/local/sbin/proxmox-managed-updates ]]; then
+    python3 - <<'PVE_TIMEZONE_V176' || warn "Zeitzonenabgleich unvollständig; Diagnose prüfen."
+import importlib.machinery, importlib.util
+loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-managed-updates")
+spec=importlib.util.spec_from_loader(loader.name,loader)
+mod=importlib.util.module_from_spec(spec)
+loader.exec_module(mod)
+mod.install_timezone_timer()
+mod.run(["systemctl","start","proxmox-timezone-sync.service"],capture_output=True)
+PVE_TIMEZONE_V176
 fi
 
 # V146: Eine bereits konfigurierte externe URL-Struktur nach Installationen

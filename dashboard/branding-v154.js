@@ -151,6 +151,30 @@ function v174Sub(id,...parts){const e=document.getElementById(id);if(e)e.replace
 function v174Line(text,color){const e=v174Span(text,color);e.classList.add('v174Line');return e}
 function v174Temp(v){return v174Valid(v)?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' °C':'n/v'}
 function v174Bytes(v){if(!v174Valid(v)||v<0)return 'n/v';const units=['B','kB','MB','GB','TB'];let i=0;while(v>=1000&&i<4){v/=1000;i++}return v.toLocaleString('de-DE',{maximumFractionDigits:1})+' '+units[i]}
+function v176HostDate(value,zone=lastPing?.timezone,clock=false){
+ const t=new Date(value);if(!zone||!Number.isFinite(t.getTime()))return 'n/v';
+ try{return new Intl.DateTimeFormat('de-DE',clock?{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}:{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(t)}catch{return 'n/v'}
+}
+function v176MB(v){return v174Valid(v)&&v>=0?(v/1000000).toLocaleString('de-DE',{maximumFractionDigits:0})+' MB':'n/v'}
+function v176SecuritySummary(sample,now=Date.now()){
+ const age=now-Date.parse(sample?.checked||'');const s=sample?.security;
+ if(!Number.isFinite(age)||age<0||age>35000||!s)return {state:'unknown',label:'n/v',rows:[]};
+ if(s.active===false)return {state:'inactive',label:'Inaktiv',rows:[]};
+ if(s.active!==true)return {state:'unknown',label:'n/v',rows:[]};
+ const rows=['sshd','proxmox-nginx'].map(name=>{const j=s.jails?.[name];return {name,ok:j?.ok===true,banned:Number.isSafeInteger(j?.banned)&&j.banned>=0?j.banned:null,failed:Number.isSafeInteger(j?.failed)&&j.failed>=0?j.failed:null,nftables:j?.nftables===true,pushover:j?.pushover===true,actionsKnown:j?.actions_known===true}});
+ const known=rows.every(j=>j.ok&&j.banned!==null&&j.failed!==null&&j.actionsKnown),protectedBoth=known&&rows.every(j=>j.nftables);
+ const banned=known?rows.reduce((n,j)=>n+j.banned,0):null,failed=known?rows.reduce((n,j)=>n+j.failed,0):null;
+ return {state:!known?'unknown':protectedBoth?'active':'partial',label:!known?'n/v':protectedBoth?'Aktiv':'Teilaktiv',rows,banned,failed,pushover:known&&rows.every(j=>j.pushover)};
+}
+function v176RenderSecurity(){
+ const s=v176SecuritySummary(lastPing),card=v174Card('disk','Schutz · Fail2Ban','shield');if(!card)return;
+ const color=s.state==='active'?vp.green:s.state==='inactive'?vp.red:s.state==='partial'?vp.amber:vp.muted;
+ v175Set('disk',s.label,color);
+ const rows=s.rows.map(j=>v175Row(j.name==='sshd'?'SSH':'Proxmox HTTPS',!j.ok||!j.actionsKnown?'n/v':j.nftables?'Aktiv':'Nicht geschützt',!j.ok||!j.actionsKnown?vp.muted:j.nftables?vp.green:vp.red));
+ if(s.rows.length)rows.push(v175Row('IP-Sperren (aktiv)',s.banned===null?'n/v':String(s.banned),s.banned>0?vp.amber:s.banned===0?vp.green:vp.muted),v175Row('Fehlversuche (seit Start)',s.failed===null?'n/v':String(s.failed)),v175Row('Pushover-Aktion',s.state==='unknown'?'n/v':s.pushover?'Konfiguriert':'Nicht vollständig',s.state==='unknown'?vp.muted:s.pushover?vp.green:vp.amber));
+ else rows.push(v174Line(s.state==='inactive'?'Fail2Ban-Dienst nicht aktiv':'Keine aktuellen Schutzdaten'));
+ v174Sub('diskSub',...rows);v174Frame(card,s.state==='inactive'?2:s.state==='partial'||s.state==='active'&&s.banned>0?1:0);
+}
 function v175Percent(v){return v174Valid(v)?v.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'n/v'}
 function v175Ratio(v,max){return v174Valid(v)&&v174Valid(max)&&max>0?Math.max(0,Math.min(100,v/max*100)):null}
 function v175Row(label,value,color){const e=document.createElement('div');e.className='v175Row';e.append(v174Span(label),v174Span(value,color));return e}
@@ -166,12 +190,14 @@ const level=(v,a,b)=>!v174Valid(v)?0:v>=b?2:v>=a?1:0;
 function renderMetrics(d){
  v175Observer?.disconnect();try{
  const cpu=v174Card('cpu','CPU','cpu',v174Valid(d.cpu_freq)?(d.cpu_freq/1000).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' GHz':'');
- v175Set('cpu',v175Percent(d.cpu_percent),v174Color(d.cpu_percent,usageStops()));v174Sub('cpuSub',v175Bar(d.cpu_percent,v174Color(d.cpu_percent,usageStops())),v175Row('CPU',v174Temp(d.cpu_temp),v174Color(d.cpu_temp,tempStops())),v175Row('Board',v174Temp(d.board_temp),v174Color(d.board_temp,tempStops())));
- v174Frame(cpu,Math.max(level(d.cpu_percent,55,80),level(d.cpu_temp,50,76),level(d.board_temp,50,76)));
- const disk=v174Card('disk','Speicher','disk',v174Bytes(d.root_total));v175Set('disk',v175Percent(d.root_percent),v174Color(d.root_percent,usageStops()));
- v174Sub('diskSub',v175Bar(d.root_percent,v174Color(d.root_percent,usageStops())),v175Row('Belegt',v174Bytes(d.root_used)),v175Row('SSD',v174Temp(d.drive_temp),v174Color(d.drive_temp,tempStops(50,70))));
- v174Frame(disk,Math.max(level(d.root_percent,55,80),level(d.drive_temp,50,70)));
- const ram=v174Card('ram','RAM / Swap','ram',v174Bytes(d.ram_total));v175Set('ram',v175Percent(d.ram_percent),v174Color(d.ram_percent,usageStops(70,90)));v174Sub('ramSub',v175Bar(d.ram_percent,v174Color(d.ram_percent,usageStops(70,90))),v175Row('Belegt',v174Bytes(d.ram_used)),v175Row('Swap',v175Percent(d.swap_percent),v174Color(d.swap_percent,usageStops(30,60))),v175Bar(d.swap_percent,v174Color(d.swap_percent,usageStops(30,60))));v174Frame(ram,Math.max(level(d.ram_percent,70,90),level(d.swap_percent,30,60)));
+ v175Set('cpu',v175Percent(d.cpu_percent),v174Color(d.cpu_percent,usageStops()));v174Sub('cpuSub',v175Bar(d.cpu_percent,v174Color(d.cpu_percent,usageStops())),v175Row('CPU',v174Temp(d.cpu_temp),v174Color(d.cpu_temp,tempStops())),v175Row('Board',v174Temp(d.board_temp),v174Color(d.board_temp,tempStops())),v175Row('SSD',v174Temp(d.drive_temp),v174Color(d.drive_temp,tempStops(50,70))));
+ v174Frame(cpu,Math.max(level(d.cpu_percent,55,80),level(d.cpu_temp,50,76),level(d.board_temp,50,76),level(d.drive_temp,50,70)));
+ v176RenderSecurity();
+ const ram=v174Card('ram','RAM / SSD / Swap','ram',v174Bytes(d.ram_total));
+ v175Set('ram',v175Percent(d.ram_percent),v174Color(d.ram_percent,usageStops(70,90)));
+ const diskColor=v174Color(d.root_percent,usageStops());
+ v174Sub('ramSub',v175Bar(d.ram_percent,v174Color(d.ram_percent,usageStops(70,90))),v175Row('RAM belegt',v174Bytes(d.ram_used)),v175Row('SSD (System)',v175Percent(d.root_percent),diskColor),v175Bar(d.root_percent,diskColor),v175Row('SSD belegt',v176MB(d.root_used)),v175Row('Swap',v175Percent(d.swap_percent),v174Color(d.swap_percent,usageStops(30,60))),v175Bar(d.swap_percent,v174Color(d.swap_percent,usageStops(30,60))));
+ v174Frame(ram,Math.max(level(d.ram_percent,70,90),level(d.root_percent,55,80),level(d.swap_percent,30,60)));
  const guests=v174Card('guests','VM / LXC','server');
  const valid=[d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid);
  if(valid){const a=d.vm_running+d.ct_running,total=d.vm_total+d.ct_total,vm=d.vm_running===d.vm_total,ct=d.ct_running===d.ct_total;const e=document.getElementById('guests');e.classList.remove('v174Guests');v175Set('guests',a+' Aktiv',a===total?vp.green:a===0?vp.red:vp.yellow);v174Sub('guestSub',v175Row('Virtuelle Maschinen',d.vm_running+'/'+d.vm_total,vm?vp.green:vp.red),v175Bar(v175Ratio(d.vm_running,d.vm_total),vp.green,vp.red),v175Row('LXC-Container',d.ct_running+'/'+d.ct_total,ct?vp.green:vp.red),v175Bar(v175Ratio(d.ct_running,d.ct_total),vp.green,vp.red));v174Frame(guests,a===total?0:a===0?2:1)}
@@ -190,7 +216,7 @@ function renderPing(){
  const name=providers[pingIndex%providers.length],fresh=lastPing&&now-Date.parse(lastPing.checked)<35000,v=fresh?lastPing.targets?.[name]:undefined;
  line.textContent='Ping: '+name+' · '+(v174Valid(v)?Math.round(v)+' ms':v===null?'Timeout':'n/v');line.style.color=!warnPrefs.pingColors?vp.white:v===null?vp.red:v174Color(v,pingStops);
 }
-async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}v175Observer?.disconnect();try{renderPing()}finally{v175Watch()}if(lastMetrics)evaluateWarnings(lastMetrics)}
+async function fetchPing(){try{const r=await fetch('/dashboard-ping-v174.json',{cache:'no-store'});if(!r.ok)throw Error();lastPing=await r.json()}catch{lastPing=null}v175Observer?.disconnect();try{renderPing();v176RenderSecurity()}finally{v175Watch()}if(lastMetrics)evaluateWarnings(lastMetrics)}
 function evaluateWarnings(d){
  const now=Date.now(),checks=[['CPU-Auslastung',d.cpu_percent,80,60],['RAM-Auslastung',d.ram_percent,90,60],['Swap-Auslastung',d.swap_percent,60,60],['CPU-Temperatur',d.cpu_temp,76,10],['Board-Temperatur',d.board_temp,76,10],['SSD-Temperatur',d.drive_temp,70,10],['Speicherbelegung',d.root_percent,80,30],['Pi-hole-Blockrate',d.pihole_blocked_percent,60,30]];
  if([d.vm_running,d.vm_total,d.ct_running,d.ct_total].every(v174Valid))checks.push(['VM / LXC offline',d.vm_total+d.ct_total-d.vm_running-d.ct_running,1,30]);
@@ -229,7 +255,7 @@ function renderSystemStatus(confirmed){
  const host=document.querySelector('.toolbarCenter');if(!host)return;
  let b=document.getElementById('v174SystemStatus');if(!b){b=document.createElement('button');b.type='button';b.id='v174SystemStatus';b.addEventListener('click',()=>{const p=document.getElementById('v174WarningList');if(p)p.hidden=!p.hidden});host.append(b)}
  b.replaceChildren(v174Icon(confirmed.length?'alert':'shield'),v174Span(confirmed.length?confirmed.length+' Kritisch':'System OK'));b.style.color=confirmed.length?vp.red:vp.green;
- let list=document.getElementById('v174WarningList');if(!list){list=document.createElement('aside');list.id='v174WarningList';list.hidden=true;document.body.append(list)}list.replaceChildren(v174Line('Systemwarnungen'));for(const [name,w] of confirmed)list.append(v174Line(name+' · seit '+new Date(w.since).toLocaleTimeString('de-DE'),vp.red));if(!confirmed.length)list.append(v174Line('Keine bestätigten kritischen Warnungen',vp.green));
+ let list=document.getElementById('v174WarningList');if(!list){list=document.createElement('aside');list.id='v174WarningList';list.hidden=true;document.body.append(list)}list.replaceChildren(v174Line('Systemwarnungen'));for(const [name,w] of confirmed)list.append(v174Line(name+' · seit '+v176HostDate(w.since,undefined,true),vp.red));if(!confirmed.length)list.append(v174Line('Keine bestätigten kritischen Warnungen',vp.green));
 }
 function installWarningSettings(){
  if(document.getElementById('v174WarningSettings'))return;
@@ -241,18 +267,21 @@ function installWarningSettings(){
  const interval=panel.querySelector('[data-v174-interval]');interval.value=warnPrefs.pingInterval;interval.addEventListener('change',()=>{warnPrefs.pingInterval=Number(interval.value);saveLocal(warnKey,warnPrefs)});
  for(const name of warnDefaults.providers){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=warnPrefs.providers.includes(name);i.addEventListener('change',()=>{warnPrefs.providers=i.checked?[...new Set([...warnPrefs.providers,name])]:warnPrefs.providers.filter(n=>n!==name);saveLocal(warnKey,warnPrefs);renderPing()});l.append(i,document.createTextNode(name));panel.querySelector('[data-v174-providers]').append(l)}
  panel.querySelector('[data-v174-test]').addEventListener('click',()=>{unlockAlarm();if(!isSnoozed())playAlarm()});
- const h=panel.querySelector('[data-v174-history]');for(const w of warningHistory.slice(0,20))h.append(v174Line(w.event+' · '+w.name+' · '+new Date(w.at).toLocaleString('de-DE')));
+ const h=panel.querySelector('[data-v174-history]');for(const w of warningHistory.slice(0,20))h.append(v174Line(w.event+' · '+w.name+' · '+v176HostDate(w.at)));
  const net=document.createElement('div');net.innerHTML='<label>Download-Maximum (Mbit/s, 0 = kein Balken) <input type="number" min="0" max="1000000" data-down></label><label>Upload-Maximum (Mbit/s, 0 = kein Balken) <input type="number" min="0" max="1000000" data-up></label><label>Netzwerkeinheit <select data-unit><option value="mb">MB/s</option><option value="mbit">Mbit/s</option></select></label>';for(const [sel,key] of [['[data-down]','netDown'],['[data-up]','netUp'],['[data-unit]','netUnit']]){const e=net.querySelector(sel);e.value=warnPrefs[key];e.addEventListener('change',()=>{warnPrefs[key]=key==='netUnit'?e.value:Math.max(0,Math.min(1000000,Number(e.value)||0));saveLocal(warnKey,warnPrefs);if(lastMetrics)renderMetrics(lastMetrics)})}panel.append(net);
  anchor.before(panel);
 }
 let v175Observer=null,v175Pending=false;
 function v175Observe(){if(v175Observer||typeof MutationObserver!=='function')return;v175Observer=new MutationObserver(()=>{if(v175Pending)return;v175Pending=true;window.setTimeout(()=>{v175Pending=false;if(lastMetrics&&Date.now()-lastMetricsAt<45000)renderMetrics(lastMetrics)},0)});v175Watch()}
 function v175Watch(){if(!v175Observer)return;for(const id of ['cpu','cpuSub','disk','diskSub','ram','ramSub','guests','guestSub','piholeBlockedPct','piholeBlockedSub','net','netSub','power','powerSub','upsValue','upsSub']){const e=document.getElementById(id);if(e)v175Observer.observe(e,{childList:true,characterData:true,subtree:true})}}
-function v174Tick(){renderSnooze();installWarningSettings();v175Observe();if(lastMetrics){v175Observer?.disconnect();try{renderPing()}finally{v175Watch()}evaluateWarnings(lastMetrics)}}
+function v174Tick(){renderSnooze();installWarningSettings();v175Observe();if(lastMetrics){v175Observer?.disconnect();try{renderPing();v176RenderSecurity()}finally{v175Watch()}evaluateWarnings(lastMetrics)}}
 window.addEventListener('storage',e=>{if(e.key===snoozeKey){snooze=readLocal(snoozeKey,null);if(isSnoozed())stopAlarm();renderSnooze()}if(e.key===warnKey){warnPrefs={...warnDefaults,...readLocal(warnKey,{})};if(!warnPrefs.sound)stopAlarm()}});
 window.setInterval(v174Tick,1000);window.setInterval(fetchPing,10000);
 window.setTimeout(()=>{v174Tick();fetchPing()},0);
 
+if(typeof upsPollTime==='function'){
+ upsPollTime=function(value){return value?v176HostDate(value,undefined,true):null};
+}
 if(typeof getJSON==='function'){
   const originalGetJSON=getJSON;
   getJSON=async function(url,...args){

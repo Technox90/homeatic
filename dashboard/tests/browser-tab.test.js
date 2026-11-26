@@ -16,7 +16,7 @@ const ctx=vm.createContext({
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,v176MB,v176SecuritySummary,v176HostDate,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -96,3 +96,53 @@ assert.equal(t.v175Ratio(50,100),50);
 assert.equal(t.v175Ratio(50,0),null);
 assert.equal(t.v175Percent(39.8),'39,8 %');
 console.log('V175 decimal storage and ratio tests passed');
+
+assert.equal(t.v176MB(38130000000),'38.130 MB');
+assert.equal(t.v176MB(null),'n/v');
+const checkDate=Date.now(), stamp=new Date(checkDate).toISOString();
+const jail={ok:true,banned:0,failed:1,nftables:true,pushover:true,actions_known:true};
+const sample={checked:stamp,security:{active:true,jails:{sshd:jail,'proxmox-nginx':{...jail,banned:2}}}};
+const secure=t.v176SecuritySummary(sample,checkDate);
+assert.equal(secure.state,'active');
+assert.equal(secure.banned,2);
+assert.equal(secure.failed,2);
+assert.equal(secure.pushover,true);
+assert.equal(t.v176SecuritySummary(sample,checkDate+36000).state,'unknown');
+assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:false}},checkDate).state,'inactive');
+assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:true,jails:{sshd:jail}}},checkDate).state,'unknown');
+assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:true,jails:{sshd:jail,'proxmox-nginx':{...jail,nftables:false}}}},checkDate).state,'partial');
+console.log('V176 SSD MB and protection status tests passed');
+
+const master=fs.readFileSync('proxmox/proxmox.sh','utf8');
+const upperStart=master.indexOf('let upperZone='),upperEnd=master.indexOf('async function json(url)',upperStart);
+assert.ok(upperStart>0&&upperEnd>upperStart);
+const upper=vm.createContext({});
+vm.runInContext(master.slice(upperStart,upperEnd)+'\n globalThis.upperTest={kumaEpoch,kumaLocal,kumaSort,setUpperZone};',upper);
+const u=upper.upperTest;
+assert.equal(u.kumaLocal('2026-11-26 18:05:35'),'—');
+u.setUpperZone('Europe/Berlin');
+assert.equal(u.kumaEpoch('2026-11-26 18:05:35'),Date.parse('2026-11-26T18:05:35Z'));
+assert.equal(u.kumaEpoch('2026-11-26T19:05:35+01:00'),Date.parse('2026-11-26T18:05:35Z'));
+assert.equal(u.kumaEpoch('2026-07-26T18:05:35.123Z'),Date.parse('2026-07-26T18:05:35.123Z'));
+assert.match(u.kumaLocal('2026-11-26 18:05:35'),/19:05:35/);
+assert.match(u.kumaLocal('2026-07-26 18:05:35'),/20:05:35/);
+assert.match(u.kumaLocal('2026-03-29 01:00:00'),/03:00:00/);
+assert.match(u.kumaLocal('2026-10-25 01:00:00'),/02:00:00/);
+assert.equal(u.kumaLocal('invalid'),'—');
+assert.ok(u.kumaSort({time:'2026-11-26T19:00:00+01:00'},{time:'2026-11-26 18:01:00'})<0);
+u.setUpperZone('America/New_York');
+assert.match(u.kumaLocal('2026-11-26 18:05:35'),/13:05:35/);
+u.setUpperZone('UTC');
+assert.match(u.kumaLocal('2026-11-26 18:05:35'),/18:05:35/);
+assert.throws(()=>u.setUpperZone('not-a-zone'));
+console.log('V176 UPPER host timezone conversion and DST tests passed');
+
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z','Europe/Berlin',true),'19:05:35');
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z','UTC',true),'18:05:35');
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z','invalid',true),'n/v');
+assert.equal(t.v176HostDate('2026-11-26T18:05:35Z',null,true),'n/v');
+const python = require('node:child_process').spawnSync('python3',['-c',
+  "import runpy; m=runpy.run_path('proxmox/tools/proxmox-managed-updates'); compile(m['DOCKER_ZONE_SCRIPT'],'docker-zone-script','exec'); assert m['DOCKER_TIMEZONES']['uptime-kuma'][2] == ('TZ',)"
+],{encoding:'utf8'});
+assert.equal(python.status,0,python.stderr);
+console.log('V176 dashboard host timezone and managed Docker script syntax tests passed');
