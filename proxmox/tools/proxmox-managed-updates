@@ -114,6 +114,35 @@ def dashboard_payload(index, css, js):
     return re.sub(r"</body\s*>",lambda m:tag+m.group(),clean,count=1,flags=re.I)
 
 
+def install_dashboard_ping(download):
+    if not (DASH/"index.html").is_file():
+        return
+    if not shutil.which("ping"):
+        run(["apt-get","install","-y","iputils-ping"],capture_output=True)
+    script=download("proxmox/tools/proxmox-dashboard-ping")
+    unit=download("proxmox/tools/proxmox-dashboard-ping.service")
+    compile(script,"proxmox-dashboard-ping","exec")
+    if b"ExecStart=/usr/bin/python3 /usr/local/sbin/proxmox-dashboard-ping" not in unit:
+        raise ValueError("Ungültiger Ping-Dienst")
+    changed=False
+    for path,data,mode in ((pathlib.Path("/usr/local/sbin/proxmox-dashboard-ping"),script,0o755),(pathlib.Path("/etc/systemd/system/proxmox-dashboard-ping.service"),unit,0o644)):
+        if path.exists() or path.is_symlink():
+            safe_file(path)
+            changed=replace_files([(path,data)],"dashboard-ping") or changed
+        else:
+            fd,tmp=tempfile.mkstemp(prefix=".dashboard-ping-",dir=path.parent)
+            try:
+                with os.fdopen(fd,"wb") as fp: fp.write(data)
+                os.chmod(tmp,mode)
+                os.replace(tmp,path)
+            finally:
+                if os.path.exists(tmp): os.unlink(tmp)
+            changed=True
+    if changed: run(["systemctl","daemon-reload"])
+    run(["systemctl","enable","--now","proxmox-dashboard-ping.service"],capture_output=True)
+    if changed: run(["systemctl","restart","proxmox-dashboard-ping.service"])
+    report("UPDATED" if changed else "INFO","Dashboard-Ping: Dienst aktiviert")
+
 def dashboard_update(master,download):
     index=DASH/"index.html"
     overlay=DASH/"installer-update-v155.js"
@@ -142,6 +171,7 @@ def dashboard_update(master,download):
         raise ValueError("Theme-Runtime ungültig")
     for target in (DASH/"proxmox-views/runtime.js",pathlib.Path("/home/downloads/proxmox/dashboard-views/v1/runtime.js"),pathlib.Path("/home/downloads/proxmox/dashboard-views/v2/runtime.js"),pathlib.Path("/home/downloads/proxmox/dashboard-views/v3/runtime.js")):
         if target.is_file(): pairs.append((target,runtime))
+    install_dashboard_ping(download)
     if replace_files(pairs,"dashboard"):
         report("UPDATED","Dashboard: verwaltete Toolbar und Installer-Updateanzeige")
     else:

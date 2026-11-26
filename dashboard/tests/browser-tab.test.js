@@ -16,7 +16,7 @@ const ctx=vm.createContext({
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -89,3 +89,10 @@ assert.equal(t.v174Color(55,[[50,'#FFFFFF'],[60,'#EF4444']]),'rgb(247,162,162)')
 assert.equal(t.v174Color(60,[[50,'#FFFFFF'],[60,'#EF4444']]),'rgb(239,68,68)');
 assert.equal(t.v174Color(85,[[0,'#FFB020'],[85,'#3B82F6'],[100,'#3B82F6']]),'rgb(59,130,246)');
 console.log('V174 color interpolation tests passed');
+
+assert.equal(t.v174Bytes(100000000000),'100 GB');
+assert.equal(t.v174Bytes(1073741824),'1,1 GB');
+assert.equal(t.v175Ratio(50,100),50);
+assert.equal(t.v175Ratio(50,0),null);
+assert.equal(t.v175Percent(39.8),'39,8 %');
+console.log('V175 decimal storage and ratio tests passed');
