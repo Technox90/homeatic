@@ -97,7 +97,13 @@ assert.equal(t.v175Ratio(50,0),null);
 assert.equal(t.v175Percent(39.8),'39,8 %');
 console.log('V175 decimal storage and ratio tests passed');
 
-assert.equal(t.v176MB(38130000000),'38.130 MB');
+assert.equal(t.v176MB(38130000000),'38,13 GB');
+assert.equal(t.v176MB(0),'0 MB');
+assert.equal(t.v176MB(949000000),'949 MB');
+assert.equal(t.v176MB(950000000),'0,95 GB');
+assert.equal(t.v176MB(1500000000),'1,50 GB');
+assert.equal(t.v176MB(106450000000),'106,45 GB');
+assert.equal(t.v176MB(-1),'n/v');
 assert.equal(t.v176MB(null),'n/v');
 const checkDate=Date.now(), stamp=new Date(checkDate).toISOString();
 const jail={ok:true,banned:0,failed:1,nftables:true,pushover:true,actions_known:true};
