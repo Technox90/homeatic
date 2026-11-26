@@ -16,7 +16,7 @@ CONF = pathlib.Path("/root/.config/proxmox-auto-updater/proxmox-updates.json")
 STATE = pathlib.Path("/var/lib/proxmox-installer-monitor")
 BACKUPS = pathlib.Path("/home/backups/proxmox-managed-updates")
 DASH = pathlib.Path("/opt/dashboard/static")
-API = "https://api.github.com/repos/Technox90/homeatic/commits/main"
+API = "https://api.github.com/repos/Technox90/homeatic/releases/latest"
 RAW = "https://raw.githubusercontent.com/Technox90/homeatic/"
 KEYS = ("installer", "dashboard", "kuma")
 
@@ -469,11 +469,15 @@ def main():
     if not isinstance(cfg,dict) or any(type(cfg.get(k,False)) is not bool for k in KEYS):
         raise ValueError("Ungültige Update-Konfiguration")
     if not any(cfg.get(k,False) for k in KEYS): return 0
-    sha=json.loads(request(API))["sha"]
+    release=json.loads(request(API))
+    tag=release.get("tag_name","")
+    if release.get("draft") or release.get("prerelease") or not re.fullmatch(r"V[0-9]+",tag):
+        raise ValueError("Kein stabiler Proxmox-Release")
+    sha=json.loads(request("https://api.github.com/repos/Technox90/homeatic/commits/"+tag))["sha"]
     if not re.fullmatch(r"[0-9a-f]{40}",sha): raise ValueError("Ungültiger GitHub-Commit")
     def download(path): return request(RAW+sha+"/"+path)
     remote=download("proxmox/proxmox.sh")
-    version(remote)
+    if "V"+str(version(remote)) != tag: raise ValueError("Release und Installer-Version stimmen nicht überein")
     run(["bash","-n"],input=remote,capture_output=True)
     master=remote.decode()
     failed=False
