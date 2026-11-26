@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V176
+# PROXMOX MODULARER KOMPLETT-INSTALLER V177
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V176"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V176"
+TUI_TITLE="PROXMOX INSTALLER V177"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V177"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -6320,7 +6320,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="830ec8addf6686a09eba818ed16e43d25ae3f741"
+TOOLS_REF="4bb64abb2e1155ad1f7c02b796a98864c9857c0f"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
@@ -8246,7 +8246,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V176",
+    "installer_version": "V177",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8720,7 +8720,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V176 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V177 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -20598,7 +20598,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     (( INSTALL_DASHBOARD )) && install_dashboard_branding_v154
     install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige fehlt."
     if (( INSTALL_DASHBOARD )); then
-        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V176'
+        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V177'
 import importlib.machinery, importlib.util, sys
 from pathlib import Path
 loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-managed-updates")
@@ -20610,9 +20610,9 @@ def download(path): return mod.request(mod.RAW+ref+"/"+path)
 index=mod.DASH/"index.html"
 css=download("dashboard/branding-v154.css").decode()
 js=download("dashboard/branding-v154.js").decode()
-mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v176")
+mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v177")
 mod.install_dashboard_ping(download)
-PVE_DASHBOARD_V176
+PVE_DASHBOARD_V177
     fi
 fi
 
