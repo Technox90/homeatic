@@ -341,6 +341,12 @@ jobs:
           for heading in headings:
               assert heading in history, f"Missing HISTORY.md entry: {heading}"
 
+          expected=[re.search(r"\bV\d+\b", heading).group() for heading in headings[:5]]
+          for name,doc in (("README.md",root),("proxmox/README.md",readme)):
+              section=doc.split("## Versionsverlauf – letzte 5 Versionen",1)[1]
+              actual=re.findall(r"^### (V\d+)\b",section,re.M)
+              assert actual==expected, f"{name}: latest five versions {actual} != {expected}"
+
           newest=headings[0]
           assert version in newest, f"Newest history entry is not {version}: {newest}"
           PY
