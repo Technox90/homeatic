@@ -151,6 +151,10 @@ function v174Sub(id,...parts){const e=document.getElementById(id);if(e)e.replace
 function v174Line(text,color){const e=v174Span(text,color);e.classList.add('v174Line');return e}
 function v174Temp(v){return v174Valid(v)?v.toLocaleString('de-DE',{maximumFractionDigits:1})+' °C':'n/v'}
 function v174Bytes(v){if(!v174Valid(v)||v<0)return 'n/v';const units=['B','kB','MB','GB','TB'];let i=0;while(v>=1000&&i<4){v/=1000;i++}return v.toLocaleString('de-DE',{maximumFractionDigits:1})+' '+units[i]}
+function v176HostDate(value,zone=lastPing?.timezone,clock=false){
+ const t=new Date(value);if(!zone||!Number.isFinite(t.getTime()))return 'n/v';
+ try{return new Intl.DateTimeFormat('de-DE',clock?{timeZone:zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}:{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(t)}catch{return 'n/v'}
+}
 function v176MB(v){return v174Valid(v)&&v>=0?(v/1000000).toLocaleString('de-DE',{maximumFractionDigits:0})+' MB':'n/v'}
 function v176SecuritySummary(sample,now=Date.now()){
  const age=now-Date.parse(sample?.checked||'');const s=sample?.security;
@@ -251,7 +255,7 @@ function renderSystemStatus(confirmed){
  const host=document.querySelector('.toolbarCenter');if(!host)return;
  let b=document.getElementById('v174SystemStatus');if(!b){b=document.createElement('button');b.type='button';b.id='v174SystemStatus';b.addEventListener('click',()=>{const p=document.getElementById('v174WarningList');if(p)p.hidden=!p.hidden});host.append(b)}
  b.replaceChildren(v174Icon(confirmed.length?'alert':'shield'),v174Span(confirmed.length?confirmed.length+' Kritisch':'System OK'));b.style.color=confirmed.length?vp.red:vp.green;
- let list=document.getElementById('v174WarningList');if(!list){list=document.createElement('aside');list.id='v174WarningList';list.hidden=true;document.body.append(list)}list.replaceChildren(v174Line('Systemwarnungen'));for(const [name,w] of confirmed)list.append(v174Line(name+' · seit '+new Date(w.since).toLocaleTimeString('de-DE'),vp.red));if(!confirmed.length)list.append(v174Line('Keine bestätigten kritischen Warnungen',vp.green));
+ let list=document.getElementById('v174WarningList');if(!list){list=document.createElement('aside');list.id='v174WarningList';list.hidden=true;document.body.append(list)}list.replaceChildren(v174Line('Systemwarnungen'));for(const [name,w] of confirmed)list.append(v174Line(name+' · seit '+v176HostDate(w.since,undefined,true),vp.red));if(!confirmed.length)list.append(v174Line('Keine bestätigten kritischen Warnungen',vp.green));
 }
 function installWarningSettings(){
  if(document.getElementById('v174WarningSettings'))return;
@@ -263,7 +267,7 @@ function installWarningSettings(){
  const interval=panel.querySelector('[data-v174-interval]');interval.value=warnPrefs.pingInterval;interval.addEventListener('change',()=>{warnPrefs.pingInterval=Number(interval.value);saveLocal(warnKey,warnPrefs)});
  for(const name of warnDefaults.providers){const l=document.createElement('label'),i=document.createElement('input');i.type='checkbox';i.checked=warnPrefs.providers.includes(name);i.addEventListener('change',()=>{warnPrefs.providers=i.checked?[...new Set([...warnPrefs.providers,name])]:warnPrefs.providers.filter(n=>n!==name);saveLocal(warnKey,warnPrefs);renderPing()});l.append(i,document.createTextNode(name));panel.querySelector('[data-v174-providers]').append(l)}
  panel.querySelector('[data-v174-test]').addEventListener('click',()=>{unlockAlarm();if(!isSnoozed())playAlarm()});
- const h=panel.querySelector('[data-v174-history]');for(const w of warningHistory.slice(0,20))h.append(v174Line(w.event+' · '+w.name+' · '+new Date(w.at).toLocaleString('de-DE')));
+ const h=panel.querySelector('[data-v174-history]');for(const w of warningHistory.slice(0,20))h.append(v174Line(w.event+' · '+w.name+' · '+v176HostDate(w.at)));
  const net=document.createElement('div');net.innerHTML='<label>Download-Maximum (Mbit/s, 0 = kein Balken) <input type="number" min="0" max="1000000" data-down></label><label>Upload-Maximum (Mbit/s, 0 = kein Balken) <input type="number" min="0" max="1000000" data-up></label><label>Netzwerkeinheit <select data-unit><option value="mb">MB/s</option><option value="mbit">Mbit/s</option></select></label>';for(const [sel,key] of [['[data-down]','netDown'],['[data-up]','netUp'],['[data-unit]','netUnit']]){const e=net.querySelector(sel);e.value=warnPrefs[key];e.addEventListener('change',()=>{warnPrefs[key]=key==='netUnit'?e.value:Math.max(0,Math.min(1000000,Number(e.value)||0));saveLocal(warnKey,warnPrefs);if(lastMetrics)renderMetrics(lastMetrics)})}panel.append(net);
  anchor.before(panel);
 }
@@ -275,6 +279,9 @@ window.addEventListener('storage',e=>{if(e.key===snoozeKey){snooze=readLocal(sno
 window.setInterval(v174Tick,1000);window.setInterval(fetchPing,10000);
 window.setTimeout(()=>{v174Tick();fetchPing()},0);
 
+if(typeof upsPollTime==='function'){
+ upsPollTime=function(value){return value?v176HostDate(value,undefined,true):null};
+}
 if(typeof getJSON==='function'){
   const originalGetJSON=getJSON;
   getJSON=async function(url,...args){
