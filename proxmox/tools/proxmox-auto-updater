@@ -1158,7 +1158,7 @@ on_root() {
 }
 if command -v docker >/dev/null 2>&1; then
     root=$(docker info --format '{{.DockerRootDir}}')
-    if on_root "$root"; then
+    if on_root "$root" && { [ ! -d /var/lib/containerd ] || on_root /var/lib/containerd; }; then
         ids=$(docker ps -q)
         healthy=1
         for id in $ids; do
@@ -1178,6 +1178,11 @@ if command -v docker >/dev/null 2>&1; then
 fi
 if command -v apt-get >/dev/null 2>&1 && on_root /var/cache/apt/archives; then
     apt-get autoclean
+fi
+if command -v journalctl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-journald; then
+    if on_root /var/log && { [ ! -d /var/log/journal ] || on_root /var/log/journal; }; then
+        journalctl --rotate && journalctl --vacuum-size=100M --vacuum-time=30d
+    fi
 fi
 df -h /
 GUEST
@@ -1213,12 +1218,15 @@ maintenance_daily() {
             *) echo "VM $id: nicht unterstütztes System $os"; continue ;;
         esac
         if [[ "$os" == haos ]]; then
-            timeout 300 qm guest cmd "$id" fstrim || add_failure "VM $id: TRIM fehlgeschlagen"
+            timeout 300 qm guest exec "$id" -- fstrim /mnt/data | jq -e '.exited == 1 and .exitcode == 0' || add_manual "VM $id: HAOS Daten-TRIM nicht verfügbar"
         else
             # Only trim the root filesystem; never external guest mounts.
             timeout 300 qm guest exec "$id" -- fstrim / | jq -e '.exited == 1 and .exitcode == 0' || add_manual "VM $id: Root-TRIM nicht verfügbar"
         fi
     done
+    if command -v journalctl >/dev/null 2>&1; then
+        journalctl --rotate && journalctl --vacuum-size=500M --vacuum-time=30d || add_failure "Host: Journal-Bereinigung fehlgeschlagen"
+    fi
     after="$(pvesm status)" || after=""
     printf '%s\n' "$after"
     while read -r name use; do
