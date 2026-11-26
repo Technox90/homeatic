@@ -6294,7 +6294,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="9332b6d9806b3567bf7163886446f931b28bd82b"
+TOOLS_REF="675e1cc25cf83f73524ae317b92f60f81332f4e7"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
@@ -20606,6 +20606,18 @@ if (( INSTALL_DASHBOARD )); then
     else
         die "Dashboard-Ansichtsauswahl konnte nicht geladen werden."
     fi
+fi
+
+# V176: Zeitzonen des laufenden verwalteten Linux-Stacks an den Host angleichen.
+if [[ -f /usr/local/sbin/proxmox-managed-updates ]]; then
+    python3 - <<'PVE_TIMEZONE_V176' || warn "Zeitzonenabgleich unvollständig; Diagnose prüfen."
+import importlib.machinery, importlib.util
+loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-managed-updates")
+spec=importlib.util.spec_from_loader(loader.name,loader)
+mod=importlib.util.module_from_spec(spec)
+loader.exec_module(mod)
+mod.timezone_update()
+PVE_TIMEZONE_V176
 fi
 
 # V146: Eine bereits konfigurierte externe URL-Struktur nach Installationen
