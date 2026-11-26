@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+26.11.2026 – V178 · Speicherwartung und Auto-Release
+--------------------------------------------------------
+- Tägliche konservative Speicherwartung für laufende CTs und unterstützte Linux-VMs, Docker-Image- und Build-Cache-Bereinigung, lokaler APT-Autoclean, Journal-Vacuum, TRIM, Speicherwarnungen und HAOS-Sonderbehandlung. Externe Caches bleiben erhalten. Docker-Logrotation wird zunächst geprüft und gemeldet. CPU-/RAM-Kachel ohne doppelte Überschrift und mit eigenen Symbolen; direkte Home-Assistant-JSON-Abfragen und stabile GitHub-Releases für verwaltete Updates.
+
 26.11.2026 – V177 · CPU/RAM und physische SSD
 --------------------------------------------------------
 - CPU und RAM gleich groß nebeneinander mit separaten Balken; CPU-, Board- und SSD-Temperaturen kompakt darunter. Die bisherige RAM/SSD/Swap-Kachel zeigt die physische System-SSD mit Gesamtkapazität, belegten und direkt verfügbaren dezimalen MB, reserviertem Rest und separaten Root-/Thin-Pool-Balken. Automatische Erkennung für eindeutige Single-Disk-Root-LVM-Layouts, ohne doppelt gezählte Storage-Verzeichnisse oder NAS; bei fehlenden/mehrdeutigen Messwerten n/v. Thin-Pool-Belegung ist blockbasiert und gerundet, nicht NAND-Auslastung. Swap entfällt aus der Übersicht, Swap-Partition bleibt unverändert. Keine Änderung an Partitionen, Gästen, Branding oder Fail2Ban.
