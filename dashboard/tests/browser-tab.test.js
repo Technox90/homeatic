@@ -16,7 +16,7 @@ const ctx=vm.createContext({
 });
 const expose=String.raw`
 globalThis.tabTest={
-  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,
+  normalizeTabSettings,buildTabFrames,refreshTabTitle,setTabUpdateStatus,localHostPower,decimalTransferRate,v174Color,v174Bytes,v175Ratio,v175Percent,v176MB,v176SecuritySummary,
   setMetrics(d,when=Date.now()){tabMetrics=d;tabMetricsTime=when},
   setSettings(s){tabSettings=normalizeTabSettings(s)},
   next(){tabIndex++;refreshTabTitle()}
@@ -96,3 +96,19 @@ assert.equal(t.v175Ratio(50,100),50);
 assert.equal(t.v175Ratio(50,0),null);
 assert.equal(t.v175Percent(39.8),'39,8 %');
 console.log('V175 decimal storage and ratio tests passed');
+
+assert.equal(t.v176MB(38130000000),'38.130 MB');
+assert.equal(t.v176MB(null),'n/v');
+const checkDate=Date.now(), stamp=new Date(checkDate).toISOString();
+const jail={ok:true,banned:0,failed:1,nftables:true,pushover:true,actions_known:true};
+const sample={checked:stamp,security:{active:true,jails:{sshd:jail,'proxmox-nginx':{...jail,banned:2}}}};
+const secure=t.v176SecuritySummary(sample,checkDate);
+assert.equal(secure.state,'active');
+assert.equal(secure.banned,2);
+assert.equal(secure.failed,2);
+assert.equal(secure.pushover,true);
+assert.equal(t.v176SecuritySummary(sample,checkDate+36000).state,'unknown');
+assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:false}},checkDate).state,'inactive');
+assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:true,jails:{sshd:jail}}},checkDate).state,'unknown');
+assert.equal(t.v176SecuritySummary({checked:stamp,security:{active:true,jails:{sshd:jail,'proxmox-nginx':{...jail,nftables:false}}}},checkDate).state,'partial');
+console.log('V176 SSD MB and protection status tests passed');
