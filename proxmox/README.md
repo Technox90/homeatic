@@ -4,7 +4,11 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V177 · 26.11.2026**
+**Installationskandidat: V178 · 26.11.2026**
+
+## V178 · Speicherwartung und Auto-Release
+
+- Tägliche konservative Speicherwartung für laufende CTs und unterstützte Linux-VMs, Docker-Image- und Build-Cache-Bereinigung, lokaler APT-Autoclean, Journal-Vacuum, TRIM, Speicherwarnungen und HAOS-Sonderbehandlung. Externe Caches bleiben erhalten. Docker-Logrotation wird zunächst geprüft und gemeldet. CPU-/RAM-Kachel ohne doppelte Überschrift und mit eigenen Symbolen; direkte Home-Assistant-JSON-Abfragen und stabile GitHub-Releases für verwaltete Updates.
 
 ## V177 · CPU/RAM und physische SSD
 

@@ -198,10 +198,11 @@ function v177Capacity(n){return v174Valid(n)?(n/1000000000).toLocaleString('de-D
 function v177Metric(label,detail,pct,color,foot){
  const e=document.createElement('div');e.className='v177Metric';
  const value=v174Span(v175Percent(pct),color);value.classList.add('v177Big');
- e.append(v175Row(label,detail),value,v175Bar(pct,color));if(foot)e.append(v174Line(foot));return e;
+ const row=v175Row(label,detail);if(warnPrefs.icons)row.firstChild.prepend(v174Icon(label.toLowerCase()));
+ e.append(row,value,v175Bar(pct,color));if(foot)e.append(v174Line(foot));return e;
 }
 function v177RenderCompute(d){
- const card=v174Card('cpu','CPU / RAM','cpu');if(!card)return;
+ const card=v174Card('cpu','','cpu');if(!card)return;const heading=card.querySelector('.label');if(heading)heading.style.display='none';
  card.classList.add('v177Compute');
  const cc=v174Color(d.cpu_percent,usageStops()),rc=v174Color(d.ram_percent,usageStops(70,90));
  v175Set('cpu',v175Percent(d.cpu_percent),cc);
