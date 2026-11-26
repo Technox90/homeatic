@@ -8,6 +8,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import urllib.request
 
@@ -208,25 +209,29 @@ if [ -f /var/www/upper/index.html ] || [ -f /var/www/nodezero-kuma-status/index.
     shell=extract(master,"<<'KUMA_STATUS_INSTALL'\n","\nKUMA_STATUS_INSTALL\n")+"\n"
     if "/var/www/upper" not in shell or "UPPER PUBLIC STATUS" not in shell:
         raise ValueError("Ungültiger UPPER-Installer")
-    result=subprocess.run(["pct","exec",ct,"--","bash","-s"],input=shell,text=True,capture_output=True,timeout=120)
+    result=subprocess.run(["pct","exec",ct,"--","bash","-s","--",host_timezone()[0]],input=shell,text=True,capture_output=True,timeout=120)
     if result.returncode:
         raise ValueError("UPPER-Installation fehlgeschlagen: "+(result.stderr or result.stdout)[-500:])
     report("INFO" if "UPPER_CURRENT" in result.stdout else "UPDATED","UPPER: öffentliche Statusseite geprüft")
 
 
-def timezone_update():
-    """Align running installer-managed Linux LXCs with the host's local timezone.
-    Never change the clock, database timestamps, guest power state or Docker services."""
+def host_timezone():
     host=run(["timedatectl","show","-p","Timezone","-p","NTPSynchronized","-p","NTP"],capture_output=True,text=True).stdout
     properties=dict(line.split("=",1) for line in host.splitlines() if "=" in line)
     zone=properties.get("Timezone","")
     zonefile=pathlib.Path("/usr/share/zoneinfo")/zone
     if not re.fullmatch(r"[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)*",zone) or not zonefile.is_file():
         raise ValueError("Host-Zeitzone nicht ermittelbar")
+    return zone,properties
+
+def timezone_update():
+    """Align running installer-managed Linux LXCs with the host's local timezone.
+    Never change the clock, database timestamps, guest power state or Docker services."""
+    zone,properties=host_timezone()
     report("INFO","Host-Zeitzone: "+zone)
     if properties.get("NTPSynchronized")!="yes" or properties.get("NTP")!="yes":
         report("MANUAL","Host-NTP/Synchronisation prüfen; keine Uhrzeit erzwungen")
-    names={"paperless","pihole","netalertx","uptime-kuma","stirling-pdf","speedtest-tracker","scrutiny","pve-ups","vaultwarden","mealie","mqtt","emqx","pulse"}
+    names={"paperless","pihole","netalertx","uptime-kuma","stirling-pdf","speedtest-tracker","scrutiny","pve-ups","vaultwarden","mealie","mqtt","emqx","pulse","proxmox-backup-server","pbs"}
     listing=run(["pct","list"],capture_output=True,text=True).stdout
     for line in listing.splitlines()[1:]:
         fields=line.split()
@@ -247,9 +252,59 @@ def timezone_update():
                 report("UPDATED","CT "+ct+" Zeitzone: "+zone)
             else:
                 report("INFO","CT "+ct+" Zeitzone: "+zone)
+            if name.group(1).lower()=="uptime-kuma":
+                # Only update a timezone file created by our UPPER installer.
+                publish=r"""set -eu
+file=/var/www/upper/timezone.json
+[ -f "$file" ] && [ ! -L "$file" ] || exit 0
+tmp=$(mktemp /var/www/upper/.timezone.XXXXXX)
+trap 'rm -f "$tmp"' EXIT
+printf '{"timezone":"%s"}\n' "$1" > "$tmp"
+chmod 0644 "$tmp"
+if ! cmp -s "$tmp" "$file"; then mv -f "$tmp" "$file"; fi
+"""
+                run(["pct","exec",ct,"--","bash","-c",publish,"timezone-sync",zone],capture_output=True)
         except Exception as exc:
             report("MANUAL","CT "+ct+" Zeitzone prüfen: "+type(exc).__name__)
     report("INFO","VM- und Docker-Anwendungszeitzonen separat prüfen; keine Neustarts")
+
+def install_timezone_timer():
+    units={
+        "proxmox-timezone-sync.service":"""[Unit]
+Description=Proxmox zentrale Zeitzone
+After=pve-cluster.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/proxmox-managed-updates --timezone-only
+TimeoutStartSec=10min
+""",
+        "proxmox-timezone-sync.timer":"""[Unit]
+Description=Proxmox Zeitzonenabgleich alle 15 Minuten
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=15min
+Unit=proxmox-timezone-sync.service
+[Install]
+WantedBy=timers.target
+"""
+    }
+    changed=False
+    for name,value in units.items():
+        path=pathlib.Path("/etc/systemd/system")/name
+        data=value.encode()
+        if path.exists() or path.is_symlink():
+            changed=replace_files([(path,data)],"timezone-sync") or changed
+        else:
+            fd,tmp=tempfile.mkstemp(prefix=".timezone-sync-",dir=path.parent)
+            try:
+                with os.fdopen(fd,"wb") as fp:fp.write(data)
+                os.chmod(tmp,0o644)
+                os.replace(tmp,path)
+            finally:
+                if os.path.exists(tmp):os.unlink(tmp)
+            changed=True
+    if changed:run(["systemctl","daemon-reload"])
+    run(["systemctl","enable","--now","proxmox-timezone-sync.timer"],capture_output=True)
 
 def installer_update(remote, download):
     path=pathlib.Path((STATE/"installer-path").read_text().strip())
@@ -306,13 +361,21 @@ def main():
             report("FAILED",key+": "+type(exc).__name__+" – "+str(exc).splitlines()[0][:200])
             failed=True
     if cfg.get("installer",False):
-        try: timezone_update()
+        try:
+            install_timezone_timer()
+            # systemd serializes timer and explicit runs of the same unit.
+            run(["systemctl","start","--no-block","proxmox-timezone-sync.service"],capture_output=True)
         except Exception as exc:
             report("MANUAL","Zeitzonenprüfung: "+type(exc).__name__)
     return int(failed)
 
 if __name__=="__main__":
     try:
+        if sys.argv[1:]==["--timezone-only"]:
+            timezone_update()
+            raise SystemExit(0)
+        if sys.argv[1:]:
+            raise SystemExit("Unbekannte Option")
         raise SystemExit(main())
     except Exception as exc:
         report("FAILED","Proxmox-Updateprüfung: "+type(exc).__name__)
