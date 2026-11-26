@@ -368,7 +368,10 @@ try:
     current_env=dict(e.split("=",1) for e in info["Config"].get("Env",[]) if "=" in e)
     if not all(current_env.get(k)==v for k,v in desired.items()):raise RuntimeError("Zeitzonenwerte nicht übernommen")
 except Exception:
-    if backup is not None: atomic(old)
+    if backup is not None:
+        atomic(old)
+        try: docker("compose","up","-d","--no-deps","--pull","never","--no-build",service)
+        except Exception: pass
     # Do not mask the failed service update; the normal updater reports it.
     raise
 print("UPDATED")
@@ -491,6 +494,10 @@ def main():
 
 if __name__=="__main__":
     try:
+        if sys.argv[1:]==["--timezone-init"]:
+            install_timezone_timer()
+            run(["systemctl","start","proxmox-timezone-sync.service"],capture_output=True)
+            raise SystemExit(0)
         if sys.argv[1:]==["--timezone-only"]:
             timezone_update()
             raise SystemExit(0)
