@@ -4,7 +4,11 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V178 · 26.11.2026**
+**Installationskandidat: V179 · 26.11.2026**
+
+## V179 · CPU/RAM-Icon und Update-Timer
+
+- Redundanten CPU-Kartenkopf vollständig entfernt; CPU- und RAM-Symbole bleiben jeweils einmal mit sauberem Abstand sichtbar. Installer-Monitor prüft zu festen 5-Minuten-Zeitpunkten; bestehende Timer werden beim verwalteten Update migriert. Der reguläre Installationszeitpunkt bleibt unverändert.
 
 ## V178 · Speicherwartung und Auto-Release
 
