@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V176 · 26.11.2026**  
+> **Aktueller Stand: V177 · 26.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+26.11.2026 – V177 · CPU/RAM und physische SSD
+--------------------------------------------------------
+- CPU und RAM gleich groß nebeneinander mit separaten Balken; CPU-, Board- und SSD-Temperaturen kompakt darunter. Die bisherige RAM/SSD/Swap-Kachel zeigt die physische System-SSD mit Gesamtkapazität, belegten und direkt verfügbaren dezimalen MB, reserviertem Rest und separaten Root-/Thin-Pool-Balken. Automatische Erkennung für eindeutige Single-Disk-Root-LVM-Layouts, ohne doppelt gezählte Storage-Verzeichnisse oder NAS; bei fehlenden/mehrdeutigen Messwerten n/v. Thin-Pool-Belegung ist blockbasiert und gerundet, nicht NAND-Auslastung. Swap entfällt aus der Übersicht, Swap-Partition bleibt unverändert. Keine Änderung an Partitionen, Gästen, Branding oder Fail2Ban.
 
 26.11.2026 – V176 · Schutz und Speicher
 --------------------------------------------------------
