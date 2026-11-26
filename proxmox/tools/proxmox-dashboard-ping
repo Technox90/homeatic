@@ -16,6 +16,13 @@ def command(args):
     except (OSError,subprocess.TimeoutExpired):
         return None
 
+def host_timezone():
+    state=command(["timedatectl","show","-p","Timezone","--value"])
+    zone=state.stdout.strip() if state is not None and state.returncode==0 else ""
+    if not re.fullmatch(r"[A-Za-z0-9_+-]+(?:/[A-Za-z0-9_+-]+)*",zone) or not (Path("/usr/share/zoneinfo")/zone).is_file():
+        return None
+    return zone
+
 def protection():
     state=command(["systemctl","is-active","fail2ban.service"])
     if state is None:
@@ -48,7 +55,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         if out.parent.is_dir():
             fd,name=tempfile.mkstemp(dir=out.parent,prefix=".ping-")
             try:
-                with os.fdopen(fd,"w") as fp:json.dump({"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"targets":values,"security":security},fp)
+                with os.fdopen(fd,"w") as fp:json.dump({"checked":datetime.datetime.now(datetime.timezone.utc).isoformat(),"targets":values,"security":security,"timezone":host_timezone()},fp)
                 os.chmod(name,0o644);os.replace(name,out)
             finally:
                 if os.path.exists(name):os.unlink(name)
