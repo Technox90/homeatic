@@ -1,0 +1,55 @@
+name: Publish validated Proxmox release
+on:
+  workflow_run:
+    workflows: ["Validate Proxmox Installer", "Proxmox dashboard views checks"]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: proxmox-release-main
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Check both validations and current main
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          [[ "$(gh api "repos/$REPO/commits/main" --jq .sha)" == "$SHA" ]] || exit 0
+          for workflow in validate-proxmox.yml dashboard-views.yml; do
+            result=$(gh api "repos/$REPO/actions/workflows/$workflow/runs?head_sha=$SHA&branch=main&event=push&per_page=1" --jq '.workflow_runs[0].conclusion // ""')
+            [[ "$result" == success ]] || exit 0
+          done
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+      - name: Publish version exactly once
+        if: steps.gate.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(sed -nE 's/^# PROXMOX MODULARER KOMPLETT-INSTALLER (V[0-9]+)$/\1/p' proxmox/proxmox.sh)
+          [[ "$version" =~ ^V[0-9]+$ ]]
+          if gh release view "$version" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $version already exists."
+            exit 0
+          fi
+          [[ "$(gh api "repos/$REPO/commits/main" --jq .sha)" == "$SHA" ]] || exit 0
+          if git ls-remote --exit-code --tags origin "refs/tags/$version" >/dev/null 2>&1; then
+            echo "Existing tag without release; refusing to overwrite." >&2
+            exit 1
+          fi
+          gh release create "$version" --repo "$REPO" --target "$SHA" --title "Proxmox $version" --generate-notes
