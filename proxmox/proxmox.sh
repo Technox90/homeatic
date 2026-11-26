@@ -1671,6 +1671,7 @@ function kumaEpoch(value){
 function kumaLocal(value){const epoch=kumaEpoch(value);return Number.isFinite(epoch)&&upperDateFormat?upperDateFormat.format(epoch):"—"}
 function kumaSort(a,b){const x=kumaEpoch(a.time),y=kumaEpoch(b.time);return (Number.isFinite(x)?x:-Infinity)-(Number.isFinite(y)?y:-Infinity)||0}
 async function json(url){const response=await fetch(url,{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("HTTP "+response.status);return response.json()}
+async function upperTime(){const response=await fetch("/upper/timezone.json",{cache:"no-store",credentials:"omit",signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error("Host-Zeit HTTP "+response.status);const data=await response.json();return {timezone:data.timezone,epoch:Date.parse(response.headers.get("Date")||"")}}
 function stat(parent,label,value){const n=el("div");n.append(el("span",label),el("strong",value));parent.append(n)}
 function graph(rows){
  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 640 130");svg.setAttribute("role","img");svg.setAttribute("aria-label","Antwortzeitverlauf in Millisekunden");
@@ -1724,7 +1725,7 @@ function render(config,heartbeat){
 }
 async function refresh(){
  if(!active||busy)return;busy=true;const token=generation,slug=encodeURIComponent(active);
- try{const [config,heartbeat,tz]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug),json("/upper/timezone.json")]);if(token!==generation)return;setUpperZone(tz.timezone);if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+upperClockFormat.format(new Date())+" · alle 60 Sekunden";}
+ try{const [config,heartbeat,tz]=await Promise.all([json("/api/status-page/"+slug),json("/api/status-page/heartbeat/"+slug),upperTime()]);if(token!==generation)return;setUpperZone(tz.timezone);if(!Array.isArray(config.publicGroupList)||!heartbeat.heartbeatList)throw Error("Unerwartetes API-Format");render(config,heartbeat);$("form").hidden=true;$("message").textContent="Aktualisiert: "+(Number.isFinite(tz.epoch)?upperClockFormat.format(tz.epoch):"n/v")+" · alle 60 Sekunden";}
  catch(e){if(token===generation){$("groups").replaceChildren();$("message").textContent="Statusdaten nicht verfügbar: "+e.message;}}
  finally{busy=false;if(token!==generation)refresh()}
 }
