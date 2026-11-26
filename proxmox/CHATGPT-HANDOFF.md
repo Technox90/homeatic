@@ -9,12 +9,14 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V178
+- Aktueller Installationskandidat: V179
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
 
 Produktive Namen und Pfade nicht ohne ausdrücklichen Wunsch ändern.
+
+V179: Redundanten CPU-Kartenkopf vollständig entfernt; CPU- und RAM-Symbole bleiben jeweils einmal mit sauberem Abstand sichtbar. Installer-Monitor prüft zu festen 5-Minuten-Zeitpunkten; bestehende Timer werden beim verwalteten Update migriert. Der reguläre Installationszeitpunkt bleibt unverändert.
 
 V178: Tägliche konservative Speicherwartung für laufende CTs und unterstützte Linux-VMs, Docker-Image- und Build-Cache-Bereinigung, lokaler APT-Autoclean, Journal-Vacuum, TRIM, Speicherwarnungen und HAOS-Sonderbehandlung. Externe Caches bleiben erhalten. Docker-Logrotation wird zunächst geprüft und gemeldet. CPU-/RAM-Kachel ohne doppelte Überschrift und mit eigenen Symbolen; direkte Home-Assistant-JSON-Abfragen und stabile GitHub-Releases für verwaltete Updates.
 

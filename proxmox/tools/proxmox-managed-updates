@@ -462,6 +462,19 @@ def installer_update(remote, download):
     if replace_files(pairs,"installer"):
         report("UPDATED",f"Master-Installer V{old} → V{new} inkl. Updater-Werkzeuge")
 
+def install_monitor_timer(master):
+    target=pathlib.Path("/etc/systemd/system/proxmox-installer-monitor.timer")
+    if not target.is_file():
+        report("MANUAL","Installer-Monitor fehlt; Installer einmal ausführen")
+        return
+    timer=extract(master,"<<'MONITOR_TIMER'\n","\nMONITOR_TIMER")
+    if "OnCalendar=*:00/5" not in timer:
+        raise ValueError("Ungültiger Installer-Monitor-Timer")
+    if replace_files([(target,(timer+"\n").encode())],"monitor-timer"):
+        run(["systemctl","daemon-reload"])
+        run(["systemctl","restart","proxmox-installer-monitor.timer"],capture_output=True)
+        report("UPDATED","Installer-Monitor: feste 5-Minuten-Intervalle")
+
 def main():
     if not CONF.exists(): return 0
     safe_file(CONF)
@@ -489,6 +502,7 @@ def main():
             failed=True
     if cfg.get("installer",False):
         try:
+            install_monitor_timer(master)
             install_timezone_timer()
             # systemd serializes timer and explicit runs of the same unit.
             run(["systemctl","start","--no-block","proxmox-timezone-sync.service"],capture_output=True)

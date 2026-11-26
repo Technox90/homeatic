@@ -236,3 +236,7 @@ body.dashboardToolbarFixed .top .brand h1{text-align:center!important;overflow-w
 .v177Temps>div>span:last-child{font-weight:650;font-size:14px}
 .v177StorageCard .v175Row{font-size:11px}
 @media(max-width:600px){.v177Big{font-size:22px}.v177Metric+.v177Metric{padding-left:8px}.v177Metrics{gap:8px}}
+
+/* V179: no redundant compute heading, even when shared label rules use !important. */
+.v177Compute .label{display:none!important}
+.v179MetricLabel{display:inline-flex;align-items:center;gap:4px}
