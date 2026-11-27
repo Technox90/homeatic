@@ -231,7 +231,7 @@ def timezone_update():
     report("INFO","Host-Zeitzone: "+zone)
     if properties.get("NTPSynchronized")!="yes" or properties.get("NTP")!="yes":
         report("MANUAL","Host-NTP/Synchronisation prüfen; keine Uhrzeit erzwungen")
-    names={"paperless","pihole","netalertx","uptime-kuma","stirling-pdf","speedtest-tracker","scrutiny","pve-ups","vaultwarden","mealie","mqtt","emqx","pulse","proxmox-backup-server","pbs"}
+    names={"paperless","pihole","netalertx","uptime-kuma","stirling-pdf","speedtest-tracker","scrutiny","pve-ups","vaultwarden","mealie","kitchenowl","mqtt","emqx","pulse","proxmox-backup-server","pbs"}
     listing=run(["pct","list"],capture_output=True,text=True).stdout
     for line in listing.splitlines()[1:]:
         fields=line.split()
@@ -448,11 +448,11 @@ def installer_update(remote, download):
     if not m: raise ValueError("Tools-Referenz fehlt")
     ref=m.group(1).decode()
     pairs=[]
-    for name in ("proxmox-auto-updater","proxmox-auto-updater-config","proxmox-managed-updates"):
+    for name in ("proxmox-auto-updater","proxmox-auto-updater-config","proxmox-managed-updates","proxmox-external-urls"):
         target=pathlib.Path("/usr/local/sbin")/name
         if not target.is_file(): raise ValueError("Updater-Tool fehlt: "+name)
         data=request(RAW+ref+"/proxmox/tools/"+name)
-        if name=="proxmox-managed-updates":
+        if name in ("proxmox-managed-updates","proxmox-external-urls"):
             compile(data,name,"exec")
         else:
             if not data.startswith(b"#!/usr/bin/env bash\n"): raise ValueError("Ungültiges Tool")
