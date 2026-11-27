@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V181
+# PROXMOX MODULARER KOMPLETT-INSTALLER V182
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V181"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V181"
+TUI_TITLE="PROXMOX INSTALLER V182"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V182"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -6324,7 +6324,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="db6f3f2b40e082f9729abd0ac0b2db89cb4a52ae"
+TOOLS_REF="3214b9694f02413d84dcb4a8fe76aff43ec4cb07"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
@@ -8261,7 +8261,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V181",
+    "installer_version": "V182",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8738,7 +8738,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V181 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V182 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -12089,7 +12089,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-PROXMOX_MODULE_REF="db6f3f2b40e082f9729abd0ac0b2db89cb4a52ae"
+PROXMOX_MODULE_REF="3214b9694f02413d84dcb4a8fe76aff43ec4cb07"
 PROXMOX_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_MODULE_REF}/proxmox/modules"
 
 load_proxmox_module_v140() {
@@ -17687,20 +17687,7 @@ detect_pveups_ct() {
         return 0
     fi
 
-    # Fallback: CT mit der bekannten PVE-UPS-Adresse 192.168.178.111.
-    while read -r candidate; do
-        [[ "$candidate" =~ ^[0-9]+$ ]] || continue
-
-        if pct config "$candidate" 2>/dev/null |
-           grep -Eq 'ip=192\.168\.178\.111(/|,|$)'; then
-            printf '%s\n' "$candidate"
-            return 0
-        fi
-    done < <(
-        pct list 2>/dev/null |
-        awk 'NR > 1 {print $1}'
-    )
-
+    # No fixed IP fallback: never identify an unrelated container as PVE-UPS.
     return 1
 }
 
@@ -20680,7 +20667,7 @@ fi
 
 # V53: Mainboard-Karte durch USV/NAS ersetzen.
 # Bei frisch installiertem PVE-UPS dessen tatsächlich gewählte IP verwenden.
-# Bei bestehender Installation Standardquelle 192.168.178.111 verwenden.
+# Bei bestehender Installation USV-Einstellungen erhalten und CT dynamisch erkennen.
 if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     if (( ! INSTALL_DASHBOARD || ! DASHBOARD_FAST_UPDATE_V152 )); then
         install_dashboard_ups_card_v53
@@ -20698,7 +20685,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     (( INSTALL_DASHBOARD )) && install_dashboard_branding_v154
     install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige fehlt."
     if (( INSTALL_DASHBOARD )); then
-        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V181'
+        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V182'
 import importlib.machinery, importlib.util, sys
 from pathlib import Path
 loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-managed-updates")
@@ -20712,7 +20699,7 @@ css=download("dashboard/branding-v154.css").decode()
 js=download("dashboard/branding-v154.js").decode()
 mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v181")
 mod.install_dashboard_ping(download)
-PVE_DASHBOARD_V181
+PVE_DASHBOARD_V182
     fi
 fi
 
