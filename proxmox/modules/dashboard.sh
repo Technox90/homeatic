@@ -149,6 +149,10 @@ dashboard_reconcile_existing_guests_v134() {
                 name="Mealie"
                 url="https://${ip}/"
                 ;;
+            kitchenowl)
+                name="KitchenOwl"
+                url="https://${ip}/"
+                ;;
             proxmox-backup-server|pbs)
                 name="Proxmox Backup Server"
                 url="https://${ip}:8007/"
@@ -12860,7 +12864,8 @@ echo "[OK] $UPS_CONFIG"
 echo
 echo "===== 2. PVE-UPS DIREKT TESTEN ====="
 
-if UPS_RAW="$(curl -fsS --connect-timeout 3 --max-time 8 "$UPS_STATUS_URL" 2>/dev/null)"; then
+if UPS_RAW="$(curl -fsS --connect-timeout 3 --max-time 8 "$UPS_STATUS_URL" 2>/dev/null)" &&
+   printf '%s' "$UPS_RAW" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d.get("appliance"),dict) and isinstance(d.get("ups"),list)' 2>/dev/null; then
     echo "[OK] PVE-UPS /api/status erreichbar."
 
     printf '%s' "$UPS_RAW" |
@@ -13822,22 +13827,42 @@ echo "============================================================"
 __PVE_V53_DASHBOARD_UPS_CARD__
     chmod 700 "$patch"
 
-    local ups_ip="${PVEUPS_IP:-}" ctid
-    if [[ -z "$ups_ip" ]]; then
-        while read -r ctid; do
-            [[ "$(pct config "$ctid" 2>/dev/null | sed -n 's/^hostname: //p')" == pve-ups ]] || continue
-            ups_ip="$(pct config "$ctid" | sed -nE 's/.*[, ]ip=([0-9.]+)\/[0-9]+.*/\1/p' | head -n1)"
-            [[ -n "$ups_ip" ]] && break
-        done < <(pct list | awk 'NR>1 {print $1}')
-    fi
+    local ups_ip="${PVEUPS_IP:-}" ctid candidate url="" port
+    local -a ups_candidates=()
     if [[ -f /var/lib/pve-sensor-dashboard-web/ups-source.json ]] &&
        grep -q 'PVE_UPS_SETTINGS_V2' /opt/dashboard/app.py; then
         info "Vorhandene USV-Einstellungen unverändert übernommen."
-    elif [[ -n "$ups_ip" ]]; then
-        PVE_DASHBOARD_UPS_STATUS_URL="http://${ups_ip}:8080/api/status" bash "$patch"
-    else
-        PVE_DASHBOARD_UPS_STATUS_URL="http://127.0.0.1:8080/api/status" bash "$patch"
+        rm -f "$patch"
+        return 0
     fi
+    if [[ -z "$ups_ip" ]]; then
+        while read -r ctid; do
+            [[ "$ctid" =~ ^[0-9]+$ ]] || continue
+            [[ "$(pct config "$ctid" 2>/dev/null | sed -n 's/^hostname: //p')" == pve-ups ]] || continue
+            candidate="$(dashboard_existing_ct_ipv4_v134 "$ctid" || true)"
+            [[ -n "$candidate" ]] && ups_candidates+=("$candidate")
+        done < <(pct list 2>/dev/null | awk 'NR>1 {print $1}')
+        if (( ${#ups_candidates[@]} == 1 )); then
+            ups_ip="${ups_candidates[0]}"
+        fi
+    fi
+    if [[ -n "$ups_ip" ]]; then
+        for port in 8080 80; do
+            candidate="http://${ups_ip}:${port}/api/status"
+            if curl -fsS --connect-timeout 2 --max-time 4 "$candidate" 2>/dev/null |
+                python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d.get("appliance"),dict) and isinstance(d.get("ups"),list)' 2>/dev/null; then
+                url="$candidate"
+                break
+            fi
+        done
+    fi
+    if [[ -z "$url" && -r /etc/pve-sensor-dashboard/ups-source.json ]]; then
+        url="$(python3 -c 'import json; d=json.load(open("/etc/pve-sensor-dashboard/ups-source.json")); u=d.get("status_url",""); print(u if u.startswith(("http://","https://")) else "")' 2>/dev/null || true)"
+    fi
+    if [[ -z "$url" && -n "$ups_ip" ]]; then
+        url="http://${ups_ip}:8080/api/status"
+    fi
+    PVE_DASHBOARD_UPS_STATUS_URL="${url:-http://127.0.0.1:8080/api/status}" bash "$patch"
 
     rm -f "$patch"
 }
@@ -14025,7 +14050,7 @@ if existing:
 
     merge(default, existing)
 
-    if status_url.startswith(("http://", "https://")):
+    if not isinstance(existing.get("pveups"), dict) and status_url.startswith(("http://", "https://")):
         parsed = urlparse(status_url)
 
         if parsed.hostname:
@@ -15344,7 +15369,7 @@ if MARKER not in html:
                 type="number"
                 min="1"
                 max="65535"
-                value="80"
+                value="8080"
               >
             </div>
 
@@ -16040,7 +16065,7 @@ function fillUpsSettings(settings){
     p.host||'127.0.0.1';
 
   $('upsPvePort').value=
-    p.port||80;
+    p.port||8080;
 
   $('upsPvePath').value=
     p.path||'/api/status';
