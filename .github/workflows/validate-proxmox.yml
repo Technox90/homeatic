@@ -428,7 +428,123 @@ jobs:
           grep -q 'PROXMOX_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'PROXMOX_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'PROXMOX_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'PROXMOX_MODULE_REF="715f3f166165d590b1c98af131b1180ab1ff56b8"' proxmox/proxmox.sh
+          grep -Eq '^PROXMOX_MODULE_REF="[0-9a-f]{40}"
+          grep -q 'load_proxmox_module_v140 "dashboard"' proxmox/proxmox.sh
+          grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
+          grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
+          grep -q 'install_dashboard_layout_editor_v71() {' proxmox/modules/dashboard.sh
+          grep -q 'validate_dashboard_final_state_v69() {' proxmox/modules/dashboard.sh
+          grep -q 'local APP_DIR="/opt/dashboard"' proxmox/modules/dashboard.sh
+          if grep -q 'install_dashboard() {' proxmox/proxmox.sh; then
+            echo "Dashboard definition still embedded in master installer"
+            exit 1
+          fi
+          test -s dashboard/collector.py
+          test -s dashboard/app.py
+          test -s dashboard/index.html
+          grep -q '"4" "Pushover · Empfänger / Test / Ein-Aus"' proxmox/proxmox.sh
+          grep -Eq '^TOOLS_REF="[0-9a-f]{40}"$' proxmox/proxmox.sh
+          grep -q 'proxmox-pushover-config' proxmox/proxmox.sh
+          grep -q 'AUTO_UPDATE_TIME' proxmox/tools/proxmox-auto-updater-config
+          grep -q 'DROPIN_DIR="/etc/systemd/system/${TIMER}.d"' proxmox/tools/proxmox-auto-updater-config
+          test "$(wc -c < proxmox/proxmox.sh)" -lt 700000
+
+      - name: V158 dashboard system footer
+        run: |
+          node --check dashboard/branding-v154.js
+          python3 - <<'PY'
+          from pathlib import Path
+          js = Path("dashboard/branding-v154.js").read_text()
+          css = Path("dashboard/branding-v154.css").read_text()
+          assert "getElementById('hostinfo')" in js
+          assert "proxmoxHostInfoHidden" in js and "proxmoxHostInfoHidden" in css
+          assert "document.body.append(footer)" in js
+          assert "Number.isSafeInteger(data.local)" in js
+          assert "Version '+data.local" in js
+          assert "Copyright © Technox1990" in js
+          assert "https://github.com/Technox90/homeatic" in js
+          PY
+
+      - name: V159 stable dashboard selectors and centered title
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          js = Path('dashboard/branding-v154.js').read_text()
+          css = Path('dashboard/branding-v154.css').read_text()
+          assert "preparePowerButton" in js and "brandPowerLabel" in css
+          assert 'id="randMenuLogo"' in js and '.randMenuLogo{' in css
+          assert "getElementById('randMenuLogo')" in js
+          assert 'brandMenuLogoV154' not in js + css
+          assert 'body.dashboardToolbarFixed .top .brand{' in css
+          assert 'margin:0!important;text-align:center!important' in css
+          assert '#dashboardFixedToolbar{' in css and "button.id='brandMenuToggle'" in js
+          PY
+
+      - name: V161 browser tab title regression tests
+        run: node dashboard/tests/browser-tab.test.js
+
+      - name: V162 logo polling stability
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          js = Path('dashboard/branding-v154.js').read_text()
+          assert 'brandMenuConfigured.get(button)===text' in js
+          assert 'configureBrandMenu(menu,settings,refreshLogo)' in js
+          assert 'ensureBrandToolbarLayout(settings,true)' in js
+          PY
+
+
+      - name: V163 UPPER and power icons regression checks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('proxmox/proxmox.sh').read_text()
+          h=s.split("cat > \"$tmp\" <<'KUMA_STATUS_HTML'\\n".replace("\\n","\n"),1)[1].split("\nKUMA_STATUS_HTML\n",1)[0]
+          assert '/upper/logo.png' in h and '/upper/favicon.png' in h
+          assert 'upperFooter' in h and 'pointermove' in h and 'pointerdown' in h
+          assert 'Original-Statusseite' not in h
+          assert 'location = /upper/' in s and 'try_files /index.html =404;' in s
+          assert 'chown -R 100000:100000 "$UPTIME_DATA_DIR"' not in s
+          assert 'chown -R 100000:100000 "$persistent_source"' not in s
+          import re
+          for i, script in enumerate(re.findall(r'<script>(.*?)</script>',h,re.S)):
+              Path('/tmp/upper-script-'+str(i)+'.js').write_text(script)
+          PY
+          for f in /tmp/upper-script-*.js; do node --check "$f"; done
+          node --check dashboard/branding-v154.js
+          grep -q 'createElementNS(ns,' dashboard/branding-v154.js
+
+      - name: V164 independent layout and boot title
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          m=Path('proxmox/proxmox.sh').read_text()
+          d=Path('proxmox/modules/dashboard.sh').read_text()
+          r=Path('dashboard/views/runtime.js').read_text()
+          b=Path('dashboard/branding-v154.js').read_text()
+          assert '/opt/dashboard/static/assets/logo.png' in d
+          assert 'configuredName' in r and 'website_name' in r
+          assert 'dashboard-branding-ready' in r and 'dashboard-branding-ready' in b
+          assert 'title.textContent="DASHBOARD"' not in r
+          assert 'Einmalige Layout-Migration erforderlich' in m
+          PY
+          node --check dashboard/views/runtime.js
+          node --check dashboard/branding-v154.js
+
+      - name: V164 migration safety checks
+        run: |
+          python3 -m py_compile proxmox/tools/proxmox-migrate-layout
+          python3 proxmox/tests/test-layout-migration.py
+
+      - name: V165 boot title regression tests
+        run: node dashboard/tests/boot-title.test.js
+
+      - name: V170 UPPER selection regression tests
+        run: node proxmox/tests/upper-selection.test.js
+
+      - name: V171 update sound checks
+        run: node dashboard/tests/update-sound.test.js
+ proxmox/proxmox.sh
           grep -q 'load_proxmox_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh
