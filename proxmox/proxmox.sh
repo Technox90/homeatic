@@ -8773,7 +8773,7 @@ persist_install_secrets_v107() {
     secret_write_v107 "stirling-admin" "Stirling PDF Admin" "${STIRLING_ADMIN_PASS:-}" "${STIRLING_ADMIN_USER:-admin}" "${STIRLING_IP:+https://${STIRLING_IP}/}"
     secret_write_v107 "speedtest-admin" "Speedtest Tracker Admin" "${SPEEDTEST_ADMIN_PASS:-}" "${SPEEDTEST_ADMIN_EMAIL:-}" "${SPEEDTEST_IP:+https://${SPEEDTEST_IP}/}"
     secret_write_v107 "speedtest-app-key" "Speedtest Tracker APP_KEY" "${SPEEDTEST_APP_KEY:-}" "" ""
-    if (( ${INSTALL_MEALIE:-0} || ${INSTALL_KITCHENOWL:-0} )); then
+    if (( ${INSTALL_MEALIE:-0} )); then
         secret_write_v107 "mealie-default-login" "Mealie Erstlogin" "${MEALIE_DEFAULT_PASS:-}" "${MEALIE_DEFAULT_USER:-}" "${MEALIE_IP:+https://${MEALIE_IP}/}"
     fi
 
@@ -11256,6 +11256,7 @@ if (( INSTALL_KITCHENOWL )); then
     header "KITCHENOWL EINSTELLUNGEN"
     allocate_id
     KITCHENOWL_ID="$(get_value "CT-ID KitchenOwl" "$ALLOCATED_ID")"
+    [[ "$KITCHENOWL_ID" =~ ^[0-9]+$ ]] || die "KitchenOwl: ungültige CT-ID."
     reject_reserved_guest_id "$KITCHENOWL_ID"
     free_id_check "$KITCHENOWL_ID" || die "KitchenOwl: CT-/VM-ID belegt; vorhandene Gäste bleiben unverändert."
     RESERVED_IDS["$KITCHENOWL_ID"]="KitchenOwl"
@@ -15489,9 +15490,12 @@ EOF
 
 install_kitchenowl() {
     header "KITCHENOWL INSTALLIEREN"
-    free_id_check "$KITCHENOWL_ID" || die "KitchenOwl: ID bereits belegt."
+    [[ ! -e "/etc/pve/lxc/${KITCHENOWL_ID}.conf" && ! -e "/etc/pve/qemu-server/${KITCHENOWL_ID}.conf" ]] || die "KitchenOwl: ID bereits belegt."
     command -v arping >/dev/null || apt-get install -y iputils-arping
     arping -D -q -I "$BRIDGE" -c 3 -w 5 "$KITCHENOWL_IP" || die "KitchenOwl: IP belegt oder ARP-Prüfung fehlgeschlagen."
+    if grep -Fq "ip=${KITCHENOWL_IP}/" /etc/pve/lxc/*.conf /etc/pve/qemu-server/*.conf 2>/dev/null; then
+        die "KitchenOwl: IP bereits in einem Gast konfiguriert."
+    fi
     create_docker_app_lxc "$KITCHENOWL_ID" "kitchenowl" "$KITCHENOWL_CIDR" "$KITCHENOWL_CORES" "$KITCHENOWL_MEMORY" "$KITCHENOWL_DISK"
     pct exec "$KITCHENOWL_ID" -- bash -c '
         set -Eeuo pipefail
@@ -15509,6 +15513,7 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?missing secret}
+      OPEN_REGISTRATION: "false"
     volumes:
       - kitchenowl_data:/data
     logging:
