@@ -686,12 +686,12 @@ def show_status(cfg):
         run(["certbot", "certificates"], capture=False)
 
 def interactive(cfg):
-    cfg["base_domain"] = normalize_domain(ask("EXTERNE URLS", "Hauptdomain, z. B. ltwbh.de", cfg.get("base_domain") or "example.de"))
+    cfg["base_domain"] = normalize_domain(ask("EXTERNE URLS", "Hauptdomain der Dienste, z. B. example.de", cfg.get("base_domain", "")))
     if not valid_host(cfg["base_domain"]):
         raise SystemExit("FEHLER: Ungültige Hauptdomain.")
     cfg["dns_target"] = normalize_domain(ask(
-        "DNS / DYNDNS",
-        f"Optionales CNAME-/DynDNS-Ziel, z. B. home.{cfg['base_domain']}. Leer = A/AAAA.",
+        "REVERSE PROXY / DNS / DYNDNS",
+        "Zentrale öffentliche Zieladresse des Reverse-Proxys (CNAME/DynDNS).\nAlle Dienst-Subdomains verweisen darauf, z. B. home.example.de.\nLeer = direkte A-/AAAA-Einträge.",
         cfg.get("dns_target", ""),
     ))
     if cfg["dns_target"] and not valid_host(cfg["dns_target"]):
