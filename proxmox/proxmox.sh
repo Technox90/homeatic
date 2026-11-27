@@ -6324,7 +6324,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="3214b9694f02413d84dcb4a8fe76aff43ec4cb07"
+TOOLS_REF="2122f3057d81086d63323f2a3dc48f7ebac14c9a"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
@@ -12089,7 +12089,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-PROXMOX_MODULE_REF="3214b9694f02413d84dcb4a8fe76aff43ec4cb07"
+PROXMOX_MODULE_REF="2122f3057d81086d63323f2a3dc48f7ebac14c9a"
 PROXMOX_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_MODULE_REF}/proxmox/modules"
 
 load_proxmox_module_v140() {
