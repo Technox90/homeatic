@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V181
+# PROXMOX MODULARER KOMPLETT-INSTALLER V182
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -62,6 +62,7 @@ set -Eeuo pipefail
 #   V146: Pi-hole-Logs korrigiert; Auto-Updater entdoppelt; externe URL-/TLS-Verwaltung als separates Tool
 #   V147: Installer prüft sich beim Start gegen GitHub main, validiert Updates, sichert Altstand und startet automatisch neu
 #   V148: Stirling PDF verwendet offiziellen GHCR-Pfad; bestehende Compose-Installationen werden beim Updater sicher migriert
+#   V182: KitchenOwl deutscher Starterbestand nach Haushaltseinrichtung, SQLite-Backup und idempotenter Import
 #   V171: Update-Klingelton (sanft, 2,5 s, 50 %); numerischer aktueller GitHub-Stand
 #   V155: Paperless-Reparatur erhält öffentliche URL, CSRF, Hosts und CORS; kein erzwungener Recreate
 #   V154: Logo-Menü vergrößert; sichtbarer Rahmen/Button-Hintergrund entfernt, Klickfläche bleibt erhalten
@@ -1010,8 +1011,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V181"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V181"
+TUI_TITLE="PROXMOX INSTALLER V182"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V182"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -8261,7 +8262,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V181",
+    "installer_version": "V182",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8738,7 +8739,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V181 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V182 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"

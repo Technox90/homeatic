@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V181 · 27.11.2026**  
+> **Aktueller Stand: V182 · 28.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+28.11.2026 – V182 · KitchenOwl deutscher Grundbestand
+--------------------------------------------------------
+- KitchenOwl-Neuinstallationen erhalten einen eingebetteten deutschen Starterbestand mit 2.201 Artikeln, 32 Produktkategorien, 52 Rezepten und 24 Rezept-Tags. Ein einmaliger systemd-Timer wartet auf den ersten Haushalt; mehrere Haushalte erfordern manuelle Auswahl. SQLite-Sicherung vor Import, keine Überschreibung vorhandener Rezepte, wiederholbare Ergänzung und ASCII-kompatible Unicode-Escapes. Bestehende Installationen werden nicht automatisch neu befüllt. Der manuelle Import in CT 111 wurde erfolgreich getestet; der automatische Erstinstallationspfad ist noch nicht live getestet.
 
 27.11.2026 – V181 · KitchenOwl Einkaufslisten
 --------------------------------------------------------
