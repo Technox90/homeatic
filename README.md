@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen Homelab
 
 ## Aktueller Stand
 
-**Aktueller Stand: V181 · Proxmox Master Installer · 27.11.2026**
+**Aktueller Stand: V182 · Proxmox Master Installer · 27.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -137,6 +137,10 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V182 · Reverse-Proxy- und USV-Sicherheit
+
+- Bestehende manuelle nginx-Websites und deren Sicherheitsregeln bleiben erhalten; doppelte Servernamen werden vermieden, Konfigurationsfehler lösen Rollback aus. Neutrale DNS-Beispiele, eindeutige Reverse-Proxy-Zieladresse, Home-Assistant-Erkennung, unveränderte Compose-Werte ohne Neustart, PVE-UPS-Erkennung über CT-Hostname und Port 8080, bestehende USV-Einstellungen bleiben erhalten.
+
 ### V181 · KitchenOwl Einkaufslisten
 
 - Docker-LXC mit 4 CPU, 4 GB RAM, 16 GB Disk; lokale TLS-, Dashboard-, Update- und externe URL-Integration.
@@ -152,9 +156,5 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 ### V178 · Speicherwartung und Auto-Release
 
 - Konservative Docker-/APT-/Journal-Bereinigung, TRIM, Speicherwarnungen und stabile Releases.
-
-### V177 · CPU/RAM und physische SSD
-
-- CPU/RAM nebeneinander; physische SSD mit Kapazität und getrennten Root-/Thin-Pool-Balken.
 
 **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
