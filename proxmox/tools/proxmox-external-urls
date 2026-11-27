@@ -349,7 +349,7 @@ def build_catalog(saved=None):
             "label": label,
             "prefix": prefix,
             "backend": backend,
-            "enabled": old.get("enabled", default_on),
+            "enabled": old.get("enabled", default_on if not saved else False),
             "sensitive": sensitive,
             "host": old.get("host", ""),
             "custom": False,
@@ -548,7 +548,10 @@ def write_acme(cfg):
     names |= cert_domains(Path("/etc/letsencrypt/live") / CERT_NAME / "fullchain.pem")
     hosts = sorted(h for h in names if valid_host(h) and not external.get(h, {}).get("http"))
     if not hosts:
-        ACME_CONF.unlink(missing_ok=True)
+        if ACME_CONF.exists():
+            ACME_CONF.unlink()
+            run(["nginx", "-t"], check=True, capture=False)
+            run(["systemctl", "reload", "nginx"], check=True, capture=False)
         return
     content = f"""# Automatisch verwaltet durch proxmox-external-urls.
 server {{
@@ -577,17 +580,56 @@ def cert_domains(certfile):
     cp = run(["openssl", "x509", "-in", str(certfile), "-noout", "-ext", "subjectAltName"])
     return set(re.findall(r"DNS:([^,\s]+)", cp.stdout)) if cp.returncode == 0 else set()
 
+def current_webroots(domains):
+    """Use the renewal lineage's configured webroots; never guess a different CA path."""
+    path = Path("/etc/letsencrypt/renewal") / (CERT_NAME + ".conf")
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    default = re.search(r"(?m)^\s*webroot_path\s*=\s*([^\n,]+)", text)
+    fallback = Path(default.group(1).strip().strip('"').strip("'")) if default else ACME_ROOT
+    result = {}
+    for domain in domains:
+        match = re.search(r"(?m)^\s*" + re.escape(domain) + r"\s*=\s*([^\n,]+)", text)
+        root = Path(match.group(1).strip().strip('"').strip("'")) if match else fallback
+        if not root.is_absolute():
+            raise RuntimeError("Ungültiger ACME-Webroot für " + domain)
+        result[domain] = root
+    return result
+
+def validate_acme_webroots(domains):
+    """Local challenge probes prevent changing a working renewal path silently."""
+    ip = pve_host_ip()
+    if not ip or not domains:
+        return
+    token = "proxmox-probe-" + os.urandom(16).hex()
+    for domain, root in current_webroots(domains).items():
+        directory = root / ".well-known/acme-challenge"
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / token
+        try:
+            probe.write_text(token, encoding="utf-8")
+            probe.chmod(0o644)
+            cp = run(["curl", "--noproxy", "*", "-fsS", "--max-time", "5",
+                      "--resolve", f"{domain}:80:{ip}",
+                      f"http://{domain}/.well-known/acme-challenge/{token}"])
+            if cp.returncode or cp.stdout != token:
+                raise RuntimeError(f"ACME-Pfad für {domain} nicht erreichbar ({root}). "
+                                   "Manuelle nginx-Seite bleibt unverändert; ACME-Webroot prüfen.")
+        finally:
+            probe.unlink(missing_ok=True)
+
 def ensure_certificate(cfg):
     wanted = {proposed_host(s, cfg["base_domain"]) for s in managed_services(cfg)}
     cert_dir = Path("/etc/letsencrypt/live") / CERT_NAME
     certfile = cert_dir / "fullchain.pem"
     existing = cert_domains(certfile)
     if certfile.exists() and wanted.issubset(existing):
+        validate_acme_webroots(existing)
         cp = run(["openssl", "x509", "-checkend", "604800", "-noout", "-in", str(certfile)])
         if cp.returncode == 0:
             return cert_dir
 
     domains = sorted(wanted | {x for x in existing if valid_host(x)})
+    validate_acme_webroots(domains)
     args = [
         "certbot", "certonly", "--webroot", "-w", str(ACME_ROOT),
         "--cert-name", CERT_NAME, "--non-interactive", "--agree-tos",
@@ -598,8 +640,8 @@ def ensure_certificate(cfg):
         args += ["--register-unsafely-without-email"]
     if existing and not wanted.issubset(existing):
         args += ["--expand"]
-    for domain in domains:
-        args += ["-d", domain]
+    for domain, root in current_webroots(domains).items():
+        args += ["-w", str(root), "-d", domain]
     cp = run(args, capture=False)
     if cp.returncode != 0 or not certfile.exists():
         raise SystemExit("FEHLER: Let's-Encrypt-Zertifikat konnte nicht erstellt/erweitert werden. DNS und Port 80 prüfen.")
@@ -629,6 +671,8 @@ def proxy_server(service, cfg, cert_dir):
 
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Content-Type-Options nosniff always;
+    access_log /var/log/nginx/{host}.access.log combined;
+    error_log /var/log/nginx/{host}.error.log;
 
 {admin_guard}{body_size}    location / {{
         proxy_pass {backend};
@@ -657,8 +701,26 @@ def write_proxy(cfg, cert_dir):
         "}",
         "",
     ]
+    prior = PROXY_CONF.read_text(encoding="utf-8") if PROXY_CONF.exists() else ""
+    blocks = {}
+    for match in re.finditer(r"(?ms)^server\s*\{.*?^\}", prior):
+        block = match.group(0)
+        name = re.search(r"\bserver_name\s+([^;]+);", block)
+        if name:
+            blocks[name.group(1).strip()] = block
     for service in managed_services(cfg):
-        text.append(proxy_server(service, cfg, cert_dir))
+        host = proposed_host(service, cfg["base_domain"])
+        old = blocks.get(host, "")
+        backend = re.search(r"\bproxy_pass\s+([^;]+);", old)
+        # Preserve unchanged managed vhosts, including their custom directives.
+        # Older generated Vaultwarden sites lacking the admin guard are rebuilt.
+        has_vault_guard = "location = /admin" in old and "location ^~ /admin/" in old
+        if (backend and backend.group(1).strip() == service["backend"]
+                and f"ssl_certificate {cert_dir}/fullchain.pem;" in old
+                and (service["key"] != "vault" or has_vault_guard)):
+            text.append(old + "\n")
+        else:
+            text.append(proxy_server(service, cfg, cert_dir))
     PROXY_CONF.write_text("\n".join(text), encoding="utf-8")
     cp = run(["nginx", "-t"])
     if cp.returncode != 0 or "conflicting server name" in cp.stderr:
@@ -758,6 +820,7 @@ def apply(cfg):
         check = run(["nginx", "-t"])
         if check.returncode or "conflicting server name" in check.stderr:
             raise RuntimeError(check.stderr)
+        validate_acme_webroots(cert_domains(Path("/etc/letsencrypt/live") / CERT_NAME / "fullchain.pem"))
     except BaseException:
         for path, content in previous.items():
             if content is None:
@@ -776,6 +839,7 @@ def refresh_backends(cfg):
     base = cfg.get("base_domain", "")
     if base:
         for service in cfg["services"]:
+            service.pop("external_managed", None)
             host = proposed_host(service, base)
             entry = existing.get(host, {})
             if entry.get("https"):
@@ -783,6 +847,8 @@ def refresh_backends(cfg):
                 service["host"] = host
                 service["backend"] = entry.get("backend") or service.get("backend", "")
                 service["external_managed"] = True
+            elif saved.get(service["key"], {}).get("external_managed"):
+                service["enabled"] = False
         known = {proposed_host(s, base) for s in cfg["services"]}
         for host, entry in existing.items():
             if host not in known and host.endswith("." + base) and entry.get("https") and entry.get("backend"):
