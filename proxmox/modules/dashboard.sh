@@ -12425,6 +12425,7 @@ BASICS = {
 EXTRAS = {
     "uptime kuma",
     "vaultwarden",
+    "kitchenowl",
     "caddy",
     "caddy reverse proxy",
     "stirling pdf",
@@ -12757,7 +12758,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 APP="/opt/dashboard/app.py"
 INDEX="/opt/dashboard/static/index.html"
 UPS_CONFIG="/etc/pve-sensor-dashboard/ups-source.json"
-UPS_STATUS_URL="${PVE_DASHBOARD_UPS_STATUS_URL:-http://192.168.178.111/api/status}"
+UPS_STATUS_URL="${PVE_DASHBOARD_UPS_STATUS_URL:-http://127.0.0.1:8080/api/status}"
 
 BACKUP="/home/backups/pve-dashboard-usv-karte-backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -12890,7 +12891,7 @@ if ups:
     ):
         if key in u:
             print(f"  {key}: {u.get(key)}")
-'
+' || echo '[WARNUNG] Keine gültige PVE-UPS JSON-Antwort.'
 else
     echo "[WARNUNG] $UPS_STATUS_URL ist vom Proxmox-Host aktuell nicht erreichbar."
     echo "Das Dashboard wird trotzdem installiert und zeigt dann 'USV nicht erreichbar'."
@@ -12935,7 +12936,7 @@ if MARKER not in app:
     constants = r'''
 # PVE_DASHBOARD_UPS_CARD_V1
 UPS_SOURCE_FILE = Path("/etc/pve-sensor-dashboard/ups-source.json")
-UPS_DEFAULT_STATUS_URL = "http://192.168.178.111/api/status"
+UPS_DEFAULT_STATUS_URL = "http://127.0.0.1:8080/api/status"
 
 _ups_cache_lock = threading.Lock()
 _ups_cache = {
@@ -13255,7 +13256,7 @@ if MARKER not in html:
     new_card = '''  <div class="card ups-card ups-offline" id="upsCard">
     <div class="ups-head">
       <div class="label">USV / NAS</div>
-      <div class="ups-badge" id="upsBadge">192.168.178.111</div>
+      <div class="ups-badge" id="upsBadge">127.0.0.1</div>
     </div>
     <div class="value" id="upsValue">–</div>
     <div class="sub" id="upsSub">USV-Daten werden geladen</div>
@@ -13412,7 +13413,7 @@ function renderUps(u){
   );
 
   const sourceUrl=String(
-    u?.source_url||'http://192.168.178.111/api/status'
+    u?.source_url||'http://127.0.0.1:8080/api/status'
   );
 
   try{
@@ -13821,12 +13822,21 @@ echo "============================================================"
 __PVE_V53_DASHBOARD_UPS_CARD__
     chmod 700 "$patch"
 
-    if (( PVEUPS_INSTALLED )) && [[ -n "${PVEUPS_IP:-}" ]]; then
-        PVE_DASHBOARD_UPS_STATUS_URL="http://${PVEUPS_IP}/api/status" \
-            bash "$patch"
+    local ups_ip="${PVEUPS_IP:-}" ctid
+    if [[ -z "$ups_ip" ]]; then
+        while read -r ctid; do
+            [[ "$(pct config "$ctid" 2>/dev/null | sed -n 's/^hostname: //p')" == pve-ups ]] || continue
+            ups_ip="$(pct config "$ctid" | sed -nE 's/.*[, ]ip=([0-9.]+)\/[0-9]+.*/\1/p' | head -n1)"
+            [[ -n "$ups_ip" ]] && break
+        done < <(pct list | awk 'NR>1 {print $1}')
+    fi
+    if [[ -f /var/lib/pve-sensor-dashboard-web/ups-source.json ]] &&
+       grep -q 'PVE_UPS_SETTINGS_V2' /opt/dashboard/app.py; then
+        info "Vorhandene USV-Einstellungen unverändert übernommen."
+    elif [[ -n "$ups_ip" ]]; then
+        PVE_DASHBOARD_UPS_STATUS_URL="http://${ups_ip}:8080/api/status" bash "$patch"
     else
-        PVE_DASHBOARD_UPS_STATUS_URL="http://192.168.178.111/api/status" \
-            bash "$patch"
+        PVE_DASHBOARD_UPS_STATUS_URL="http://127.0.0.1:8080/api/status" bash "$patch"
     fi
 
     rm -f "$patch"
@@ -13961,16 +13971,16 @@ default = {
     "version": 2,
     "mode": "pveups",
     "display_name": "NAS",
-    "status_url": "http://192.168.178.111/api/status",
+    "status_url": "http://127.0.0.1:8080/api/status",
     "pveups": {
         "scheme": "http",
-        "host": "192.168.178.111",
-        "port": 80,
+        "host": "127.0.0.1",
+        "port": 8080,
         "path": "/api/status",
         "timeout": 4,
     },
     "nut": {
-        "host": "192.168.178.20",
+        "host": "127.0.0.1",
         "port": 3493,
         "ups_name": "ups",
         "username": "",
@@ -14033,7 +14043,7 @@ if existing:
 def build_status_url(cfg):
     p = cfg["pveups"]
     scheme = str(p.get("scheme") or "http")
-    host = str(p.get("host") or "192.168.178.111")
+    host = str(p.get("host") or "127.0.0.1")
     port = int(p.get("port") or (443 if scheme == "https" else 80))
     path = str(p.get("path") or "/api/status")
 
@@ -14159,16 +14169,16 @@ def _ups_settings_default_v2():
         "version": 2,
         "mode": "pveups",
         "display_name": "NAS",
-        "status_url": "http://192.168.178.111/api/status",
+        "status_url": "http://127.0.0.1:8080/api/status",
         "pveups": {
             "scheme": "http",
-            "host": "192.168.178.111",
-            "port": 80,
+            "host": "127.0.0.1",
+            "port": 8080,
             "path": "/api/status",
             "timeout": 4,
         },
         "nut": {
-            "host": "192.168.178.20",
+            "host": "127.0.0.1",
             "port": 3493,
             "ups_name": "ups",
             "username": "",
@@ -14207,7 +14217,7 @@ def _ups_build_status_url_v2(settings):
 
     host = str(
         p.get("host")
-        or "192.168.178.111"
+        or "127.0.0.1"
     ).strip()
 
     port = int(
@@ -15322,8 +15332,8 @@ if MARKER not in html:
               <input
                 id="upsPveHost"
                 type="text"
-                value="192.168.178.111"
-                placeholder="192.168.178.111"
+                value="127.0.0.1"
+                placeholder="127.0.0.1"
               >
             </div>
 
@@ -15371,8 +15381,8 @@ if MARKER not in html:
               <input
                 id="upsNutHost"
                 type="text"
-                value="192.168.178.20"
-                placeholder="192.168.178.20"
+                value="127.0.0.1"
+                placeholder="127.0.0.1"
               >
             </div>
 
@@ -16027,7 +16037,7 @@ function fillUpsSettings(settings){
       : 'http';
 
   $('upsPveHost').value=
-    p.host||'192.168.178.111';
+    p.host||'127.0.0.1';
 
   $('upsPvePort').value=
     p.port||80;
@@ -16039,7 +16049,7 @@ function fillUpsSettings(settings){
     p.timeout||4;
 
   $('upsNutHost').value=
-    n.host||'192.168.178.20';
+    n.host||'127.0.0.1';
 
   $('upsNutPort').value=
     n.port||3493;
@@ -16377,9 +16387,9 @@ required = [
     'id="settingsHubPanelUps"',
     'id="settingsUnlockModal"',
     'id="upsPveHost"',
-    'value="192.168.178.111"',
+    'value="127.0.0.1"',
     'id="upsNutHost"',
-    'value="192.168.178.20"',
+    'value="127.0.0.1"',
     'value="3493"',
     'value="ups"',
     "settingsSessionCode",
@@ -16495,8 +16505,8 @@ echo "  -> zuerst Sicherheitscode"
 echo "  -> dann [Webseitenverwaltung] [Kategorien] [USV] [Dashboard]"
 echo
 echo "USV-Defaults:"
-echo "  PVE-UPS: 192.168.178.111:80 /api/status"
-echo "  NUT:     192.168.178.20:3493 / USV-Name ups"
+echo "  PVE-UPS: automatisch erkannte Adresse, Port 8080 /api/status"
+echo "  NUT:     127.0.0.1:3493 / USV-Name ups"
 echo
 echo "Backup:"
 echo "  $BACKUP"
@@ -16838,7 +16848,7 @@ renderUps=function(u){
 
   const sourceUrl=String(
     u?.source_url
-    ||'http://192.168.178.111/api/status'
+    ||'http://127.0.0.1:8080/api/status'
   );
 
   try{
