@@ -144,11 +144,11 @@ def msg(title, text):
     else:
         print(f"\n=== {title} ===\n{text}")
 
-def ask(title, text, default=""):
+def ask(title, text, default="", allow_empty=False):
     if TUI:
         return whiptail(["--title", title, "--inputbox", text, "12", "92", default])
     value = input(f"{text} [{default}]: ").strip()
-    return value or default
+    return "" if allow_empty and value == "-" else (value or default)
 
 def yesno(title, text, default=False):
     if TUI:
@@ -264,7 +264,7 @@ def ha_backend():
         vmid = parts[0]
         cfg = run(["qm", "config", vmid])
         m = re.search(r"^name:\s*(\S+)", cfg.stdout, re.M)
-        if not m or m.group(1) not in ("homeassistant", "home-assistant"):
+        if not m or not re.fullmatch(r"home[-_]?assistant(?:[-_]?os)?|haos", m.group(1), re.I):
             continue
         agent = run(["qm", "agent", vmid, "network-get-interfaces"])
         if agent.returncode != 0:
@@ -343,13 +343,13 @@ def build_catalog(saved=None):
 
         old = saved.get(key, {})
         if old:
-            backend = backend or old.get("backend", "")
+            backend = old.get("backend", "") or backend
         services.append({
             "key": key,
             "label": label,
             "prefix": prefix,
             "backend": backend,
-            "enabled": old.get("enabled", default_on),
+            "enabled": old.get("enabled", default_on if not saved else False),
             "sensitive": sensitive,
             "host": old.get("host", ""),
             "custom": False,
@@ -391,6 +391,9 @@ def configure_selection(services, base_domain):
         if service.get("sensitive"):
             desc += " · Admin/sensibel"
         rows.append((service["key"], desc, bool(service.get("enabled"))))
+    if not rows:
+        msg("EXTERNE URLS", "Keine zusätzlich verwaltbaren Dienste gefunden.")
+        return True
     selected = checklist(
         "EXTERNE URLS · DIENSTE",
         "Welche erkannten Weboberflächen sollen von außen erreichbar sein?\n\n"
@@ -461,10 +464,15 @@ def edit_loop(cfg):
                 ("3", "Eigenen Dienst hinzufügen"),
                 ("4", "Dienste erneut auswählen"),
                 ("5", "Hauptdomain / DNS-Ziel / E-Mail ändern"),
+                ("6", "Einzelnen erkannten Dienst hinzufügen"),
+                ("7", "Einzelnen verwalteten Dienst deaktivieren"),
                 ("0", "Abbrechen"),
             ],
         )
         if choice == "1":
+            if not valid_host(cfg.get("base_domain", "")) or (cfg.get("dns_target") and not valid_host(cfg["dns_target"])):
+                msg("UNGÜLTIGE DOMAIN", "Hauptdomain und DNS-Ziel bitte korrigieren.")
+                continue
             return True
         if choice == "0" or not choice:
             return False
@@ -477,9 +485,24 @@ def edit_loop(cfg):
             add_custom(cfg["services"], cfg["base_domain"])
         elif choice == "4":
             configure_selection(cfg["services"], cfg["base_domain"])
+        elif choice in ("6", "7"):
+            adding = choice == "6"
+            options = [s for s in cfg["services"] if s.get("backend")
+                       and not s.get("external_managed")
+                       and bool(s.get("enabled")) != adding]
+            pick = menu("DIENST HINZUFÜGEN" if adding else "DIENST DEAKTIVIEREN",
+                        "Nur diesen Dienst ändern; alle anderen bleiben erhalten.",
+                        [(str(i+1), s["label"]) for i, s in enumerate(options)])
+            if pick.isdigit() and 1 <= int(pick) <= len(options):
+                service = options[int(pick)-1]
+                if adding:
+                    service["enabled"] = True
+                    edit_service(service, cfg["base_domain"])
+                elif yesno("DIENST DEAKTIVIEREN", "Externe URL deaktivieren?", False):
+                    service["enabled"] = False
         elif choice == "5":
             cfg["base_domain"] = normalize_domain(ask("EXTERNE URLS", "Hauptdomain", cfg["base_domain"]))
-            cfg["dns_target"] = normalize_domain(ask("DNS / DYNDNS", "Optionales CNAME-/DynDNS-Ziel; leer = A/AAAA", cfg.get("dns_target", "")))
+            cfg["dns_target"] = normalize_domain(ask("REVERSE PROXY / DNS / DYNDNS", "Zentrale öffentliche Zieladresse des Reverse-Proxys (CNAME/DynDNS); z. B. home.example.de. Leer = A/AAAA (Terminal: -).", cfg.get("dns_target", ""), allow_empty=True))
             cfg["email"] = ask("LET'S ENCRYPT", "E-Mail (optional)", cfg.get("email", ""))
 
 def enabled_services(cfg):
@@ -518,10 +541,17 @@ def ensure_packages():
     ACME_ROOT.mkdir(parents=True, exist_ok=True)
 
 def write_acme(cfg):
-    hosts = [proposed_host(s, cfg["base_domain"]) for s in enabled_services(cfg)
-             if not existing_vhosts().get(proposed_host(s, cfg["base_domain"]), {}).get("http")]
+    external = existing_vhosts()
+    names = {proposed_host(s, cfg["base_domain"]) for s in managed_services(cfg)}
+    # Keep challenges reachable for existing SANs, even if a managed HTTPS site
+    # was disabled. Never replace an administrator's own port-80 virtual host.
+    names |= cert_domains(Path("/etc/letsencrypt/live") / CERT_NAME / "fullchain.pem")
+    hosts = sorted(h for h in names if valid_host(h) and not external.get(h, {}).get("http"))
     if not hosts:
-        ACME_CONF.unlink(missing_ok=True)
+        if ACME_CONF.exists():
+            ACME_CONF.unlink()
+            run(["nginx", "-t"], check=True, capture=False)
+            run(["systemctl", "reload", "nginx"], check=True, capture=False)
         return
     content = f"""# Automatisch verwaltet durch proxmox-external-urls.
 server {{
@@ -550,17 +580,56 @@ def cert_domains(certfile):
     cp = run(["openssl", "x509", "-in", str(certfile), "-noout", "-ext", "subjectAltName"])
     return set(re.findall(r"DNS:([^,\s]+)", cp.stdout)) if cp.returncode == 0 else set()
 
+def current_webroots(domains):
+    """Use the renewal lineage's configured webroots; never guess a different CA path."""
+    path = Path("/etc/letsencrypt/renewal") / (CERT_NAME + ".conf")
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    default = re.search(r"(?m)^\s*webroot_path\s*=\s*([^\n,]+)", text)
+    fallback = Path(default.group(1).strip().strip('"').strip("'")) if default else ACME_ROOT
+    result = {}
+    for domain in domains:
+        match = re.search(r"(?m)^\s*" + re.escape(domain) + r"\s*=\s*([^\n,]+)", text)
+        root = Path(match.group(1).strip().strip('"').strip("'")) if match else fallback
+        if not root.is_absolute():
+            raise RuntimeError("Ungültiger ACME-Webroot für " + domain)
+        result[domain] = root
+    return result
+
+def validate_acme_webroots(domains):
+    """Local challenge probes prevent changing a working renewal path silently."""
+    ip = pve_host_ip()
+    if not ip or not domains:
+        return
+    token = "proxmox-probe-" + os.urandom(16).hex()
+    for domain, root in current_webroots(domains).items():
+        directory = root / ".well-known/acme-challenge"
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / token
+        try:
+            probe.write_text(token, encoding="utf-8")
+            probe.chmod(0o644)
+            cp = run(["curl", "--noproxy", "*", "-fsS", "--max-time", "5",
+                      "--resolve", f"{domain}:80:{ip}",
+                      f"http://{domain}/.well-known/acme-challenge/{token}"])
+            if cp.returncode or cp.stdout != token:
+                raise RuntimeError(f"ACME-Pfad für {domain} nicht erreichbar ({root}). "
+                                   "Manuelle nginx-Seite bleibt unverändert; ACME-Webroot prüfen.")
+        finally:
+            probe.unlink(missing_ok=True)
+
 def ensure_certificate(cfg):
     wanted = {proposed_host(s, cfg["base_domain"]) for s in managed_services(cfg)}
     cert_dir = Path("/etc/letsencrypt/live") / CERT_NAME
     certfile = cert_dir / "fullchain.pem"
     existing = cert_domains(certfile)
     if certfile.exists() and wanted.issubset(existing):
+        validate_acme_webroots(existing)
         cp = run(["openssl", "x509", "-checkend", "604800", "-noout", "-in", str(certfile)])
         if cp.returncode == 0:
             return cert_dir
 
     domains = sorted(wanted | {x for x in existing if valid_host(x)})
+    validate_acme_webroots(domains)
     args = [
         "certbot", "certonly", "--webroot", "-w", str(ACME_ROOT),
         "--cert-name", CERT_NAME, "--non-interactive", "--agree-tos",
@@ -571,8 +640,8 @@ def ensure_certificate(cfg):
         args += ["--register-unsafely-without-email"]
     if existing and not wanted.issubset(existing):
         args += ["--expand"]
-    for domain in domains:
-        args += ["-d", domain]
+    for domain, root in current_webroots(domains).items():
+        args += ["-w", str(root), "-d", domain]
     cp = run(args, capture=False)
     if cp.returncode != 0 or not certfile.exists():
         raise SystemExit("FEHLER: Let's-Encrypt-Zertifikat konnte nicht erstellt/erweitert werden. DNS und Port 80 prüfen.")
@@ -602,6 +671,8 @@ def proxy_server(service, cfg, cert_dir):
 
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Content-Type-Options nosniff always;
+    access_log /var/log/nginx/{host}.access.log combined;
+    error_log /var/log/nginx/{host}.error.log;
 
 {admin_guard}{body_size}    location / {{
         proxy_pass {backend};
@@ -630,12 +701,30 @@ def write_proxy(cfg, cert_dir):
         "}",
         "",
     ]
+    prior = PROXY_CONF.read_text(encoding="utf-8") if PROXY_CONF.exists() else ""
+    blocks = {}
+    for match in re.finditer(r"(?ms)^server\s*\{.*?^\}", prior):
+        block = match.group(0)
+        name = re.search(r"\bserver_name\s+([^;]+);", block)
+        if name:
+            blocks[name.group(1).strip()] = block
     for service in managed_services(cfg):
-        text.append(proxy_server(service, cfg, cert_dir))
+        host = proposed_host(service, cfg["base_domain"])
+        old = blocks.get(host, "")
+        backend = re.search(r"\bproxy_pass\s+([^;]+);", old)
+        # Preserve unchanged managed vhosts, including their custom directives.
+        # Older generated Vaultwarden sites lacking the admin guard are rebuilt.
+        has_vault_guard = "location = /admin" in old and "location ^~ /admin/" in old
+        if (backend and backend.group(1).strip() == service["backend"]
+                and f"ssl_certificate {cert_dir}/fullchain.pem;" in old
+                and (service["key"] != "vault" or has_vault_guard)):
+            text.append(old + "\n")
+        else:
+            text.append(proxy_server(service, cfg, cert_dir))
     PROXY_CONF.write_text("\n".join(text), encoding="utf-8")
-    cp = run(["nginx", "-t"], capture=False)
-    if cp.returncode != 0:
-        raise SystemExit("FEHLER: nginx-Konfiguration ungültig. Backup liegt unter /home/backups/external-urls.")
+    cp = run(["nginx", "-t"])
+    if cp.returncode != 0 or "conflicting server name" in cp.stderr:
+        raise RuntimeError("FEHLER: nginx-Konfiguration ungültig oder doppelt: " + cp.stderr)
     run(["systemctl", "reload", "nginx"], check=True, capture=False)
 
     hook = Path("/etc/letsencrypt/renewal-hooks/deploy/20-proxmox-nginx-reload.sh")
@@ -655,6 +744,8 @@ s=p.read_text(encoding="utf-8")
 key=os.environ["NZ_KEY"]; value=os.environ["NZ_VALUE"]
 pat=re.compile(r"^(\s*"+re.escape(key)+r":\s*).*$", re.M)
 if pat.search(s):
+    current=pat.search(s).group(0).split(":",1)[1].strip()
+    if current.strip("'"+chr(34)) == value: raise SystemExit(4)
     s=pat.sub(lambda m: m.group(1)+'"'+value+'"', s, count=1)
 else:
     env=re.search(r"^(\s*)environment:\s*$", s, re.M)
@@ -667,6 +758,8 @@ p.write_text(s, encoding="utf-8")
     cp = run(["pct", "exec", ctid, "--", "env", f"NZ_FILE={file}", f"NZ_KEY={key}", f"NZ_VALUE={value}", "python3", "-c", code])
     if cp.returncode == 0:
         run(["pct", "exec", ctid, "--", "bash", "-lc", f"cd {workdir!s} && docker compose config >/dev/null && docker compose up -d"], capture=False)
+    elif cp.returncode == 4:
+        print(f"[OK] {key} unverändert; kein Docker-Neustart.")
 
 def apply_app_urls(cfg):
     for s in managed_services(cfg):
@@ -692,18 +785,23 @@ def apply_app_urls(cfg):
 import os,re
 p=Path("/opt/pocket-id/.env")
 if p.exists():
-    s=p.read_text()
-    s=re.sub(r"^APP_URL=.*$", "APP_URL="+os.environ["NZ_URL"], s, flags=re.M)
+    old=p.read_text()
+    s=re.sub(r"^APP_URL=.*$", "APP_URL="+os.environ["NZ_URL"], old, flags=re.M)
     s=re.sub(r"^TRUST_PROXY=.*$", "TRUST_PROXY=true", s, flags=re.M)
+    if s == old: raise SystemExit(4)
     p.write_text(s)
+else:
+    raise SystemExit(2)
 """
-                run(["pct", "exec", ctid, "--", "env", f"NZ_URL={url}", "python3", "-c", code])
-                run(["pct", "exec", ctid, "--", "bash", "-lc", "systemctl restart pocket-id 2>/dev/null || systemctl restart pocketid 2>/dev/null || true"], capture=False)
+                cp = run(["pct", "exec", ctid, "--", "env", f"NZ_URL={url}", "python3", "-c", code])
+                if cp.returncode == 0:
+                    run(["pct", "exec", ctid, "--", "bash", "-lc", "systemctl restart pocket-id 2>/dev/null || systemctl restart pocketid 2>/dev/null || true"], capture=False)
         elif s["key"] == "pulse":
             ctid = find_ctid("pulse")
             if ctid:
                 command = (
                     "f=/opt/pulse/.env; [ -f $f ] || exit 0; "
+                    f"if grep -Fxq 'PULSE_PUBLIC_URL={url}' $f && grep -Fxq 'ALLOWED_ORIGINS={url}' $f; then exit 0; fi; "
                     "sed -i -E '/^PULSE_PUBLIC_URL=/d; /^ALLOWED_ORIGINS=/d' $f; "
                     f"printf 'PULSE_PUBLIC_URL={url}\\nALLOWED_ORIGINS={url}\\n' >> $f; "
                     "systemctl restart pulse 2>/dev/null || true"
@@ -711,10 +809,10 @@ if p.exists():
                 run(["pct", "exec", ctid, "--", "bash", "-lc", command], capture=False)
 
 def apply(cfg):
-    write_dns(cfg)
     ensure_packages()
-    previous = {p: p.read_bytes() if p.exists() else None for p in (ACME_CONF, PROXY_CONF)}
+    previous = {p: p.read_bytes() if p.exists() else None for p in (ACME_CONF, PROXY_CONF, DNS_FILE)}
     try:
+        write_dns(cfg)
         # Keep the existing HTTPS configuration until the replacement is ready.
         write_acme(cfg)
         cert_dir = ensure_certificate(cfg) if managed_services(cfg) else None
@@ -722,6 +820,7 @@ def apply(cfg):
         check = run(["nginx", "-t"])
         if check.returncode or "conflicting server name" in check.stderr:
             raise RuntimeError(check.stderr)
+        validate_acme_webroots(cert_domains(Path("/etc/letsencrypt/live") / CERT_NAME / "fullchain.pem"))
     except BaseException:
         for path, content in previous.items():
             if content is None:
@@ -740,6 +839,7 @@ def refresh_backends(cfg):
     base = cfg.get("base_domain", "")
     if base:
         for service in cfg["services"]:
+            service.pop("external_managed", None)
             host = proposed_host(service, base)
             entry = existing.get(host, {})
             if entry.get("https"):
@@ -747,6 +847,8 @@ def refresh_backends(cfg):
                 service["host"] = host
                 service["backend"] = entry.get("backend") or service.get("backend", "")
                 service["external_managed"] = True
+            elif saved.get(service["key"], {}).get("external_managed"):
+                service["enabled"] = False
         known = {proposed_host(s, base) for s in cfg["services"]}
         for host, entry in existing.items():
             if host not in known and host.endswith("." + base) and entry.get("https") and entry.get("backend"):
@@ -769,13 +871,16 @@ def show_status(cfg):
         run(["certbot", "certificates"], capture=False)
 
 def interactive(cfg):
+    if valid_host(cfg.get("base_domain", "")):
+        refresh_backends(cfg)
+        return edit_loop(cfg)
     cfg["base_domain"] = normalize_domain(ask("EXTERNE URLS", "Hauptdomain der Dienste, z. B. example.de", cfg.get("base_domain", "")))
     if not valid_host(cfg["base_domain"]):
         raise SystemExit("FEHLER: Ungültige Hauptdomain.")
     cfg["dns_target"] = normalize_domain(ask(
         "REVERSE PROXY / DNS / DYNDNS",
         "Zentrale öffentliche Zieladresse des Reverse-Proxys (CNAME/DynDNS).\nAlle Dienst-Subdomains verweisen darauf, z. B. home.example.de.\nLeer = direkte A-/AAAA-Einträge.",
-        cfg.get("dns_target", ""),
+        cfg.get("dns_target", ""), allow_empty=True,
     ))
     if cfg["dns_target"] and not valid_host(cfg["dns_target"]):
         raise SystemExit("FEHLER: Ungültiges CNAME-/DynDNS-Ziel.")

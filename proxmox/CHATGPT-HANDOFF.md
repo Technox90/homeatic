@@ -9,12 +9,14 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V181
+- Aktueller Installationskandidat: V182
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
 
 Produktive Namen und Pfade nicht ohne ausdrücklichen Wunsch ändern.
+
+V182: Bestehende manuelle nginx-Websites und deren Sicherheitsregeln bleiben erhalten; doppelte Servernamen werden vermieden, Konfigurationsfehler lösen Rollback aus. Neutrale DNS-Beispiele, eindeutige Reverse-Proxy-Zieladresse, Home-Assistant-Erkennung, unveränderte Compose-Werte ohne Neustart, PVE-UPS-Erkennung über CT-Hostname und Port 8080, bestehende USV-Einstellungen bleiben erhalten.
 
 V181: KitchenOwl als optionale Docker-LXC-Anwendung mit mindestens 4 CPU-Kernen, 4 GB RAM und 16 GB Root-Disk, persistentem SQLite-Volume, zufälligem JWT-Schlüssel, deaktivierter offener Registrierung, Logrotation und lokalem HTTPS. ID/IP frei wählbar, Kollisionsschutz ohne Löschen bestehender Gäste. Dashboard-Link, Auto-Updater und externe URL-Auswahl mit Präfix shop integriert. Erstkonto lokal anlegen, danach externe URL aktivieren.
 

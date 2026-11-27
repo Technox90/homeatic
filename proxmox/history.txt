@@ -1,6 +1,10 @@
 Verfolgung der Änderungen
 ==========================
 
+27.11.2026 – V182 · Reverse-Proxy- und USV-Sicherheit
+--------------------------------------------------------
+- Bestehende manuelle nginx-Websites und deren Sicherheitsregeln bleiben erhalten; doppelte Servernamen werden vermieden, Konfigurationsfehler lösen Rollback aus. Neutrale DNS-Beispiele, eindeutige Reverse-Proxy-Zieladresse, Home-Assistant-Erkennung, unveränderte Compose-Werte ohne Neustart, PVE-UPS-Erkennung über CT-Hostname und Port 8080, bestehende USV-Einstellungen bleiben erhalten.
+
 27.11.2026 – V181 · KitchenOwl Einkaufslisten
 --------------------------------------------------------
 - KitchenOwl als optionale Docker-LXC-Anwendung mit mindestens 4 CPU-Kernen, 4 GB RAM und 16 GB Root-Disk, persistentem SQLite-Volume, zufälligem JWT-Schlüssel, deaktivierter offener Registrierung, Logrotation und lokalem HTTPS. ID/IP frei wählbar, Kollisionsschutz ohne Löschen bestehender Gäste. Dashboard-Link, Auto-Updater und externe URL-Auswahl mit Präfix shop integriert. Erstkonto lokal anlegen, danach externe URL aktivieren.
