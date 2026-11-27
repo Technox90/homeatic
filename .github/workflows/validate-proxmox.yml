@@ -544,3 +544,6 @@ jobs:
 
       - name: V171 update sound checks
         run: node dashboard/tests/update-sound.test.js
+
+      - name: V182 external URLs regression tests
+        run: python3 proxmox/tests/test-external-urls-v182.py
