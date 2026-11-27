@@ -4,7 +4,7 @@ Repository für Home Assistant, Proxmox VE, Pi-hole und die zugehörigen Homelab
 
 ## Aktueller Stand
 
-**Aktueller Stand: V181 · Proxmox Master Installer · 27.11.2026**
+**Aktueller Stand: V182 · Proxmox Master Installer · 28.11.2026**
 
 ➡️ **[Aktuelle Proxmox-Dokumentation](proxmox/README.md)**  
 ➡️ **[Vollständige Versionshistorie](proxmox/HISTORY.md)**
@@ -137,6 +137,10 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V182 · KitchenOwl deutscher Grundbestand
+
+- 2.201 Artikel, 32 Kategorien, 52 Rezepte und 24 Tags; einmaliger Import nach Haushaltseinrichtung mit SQLite-Sicherung und Schutz bestehender Rezepte.
+
 ### V181 · KitchenOwl Einkaufslisten
 
 - Docker-LXC mit 4 CPU, 4 GB RAM, 16 GB Disk; lokale TLS-, Dashboard-, Update- und externe URL-Integration.
@@ -153,8 +157,5 @@ Bei jeder neuen Installer-Version werden künftig gemeinsam aktualisiert:
 
 - Konservative Docker-/APT-/Journal-Bereinigung, TRIM, Speicherwarnungen und stabile Releases.
 
-### V177 · CPU/RAM und physische SSD
-
-- CPU/RAM nebeneinander; physische SSD mit Kapazität und getrennten Root-/Thin-Pool-Balken.
 
 **[Vollständige Versionshistorie](proxmox/HISTORY.md)**

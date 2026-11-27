@@ -1,6 +1,6 @@
 # ChatGPT-Handoff · Proxmox
 
-Stand: 26.11.2026
+Stand: 28.11.2026
 
 Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens oder sonstige Secrets hier eintragen.
 
@@ -9,12 +9,14 @@ Diese Datei dient als Übergabe für einen neuen Chat. Keine Passwörter, Tokens
 - Repository: `Technox90/homeatic`
 - Branch: `main`
 - Master-Installer: `proxmox/proxmox.sh`
-- Aktueller Installationskandidat: V181
+- Aktueller Installationskandidat: V182
 - External-URL-Tool: `proxmox/tools/proxmox-external-urls`
 - Auto-Updater: `proxmox/tools/proxmox-auto-updater`
 - Dashboard-Modul: `proxmox/modules/dashboard.sh`
 
 Produktive Namen und Pfade nicht ohne ausdrücklichen Wunsch ändern.
+
+V182: KitchenOwl-Neuinstallationen erhalten einen eingebetteten deutschen Starterbestand mit 2.201 Artikeln, 32 Produktkategorien, 52 Rezepten und 24 Rezept-Tags. Ein einmaliger systemd-Timer wartet auf den ersten Haushalt; mehrere Haushalte erfordern manuelle Auswahl. SQLite-Sicherung vor Import, keine Überschreibung vorhandener Rezepte, wiederholbare Ergänzung und ASCII-kompatible Unicode-Escapes. Bestehende Installationen werden nicht automatisch neu befüllt. Der manuelle Import in CT 111 wurde erfolgreich getestet; der automatische Erstinstallationspfad ist noch nicht live getestet.
 
 V181: KitchenOwl als optionale Docker-LXC-Anwendung mit mindestens 4 CPU-Kernen, 4 GB RAM und 16 GB Root-Disk, persistentem SQLite-Volume, zufälligem JWT-Schlüssel, deaktivierter offener Registrierung, Logrotation und lokalem HTTPS. ID/IP frei wählbar, Kollisionsschutz ohne Löschen bestehender Gäste. Dashboard-Link, Auto-Updater und externe URL-Auswahl mit Präfix shop integriert. Erstkonto lokal anlegen, danach externe URL aktivieren.
 

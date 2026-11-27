@@ -4,7 +4,13 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V181 · 27.11.2026**
+**Installationskandidat: V182 · 28.11.2026**
+
+## V182 · KitchenOwl deutscher Grundbestand
+
+- KitchenOwl-Neuinstallationen erhalten einen eingebetteten deutschen Starterbestand mit 2.201 Artikeln, 32 Produktkategorien, 52 Rezepten und 24 Rezept-Tags. Ein einmaliger systemd-Timer wartet auf den ersten Haushalt; mehrere Haushalte erfordern manuelle Auswahl. SQLite-Sicherung vor Import, keine Überschreibung vorhandener Rezepte, wiederholbare Ergänzung und ASCII-kompatible Unicode-Escapes. Bestehende Installationen werden nicht automatisch neu befüllt. Der manuelle Import in CT 111 wurde erfolgreich getestet; der automatische Erstinstallationspfad ist noch nicht live getestet.
+
+Manuelle Ergänzung bei bestehenden Installationen: `/opt/kitchenowl/starter/run-seed.sh --household ID --apply` im KitchenOwl-LXC ausführen, sofern das Startermodul bereits bereitgestellt wurde. Keine Neuinstallation erforderlich.
 
 ## V181 · KitchenOwl Einkaufslisten
 
@@ -363,6 +369,10 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V182 · KitchenOwl deutscher Grundbestand
+
+- 2.201 Artikel, 32 Kategorien, 52 Rezepte und 24 Tags; einmaliger Import nach Haushaltseinrichtung mit SQLite-Sicherung und Schutz bestehender Rezepte.
+
 ### V181 · KitchenOwl Einkaufslisten
 
 - Docker-LXC mit 4 CPU, 4 GB RAM, 16 GB Disk; lokale TLS-, Dashboard-, Update- und externe URL-Integration.
@@ -379,8 +389,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 - Konservative Docker-/APT-/Journal-Bereinigung, TRIM, Speicherwarnungen und stabile Releases.
 
-### V177 · CPU/RAM und physische SSD
-
-- CPU/RAM nebeneinander; physische SSD mit Kapazität und getrennten Root-/Thin-Pool-Balken.
 
 **[Vollständige Versionshistorie](HISTORY.md)**
