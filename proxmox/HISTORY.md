@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V181 · 27.11.2026**  
+> **Aktueller Stand: V182 · 27.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+27.11.2026 – V182 · Reverse-Proxy- und USV-Sicherheit
+--------------------------------------------------------
+- Bestehende manuelle nginx-Websites und deren Sicherheitsregeln bleiben erhalten; doppelte Servernamen werden vermieden, Konfigurationsfehler lösen Rollback aus. Neutrale DNS-Beispiele, eindeutige Reverse-Proxy-Zieladresse, Home-Assistant-Erkennung, unveränderte Compose-Werte ohne Neustart, PVE-UPS-Erkennung über CT-Hostname und Port 8080, bestehende USV-Einstellungen bleiben erhalten.
 
 27.11.2026 – V181 · KitchenOwl Einkaufslisten
 --------------------------------------------------------
