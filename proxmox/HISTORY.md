@@ -1,12 +1,16 @@
 # Proxmox Installer · Versionshistorie
 
-> **Aktueller Stand: V180 · 26.11.2026**  
+> **Aktueller Stand: V181 · 27.11.2026**  
 > Diese Datei ist die sichtbare, vollständige Changelog-Dokumentation des im Repository nachvollziehbaren Installers. Neue Versionen werden immer **oben** ergänzt.  
 > Die formale, belastbare Versionshistorie dieses Repositorys beginnt bei **V113**; frühere Versionen werden nicht nachträglich erfunden.
 
 [Zur aktuellen Installer-Dokumentation](README.md)
 
 ---
+
+27.11.2026 – V181 · KitchenOwl Einkaufslisten
+--------------------------------------------------------
+- KitchenOwl als optionale Docker-LXC-Anwendung mit mindestens 4 CPU-Kernen, 4 GB RAM und 16 GB Root-Disk, persistentem SQLite-Volume, zufälligem JWT-Schlüssel, deaktivierter offener Registrierung, Logrotation und lokalem HTTPS. ID/IP frei wählbar, Kollisionsschutz ohne Löschen bestehender Gäste. Dashboard-Link, Auto-Updater und externe URL-Auswahl mit Präfix shop integriert. Erstkonto lokal anlegen, danach externe URL aktivieren.
 
 26.11.2026 – V180 · Automatische SSD-Speichereinheiten
 --------------------------------------------------------
