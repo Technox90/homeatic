@@ -144,6 +144,65 @@ def install_dashboard_ping(download):
     if changed: run(["systemctl","restart","proxmox-dashboard-ping.service"])
     report("UPDATED" if changed else "INFO","Dashboard-Ping: Dienst aktiviert")
 
+def dashboard_kitchenowl_category():
+    """Assign the default category once, as the dashboard's unprivileged user."""
+    code = r'''
+import json, os, pathlib, stat, tempfile
+base = pathlib.Path("/var/lib/pve-sensor-dashboard-web")
+links_path = base / "links.json"
+categories_path = base / "categories.json"
+if not links_path.is_file() or not categories_path.is_file():
+    raise SystemExit(0)
+if links_path.is_symlink() or categories_path.is_symlink():
+    raise SystemExit("Dashboard-Dateien sind Symlinks")
+original = categories_path.read_bytes()
+cfg = json.loads(original)
+links = json.loads(links_path.read_bytes())
+if not isinstance(cfg, dict) or not isinstance(links, list):
+    raise SystemExit("Ungültige Kategorien/Links")
+if cfg.get("kitchenowl_default_initialized_v182"):
+    raise SystemExit(0)
+if not any(isinstance(c, dict) and c.get("id") == "extras" for c in cfg.get("categories", [])):
+    raise SystemExit(0)
+ids = [str(x.get("id", "")) for x in links if isinstance(x, dict)
+       and str(x.get("name", "")).strip().casefold() == "kitchenowl" and x.get("id")]
+if not ids:
+    raise SystemExit(0)
+assignments = cfg.setdefault("assignments", {})
+if not isinstance(assignments, dict):
+    raise SystemExit("Ungültige Zuordnungen")
+for link_id in ids:
+    if not assignments.get(link_id):
+        assignments[link_id] = "extras"
+cfg["kitchenowl_default_initialized_v182"] = True
+mode = stat.S_IMODE(categories_path.stat().st_mode)
+fd, tmp = tempfile.mkstemp(prefix=".categories-v182-", dir=base)
+try:
+    with os.fdopen(fd, "wb") as file:
+        file.write((json.dumps(cfg, ensure_ascii=False, indent=2) + "\n").encode())
+        file.flush()
+        os.fsync(file.fileno())
+    os.chmod(tmp, mode)
+    if categories_path.read_bytes() != original:
+        raise SystemExit("Kategorien wurden gleichzeitig bearbeitet; nächster Lauf")
+    backup = base / "categories.json.pre-v182"
+    if not backup.exists():
+        with backup.open("xb") as file:
+            file.write(original)
+        backup.chmod(0o600)
+    os.replace(tmp, categories_path)
+    print("UPDATED")
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+'''
+    if not pathlib.Path("/var/lib/pve-sensor-dashboard-web/categories.json").is_file():
+        return
+    cp = run(["runuser", "-u", "pve-monitor", "--", "python3", "-c", code],
+             capture_output=True, text=True)
+    if cp.stdout.strip() == "UPDATED":
+        report("UPDATED", "Dashboard: KitchenOwl-Standardkategorie geprüft")
+
 def dashboard_update(master,download):
     index=DASH/"index.html"
     overlay=DASH/"installer-update-v155.js"
@@ -177,6 +236,10 @@ def dashboard_update(master,download):
         report("UPDATED","Dashboard: verwaltete Toolbar und Installer-Updateanzeige")
     else:
         report("INFO","Dashboard-Oberfläche aktuell")
+    try:
+        dashboard_kitchenowl_category()
+    except Exception as exc:
+        report("MANUAL","KitchenOwl-Kategorie prüfen: "+type(exc).__name__)
 
 def kuma_update(master):
     listing=run(["pct","list"],capture_output=True,text=True).stdout
