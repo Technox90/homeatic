@@ -4,7 +4,11 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V181 · 27.11.2026**
+**Installationskandidat: V182 · 27.11.2026**
+
+## V182 · Reverse-Proxy- und USV-Sicherheit
+
+- Bestehende manuelle nginx-Websites und deren Sicherheitsregeln bleiben erhalten; doppelte Servernamen werden vermieden, Konfigurationsfehler lösen Rollback aus. Neutrale DNS-Beispiele, eindeutige Reverse-Proxy-Zieladresse, Home-Assistant-Erkennung, unveränderte Compose-Werte ohne Neustart, PVE-UPS-Erkennung über CT-Hostname und Port 8080, bestehende USV-Einstellungen bleiben erhalten.
 
 ## V181 · KitchenOwl Einkaufslisten
 
@@ -363,6 +367,10 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V182 · Reverse-Proxy- und USV-Sicherheit
+
+- Bestehende manuelle nginx-Websites und deren Sicherheitsregeln bleiben erhalten; doppelte Servernamen werden vermieden, Konfigurationsfehler lösen Rollback aus. Neutrale DNS-Beispiele, eindeutige Reverse-Proxy-Zieladresse, Home-Assistant-Erkennung, unveränderte Compose-Werte ohne Neustart, PVE-UPS-Erkennung über CT-Hostname und Port 8080, bestehende USV-Einstellungen bleiben erhalten.
+
 ### V181 · KitchenOwl Einkaufslisten
 
 - Docker-LXC mit 4 CPU, 4 GB RAM, 16 GB Disk; lokale TLS-, Dashboard-, Update- und externe URL-Integration.
@@ -378,9 +386,5 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 ### V178 · Speicherwartung und Auto-Release
 
 - Konservative Docker-/APT-/Journal-Bereinigung, TRIM, Speicherwarnungen und stabile Releases.
-
-### V177 · CPU/RAM und physische SSD
-
-- CPU/RAM nebeneinander; physische SSD mit Kapazität und getrennten Root-/Thin-Pool-Balken.
 
 **[Vollständige Versionshistorie](HISTORY.md)**
