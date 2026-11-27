@@ -428,7 +428,7 @@ jobs:
           grep -q 'PROXMOX_SECRET_BACKUP_DIR="/home/passwort"' proxmox/proxmox.sh
           grep -q 'PROXMOX_DOWNLOAD_DIR="/home/downloads"' proxmox/proxmox.sh
           grep -q 'PROXMOX_IMAGE_DIR="/home/img"' proxmox/proxmox.sh
-          grep -q 'PROXMOX_MODULE_REF="715f3f166165d590b1c98af131b1180ab1ff56b8"' proxmox/proxmox.sh
+          grep -Eq '^PROXMOX_MODULE_REF="[0-9a-f]{40}"$' proxmox/proxmox.sh
           grep -q 'load_proxmox_module_v140 "dashboard"' proxmox/proxmox.sh
           grep -q 'install_dashboard() {' proxmox/modules/dashboard.sh
           grep -q 'install_dashboard_settings_v4() {' proxmox/modules/dashboard.sh

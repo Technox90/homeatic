@@ -4,7 +4,11 @@ Modularer Komplett-Installer für Proxmox VE.
 
 ## Aktueller Stand
 
-**Installationskandidat: V180 · 26.11.2026**
+**Installationskandidat: V181 · 27.11.2026**
+
+## V181 · KitchenOwl Einkaufslisten
+
+- KitchenOwl als optionale Docker-LXC-Anwendung mit mindestens 4 CPU-Kernen, 4 GB RAM und 16 GB Root-Disk, persistentem SQLite-Volume, zufälligem JWT-Schlüssel, deaktivierter offener Registrierung, Logrotation und lokalem HTTPS. ID/IP frei wählbar, Kollisionsschutz ohne Löschen bestehender Gäste. Dashboard-Link, Auto-Updater und externe URL-Auswahl mit Präfix shop integriert. Erstkonto lokal anlegen, danach externe URL aktivieren.
 
 ## V180 · Automatische SSD-Speichereinheiten
 
@@ -359,24 +363,24 @@ In beiden README-Dateien steht der Versionsverlauf am Ende, mit den fünf neuest
 
 ## Versionsverlauf – letzte 5 Versionen
 
+### V181 · KitchenOwl Einkaufslisten
+
+- Docker-LXC mit 4 CPU, 4 GB RAM, 16 GB Disk; lokale TLS-, Dashboard-, Update- und externe URL-Integration.
+
 ### V180 · Automatische SSD-Speichereinheiten
 
-- Speicherwerte unter 950 MB in MB, ab 950 MB in GB; gilt für Gesamtkapazität, belegt, verfügbar und reserviert.
+- Unter 950 MB in MB, ab 950 MB in GB.
 
 ### V179 · CPU/RAM-Icon und Update-Timer
 
-- Doppeltes CPU-Icon entfernt, CPU/RAM-Symbole ausgerichtet; Updateprüfung alle fünf Minuten.
+- Doppeltes CPU-Icon entfernt; Updateprüfung alle fünf Minuten.
 
 ### V178 · Speicherwartung und Auto-Release
 
-- Konservative Docker-/APT-/Journal-Bereinigung, TRIM, Speicherwarnungen, HA-Updateabfrage und stabile Releases; fehlende Docker-Logrotation wird gemeldet.
+- Konservative Docker-/APT-/Journal-Bereinigung, TRIM, Speicherwarnungen und stabile Releases.
 
 ### V177 · CPU/RAM und physische SSD
 
-- CPU/RAM nebeneinander, Temperaturen kompakt, physische SSD mit Kapazität, Belegung und getrennten Root-/Thin-Pool-Balken.
-
-### V176 · Schutz und Speicher
-
-- Fail2Ban-Schutzkachel, SSD-Temperatur, zentrale Host-Zeitzone für Dashboard und UPPER.
+- CPU/RAM nebeneinander; physische SSD mit Kapazität und getrennten Root-/Thin-Pool-Balken.
 
 **[Vollständige Versionshistorie](HISTORY.md)**

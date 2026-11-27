@@ -758,6 +758,7 @@ update_managed_lxcs() {
     update_one_ct "syncthing"         "Syncthing"           "/opt/syncthing"
     update_one_ct "speedtest-tracker" "Speedtest Tracker"   "/opt/speedtest-tracker"
     update_one_ct "scrutiny"          "Scrutiny"            "/opt/scrutiny"
+    update_one_ct "kitchenowl"        "KitchenOwl"          "/opt/kitchenowl"
     update_one_ct "mealie"            "Mealie"              "/opt/mealie"
 }
 

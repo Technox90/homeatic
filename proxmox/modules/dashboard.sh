@@ -23603,6 +23603,7 @@ count_install_steps() {
     (( INSTALL_SPEEDTEST )) && total=$((total + 1))
     (( INSTALL_SCRUTINY )) && total=$((total + 1))
     (( INSTALL_MEALIE )) && total=$((total + 1))
+    (( ${INSTALL_KITCHENOWL:-0} )) && total=$((total + 1))
     (( INSTALL_PBS )) && total=$((total + 1))
     (( INSTALL_PULSE )) && total=$((total + 1))
     (( INSTALL_PVEUPS )) && total=$((total + 1))
@@ -23630,7 +23631,7 @@ count_install_steps() {
     if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX ||
           INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
           INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-          INSTALL_SCRUTINY || INSTALL_MEALIE )); then
+          INSTALL_SCRUTINY || INSTALL_MEALIE || ${INSTALL_KITCHENOWL:-0} )); then
         total=$((total + 1))
     fi
 

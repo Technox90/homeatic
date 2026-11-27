@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # =============================================================================
-# PROXMOX MODULARER KOMPLETT-INSTALLER V180
+# PROXMOX MODULARER KOMPLETT-INSTALLER V181
 # =============================================================================
 # Kompaktes Hauptmenü (V107):
 #   O = Optimale Installation
@@ -1010,8 +1010,8 @@ run_install_step() {
 # =============================================================================
 
 TUI_AVAILABLE=0
-TUI_TITLE="PROXMOX INSTALLER V180"
-TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V180"
+TUI_TITLE="PROXMOX INSTALLER V181"
+TUI_BACKTITLE="Proxmox · Modularer Komplett-Installer V181"
 
 ensure_tui() {
     if command -v whiptail >/dev/null 2>&1; then
@@ -2023,7 +2023,8 @@ tui_selected_extended_text() {
     out+="  [$([[ "$INSTALL_SYNCTHING" -eq 1 ]] && echo X || echo ' ')] Syncthing   "
     out+="[$([[ "$INSTALL_SPEEDTEST" -eq 1 ]] && echo X || echo ' ')] Speedtest Tracker\n"
     out+="  [$([[ "$INSTALL_SCRUTINY" -eq 1 ]] && echo X || echo ' ')] Scrutiny   "
-    out+="[$([[ "$INSTALL_MEALIE" -eq 1 ]] && echo X || echo ' ')] Mealie\n\n"
+    out+="[$([[ "$INSTALL_MEALIE" -eq 1 ]] && echo X || echo ' ')] Mealie\n"
+    out+="  [$([[ "$INSTALL_KITCHENOWL" -eq 1 ]] && echo X || echo ' ')] KitchenOwl\n\n"
 
     out+="BETRIEBSSYSTEM\n"
     if (( INSTALL_OS )); then
@@ -2088,6 +2089,7 @@ tui_extended_checklist() {
                 "14" "EXTRAS · Scrutiny" OFF \
                 "15" "EXTRAS · Mealie" OFF \
                 "16" "OPTIONAL · Betriebssystem-VM · Windows / Linux" OFF \
+                "17" "EXTRAS · KitchenOwl" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
 
@@ -2112,6 +2114,7 @@ tui_extended_checklist() {
                 14) INSTALL_SCRUTINY=1 ;;
                 15) INSTALL_MEALIE=1 ;;
                 16) INSTALL_OS=1 ;;
+                17) INSTALL_KITCHENOWL=1 ;;
             esac
         done <<<"$selected"
 
@@ -6321,7 +6324,7 @@ fi
 # V146: Der Auto-Updater wird nicht mehr doppelt im Master-Installer gepflegt.
 # Die kanonische, separat getestete Version wird unten aus proxmox/tools installiert.
 
-TOOLS_REF="12cb0ee1eabdc81b8416f04ebe30ebdd563335bc"
+TOOLS_REF="db6f3f2b40e082f9729abd0ac0b2db89cb4a52ae"
 TOOLS_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${TOOLS_REF}/proxmox/tools"
 TOOLS_CACHE="/home/downloads/proxmox/tools/${TOOLS_REF}"
 
@@ -6964,6 +6967,7 @@ reset_addon_flags_v94() {
     INSTALL_SPEEDTEST=0
     INSTALL_SCRUTINY=0
     INSTALL_MEALIE=0
+    INSTALL_KITCHENOWL=0
 }
 
 reset_community_flags_v94() {
@@ -7009,6 +7013,7 @@ select_addon_components_v94() {
                 "8"  "Speedtest Tracker" OFF \
                 "9"  "Scrutiny" OFF \
                 "10" "Mealie" OFF \
+                "11" "KitchenOwl" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
@@ -7023,6 +7028,7 @@ select_addon_components_v94() {
         echo " 8) Speedtest Tracker"
         echo " 9) Scrutiny"
         echo "10) Mealie"
+        echo "11) KitchenOwl"
         echo
         read -rp "Zusatzanwendungen auswählen (z.B. 1,4,10; ENTER = keine): " selected
         [[ -n "$selected" ]] || return 1
@@ -7043,6 +7049,7 @@ select_addon_components_v94() {
             8)  INSTALL_SPEEDTEST=1 ;;
             9)  INSTALL_SCRUTINY=1 ;;
             10) INSTALL_MEALIE=1 ;;
+            11) INSTALL_KITCHENOWL=1 ;;
             *)
                 warn "Ungültige Zusatzanwendungs-Auswahl: $choice"
                 ;;
@@ -7052,7 +7059,7 @@ select_addon_components_v94() {
     (( INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY ||
        INSTALL_STIRLING || INSTALL_NTFY || INSTALL_FORGEJO ||
        INSTALL_SYNCTHING || INSTALL_SPEEDTEST || INSTALL_SCRUTINY ||
-       INSTALL_MEALIE )) || return 1
+       INSTALL_MEALIE || INSTALL_KITCHENOWL )) || return 1
 
     return 0
 }
@@ -7133,6 +7140,7 @@ reset_install_flags() {
     INSTALL_SPEEDTEST=0
     INSTALL_SCRUTINY=0
     INSTALL_MEALIE=0
+    INSTALL_KITCHENOWL=0
 
     # Community-Scripts Erweiterungen
     INSTALL_PBS=0
@@ -7180,12 +7188,13 @@ select_apps_compact_v106() {
                 "8"  "Speedtest Tracker" ON \
                 "9"  "Scrutiny" ON \
                 "10" "Mealie" OFF \
+                "11" "KitchenOwl" OFF \
                 3>&1 1>&2 2>&3
         )" || return 1
     else
         header "APPS & DIENSTE AUSWÄHLEN"
         echo "1 Uptime · 2 Vaultwarden · 3 Caddy · 4 Stirling · 5 ntfy"
-        echo "6 Forgejo · 7 Syncthing · 8 Speedtest · 9 Scrutiny · 10 Mealie"
+        echo "6 Forgejo · 7 Syncthing · 8 Speedtest · 9 Scrutiny · 10 Mealie · 11 KitchenOwl"
         read -rp "Auswahl kommasepariert [1,3,4,8,9]: " selected
         selected="${selected:-1,3,4,8,9}"
         selected="$(printf '%s' "$selected" | tr ',' '\n')"
@@ -7205,13 +7214,14 @@ select_apps_compact_v106() {
             8)  INSTALL_SPEEDTEST=1 ;;
             9)  INSTALL_SCRUTINY=1 ;;
             10) INSTALL_MEALIE=1 ;;
+            11) INSTALL_KITCHENOWL=1 ;;
             *) warn "Unbekannte App-Auswahl ignoriert: $choice" ;;
         esac
     done <<<"$selected"
 
     (( INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
        INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-       INSTALL_SCRUTINY || INSTALL_MEALIE )) || return 1
+       INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_KITCHENOWL )) || return 1
 
     return 0
 }
@@ -7577,6 +7587,7 @@ setup_profile_apply_selection_v64() {
             INSTALL_SPEEDTEST) INSTALL_SPEEDTEST="$value" ;;
             INSTALL_SCRUTINY) INSTALL_SCRUTINY="$value" ;;
             INSTALL_MEALIE) INSTALL_MEALIE="$value" ;;
+            INSTALL_KITCHENOWL) INSTALL_KITCHENOWL="$value" ;;
             INSTALL_PBS) INSTALL_PBS="$value" ;;
             INSTALL_PULSE) INSTALL_PULSE="$value" ;;
             INSTALL_PVEUPS) INSTALL_PVEUPS="$value" ;;
@@ -7640,6 +7651,7 @@ allowed = {
     "INSTALL_SPEEDTEST",
     "INSTALL_SCRUTINY",
     "INSTALL_MEALIE",
+    "INSTALL_KITCHENOWL",
     "INSTALL_PBS",
     "INSTALL_PULSE",
     "INSTALL_PVEUPS",
@@ -8071,6 +8083,7 @@ setup_profile_save_v64() {
         INSTALL_SPEEDTEST="${INSTALL_SPEEDTEST:-0}" \
         INSTALL_SCRUTINY="${INSTALL_SCRUTINY:-0}" \
         INSTALL_MEALIE="${INSTALL_MEALIE:-0}" \
+        INSTALL_KITCHENOWL="${INSTALL_KITCHENOWL:-0}" \
         INSTALL_PBS="${INSTALL_PBS:-0}" \
         INSTALL_PULSE="${INSTALL_PULSE:-0}" \
         INSTALL_PVEUPS="${INSTALL_PVEUPS:-0}" \
@@ -8189,6 +8202,7 @@ flags = [
     "INSTALL_SPEEDTEST",
     "INSTALL_SCRUTINY",
     "INSTALL_MEALIE",
+    "INSTALL_KITCHENOWL",
     "INSTALL_PBS",
     "INSTALL_PULSE",
     "INSTALL_PVEUPS",
@@ -8247,7 +8261,7 @@ if os_mode in {
 payload = {
     "format": "pve-modular-setup-profile",
     "version": 1,
-    "installer_version": "V180",
+    "installer_version": "V181",
     "created": datetime.now().strftime(
         "%d.%m.%Y %H:%M:%S"
     ),
@@ -8349,7 +8363,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                INSTALL_NETALERTX || INSTALL_UPTIME || INSTALL_VAULTWARDEN ||
                INSTALL_CADDY || INSTALL_STIRLING || INSTALL_NTFY || INSTALL_FORGEJO ||
                INSTALL_SYNCTHING || INSTALL_SPEEDTEST || INSTALL_SCRUTINY ||
-               INSTALL_MEALIE || INSTALL_OS )) || {
+               INSTALL_MEALIE || INSTALL_KITCHENOWL || INSTALL_OS )) || {
                 tui_msgbox \
                     "KEINE AUSWAHL" \
                     "Es wurde keine Komponente ausgewählt."
@@ -8366,7 +8380,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
 
         header "ALLES INSTALLIEREN - KOMPONENTEN AUSWÄHLEN"
         echo "Terminal-Fallback:"
-        echo "1-5 = Basics · 6-15 = Extras · 16 = Betriebssystem-VM"
+        echo "1-5 = Basics · 6-15,17 = Extras · 16 = Betriebssystem-VM"
         echo "A = alle inkl. Betriebssystem · B = Basics · Z = Extras"
         echo
 
@@ -8393,6 +8407,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                 INSTALL_SPEEDTEST=1
                 INSTALL_SCRUTINY=1
                 INSTALL_MEALIE=1
+                INSTALL_KITCHENOWL=1
                 INSTALL_OS=1
                 ;;
             B)
@@ -8413,6 +8428,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                 INSTALL_SPEEDTEST=1
                 INSTALL_SCRUTINY=1
                 INSTALL_MEALIE=1
+                INSTALL_KITCHENOWL=1
                 ;;
             *)
                 local choices choice
@@ -8436,6 +8452,7 @@ Die übrige Komponentenauswahl bleibt erhalten."
                         14) INSTALL_SCRUTINY=1 ;;
                         15) INSTALL_MEALIE=1 ;;
                         16) INSTALL_OS=1 ;;
+                17) INSTALL_KITCHENOWL=1 ;;
                         *) die "Ungültige Komponentenauswahl: $choice" ;;
                     esac
                 done
@@ -8721,7 +8738,7 @@ refresh_secret_index_v107() {
     umask 077
     {
         echo "============================================================"
-        echo " PROXMOX INSTALLER V180 · SECRET-INDEX"
+        echo " PROXMOX INSTALLER V181 · SECRET-INDEX"
         echo "============================================================"
         echo "Erstellt: $(date '+%d.%m.%Y %H:%M:%S')"
         echo "Host:     $(hostname)"
@@ -9283,6 +9300,7 @@ while true; do
             INSTALL_SPEEDTEST=1
             INSTALL_SCRUTINY=1
             INSTALL_MEALIE=1
+            INSTALL_KITCHENOWL=1
             break
             ;;
         APPS)
@@ -9484,6 +9502,7 @@ if (( TUI_AVAILABLE && ! OPTIMAL_INSTALL )); then
     (( INSTALL_SPEEDTEST )) && SELECTED_OVERVIEW+="[X] Speedtest Tracker\n"
     (( INSTALL_SCRUTINY )) && SELECTED_OVERVIEW+="[X] Scrutiny\n"
     (( INSTALL_MEALIE )) && SELECTED_OVERVIEW+="[X] Mealie\n"
+    (( INSTALL_KITCHENOWL )) && SELECTED_OVERVIEW+="[X] KitchenOwl\n"
     (( INSTALL_PBS )) && SELECTED_OVERVIEW+="[X] Proxmox Backup Server\n"
     (( INSTALL_PULSE )) && SELECTED_OVERVIEW+="[X] Pulse\n"
     (( INSTALL_PVEUPS )) && SELECTED_OVERVIEW+="[X] PVE-UPS\n"
@@ -9861,7 +9880,7 @@ if (( ${INSTALL_PAPERLESS:-0} || ${INSTALL_PIHOLE:-0} || ${INSTALL_NETALERTX:-0}
       ${INSTALL_UPTIME:-0} || ${INSTALL_VAULTWARDEN:-0} || ${INSTALL_CADDY:-0} ||
       ${INSTALL_STIRLING:-0} || ${INSTALL_NTFY:-0} || ${INSTALL_FORGEJO:-0} ||
       ${INSTALL_SYNCTHING:-0} || ${INSTALL_SPEEDTEST:-0} || ${INSTALL_SCRUTINY:-0} ||
-      ${INSTALL_MEALIE:-0} )); then
+      ${INSTALL_MEALIE:-0} || ${INSTALL_KITCHENOWL:-0} )); then
     prepare_reusable_downloads
 fi
 
@@ -10095,7 +10114,7 @@ validate_selected_storage_v107() {
           ${INSTALL_UPTIME:-0} || ${INSTALL_VAULTWARDEN:-0} || ${INSTALL_CADDY:-0} ||
           ${INSTALL_STIRLING:-0} || ${INSTALL_NTFY:-0} || ${INSTALL_FORGEJO:-0} ||
           ${INSTALL_SYNCTHING:-0} || ${INSTALL_SPEEDTEST:-0} || ${INSTALL_SCRUTINY:-0} ||
-          ${INSTALL_MEALIE:-0} || ${INSTALL_PBS:-0} || ${INSTALL_PULSE:-0} ||
+          ${INSTALL_MEALIE:-0} || ${INSTALL_KITCHENOWL:-0} || ${INSTALL_PBS:-0} || ${INSTALL_PULSE:-0} ||
           ${INSTALL_PVEUPS:-0} || ${INSTALL_SEMAPHORE:-0} || ${INSTALL_POCKETID:-0} ||
           ${INSTALL_PROMETHEUS:-0} || ${INSTALL_PVE_EXPORTER:-0} || ${INSTALL_GRAFANA:-0} ||
           ${INSTALL_PANGOLIN:-0} || ${INSTALL_NEWT:-0} || ${INSTALL_GATUS:-0} ||
@@ -10211,6 +10230,7 @@ selected_guest_disk_sum_v107() {
     (( INSTALL_SPEEDTEST )) && total=$((total + SPEEDTEST_DISK))
     (( INSTALL_SCRUTINY )) && total=$((total + SCRUTINY_DISK))
     (( INSTALL_MEALIE )) && total=$((total + MEALIE_DISK))
+    (( INSTALL_KITCHENOWL )) && total=$((total + KITCHENOWL_DISK))
     (( INSTALL_PBS )) && total=$((total + PBS_DISK))
     (( INSTALL_PULSE )) && total=$((total + PULSE_DISK))
     (( INSTALL_PVEUPS )) && total=$((total + PVEUPS_DISK))
@@ -10309,7 +10329,7 @@ NEED_GUESTS=0
 (( INSTALL_HA || INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS ||
    INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
    INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-   INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_PBS || INSTALL_PULSE ||
+   INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_KITCHENOWL || INSTALL_PBS || INSTALL_PULSE ||
    INSTALL_PVEUPS || INSTALL_SEMAPHORE || INSTALL_POCKETID ||
    INSTALL_PROMETHEUS || INSTALL_PVE_EXPORTER || INSTALL_GRAFANA ||
    INSTALL_PANGOLIN || INSTALL_NEWT || INSTALL_GATUS ||
@@ -10345,7 +10365,7 @@ if (( NEED_GUESTS )); then
     if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX || INSTALL_OS ||
           INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
           INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-          INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_PBS || INSTALL_PULSE ||
+          INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_KITCHENOWL || INSTALL_PBS || INSTALL_PULSE ||
           INSTALL_PVEUPS || INSTALL_SEMAPHORE || INSTALL_POCKETID ||
           INSTALL_PROMETHEUS || INSTALL_PVE_EXPORTER || INSTALL_GRAFANA ||
           INSTALL_PANGOLIN || INSTALL_NEWT || INSTALL_GATUS ||
@@ -11080,6 +11100,7 @@ SYNCTHING_ID=""; SYNCTHING_CIDR=""; SYNCTHING_IP=""; SYNCTHING_CORES=""; SYNCTHI
 SPEEDTEST_ID=""; SPEEDTEST_CIDR=""; SPEEDTEST_IP=""; SPEEDTEST_CORES=""; SPEEDTEST_MEMORY=""; SPEEDTEST_DISK=""
 SCRUTINY_ID=""; SCRUTINY_CIDR=""; SCRUTINY_IP=""; SCRUTINY_CORES=""; SCRUTINY_MEMORY=""; SCRUTINY_DISK=""
 MEALIE_ID=""; MEALIE_CIDR=""; MEALIE_IP=""; MEALIE_CORES=""; MEALIE_MEMORY=""; MEALIE_DISK=""
+KITCHENOWL_ID=""; KITCHENOWL_CIDR=""; KITCHENOWL_IP=""; KITCHENOWL_CORES=""; KITCHENOWL_MEMORY=""; KITCHENOWL_DISK=""
 
 # Community-Scripts Erweiterungen
 PBS_ID=""; PBS_CIDR=""; PBS_IP=""; PBS_CORES=""; PBS_MEMORY=""; PBS_DISK=""
@@ -11229,6 +11250,30 @@ fi
 if (( INSTALL_SCRUTINY )); then
     header "SCRUTINY EINSTELLUNGEN"
     configure_optional_lxc_app SCRUTINY "Scrutiny" 2 2 12 12
+fi
+
+if (( INSTALL_KITCHENOWL )); then
+    header "KITCHENOWL EINSTELLUNGEN"
+    allocate_id
+    KITCHENOWL_ID="$(get_value "CT-ID KitchenOwl" "$ALLOCATED_ID")"
+    [[ "$KITCHENOWL_ID" =~ ^[0-9]+$ ]] || die "KitchenOwl: ungültige CT-ID."
+    reject_reserved_guest_id "$KITCHENOWL_ID"
+    free_id_check "$KITCHENOWL_ID" || die "KitchenOwl: CT-/VM-ID belegt; vorhandene Gäste bleiben unverändert."
+    RESERVED_IDS["$KITCHENOWL_ID"]="KitchenOwl"
+    KITCHENOWL_CIDR="$(get_value "KitchenOwl IP/CIDR" "$(suggest_ip_from_guest_id "$KITCHENOWL_ID" || true)")"
+    KITCHENOWL_IP="${KITCHENOWL_CIDR%%/*}"
+    [[ -n "$KITCHENOWL_IP" ]] || die "KitchenOwl: IP fehlt."
+    KITCHENOWL_CORES="$(get_cpu_cores "CPU-Kerne für KitchenOwl" 4 4)"
+    while true; do
+        KITCHENOWL_MEMORY="$(get_ram_mb "RAM für KitchenOwl in GB (mind. 4)" 4)"
+        (( KITCHENOWL_MEMORY >= 4096 )) && break
+        warn "KitchenOwl benötigt mindestens 4 GB RAM."
+    done
+    while true; do
+        KITCHENOWL_DISK="$(get_disk_gb "Root-Disk für KitchenOwl in GB (mind. 16)" 16 16)"
+        (( KITCHENOWL_DISK >= 16 )) && break
+        warn "KitchenOwl benötigt mindestens 16 GB Root-Disk."
+    done
 fi
 
 if (( INSTALL_MEALIE )); then
@@ -11451,6 +11496,7 @@ register_service_ip() {
 (( INSTALL_SPEEDTEST )) && register_service_ip "Speedtest Tracker" "$SPEEDTEST_IP"
 (( INSTALL_SCRUTINY )) && register_service_ip "Scrutiny" "$SCRUTINY_IP"
 (( INSTALL_MEALIE )) && register_service_ip "Mealie" "$MEALIE_IP"
+(( INSTALL_KITCHENOWL )) && register_service_ip "KitchenOwl" "$KITCHENOWL_IP"
 (( INSTALL_PBS )) && register_service_ip "Proxmox Backup Server" "$PBS_IP"
 (( INSTALL_PULSE )) && register_service_ip "Pulse" "$PULSE_IP"
 (( INSTALL_PVEUPS )) && register_service_ip "PVE-UPS" "$PVEUPS_IP"
@@ -11605,6 +11651,13 @@ fi
     "CPU / RAM" "${SCRUTINY_CORES} / $((SCRUTINY_MEMORY / 1024)) GB" \
     "Disk" "${SCRUTINY_DISK} GB" \
     "Collector" "Proxmox-Host · alle 15 Minuten"
+
+(( INSTALL_KITCHENOWL )) && ui_card \
+    "KitchenOwl" \
+    "CT-ID" "$KITCHENOWL_ID" \
+    "Web" "https://${KITCHENOWL_IP}/" \
+    "CPU / RAM" "${KITCHENOWL_CORES} / $((KITCHENOWL_MEMORY / 1024)) GB" \
+    "Disk" "${KITCHENOWL_DISK} GB"
 
 (( INSTALL_MEALIE )) && ui_card \
     "Mealie" \
@@ -12036,7 +12089,7 @@ verify_web_v107() {
 # Die komplette Dashboard-Logik liegt nicht mehr im Master-Installer.
 # Sie wird über einen unveränderlichen Git-Commit in /home/downloads gecacht
 # und anschließend mit source in den aktuellen Installer-Kontext eingebunden.
-PROXMOX_MODULE_REF="715f3f166165d590b1c98af131b1180ab1ff56b8"
+PROXMOX_MODULE_REF="db6f3f2b40e082f9729abd0ac0b2db89cb4a52ae"
 PROXMOX_MODULE_RAW_BASE="https://raw.githubusercontent.com/Technox90/homeatic/${PROXMOX_MODULE_REF}/proxmox/modules"
 
 load_proxmox_module_v140() {
@@ -15433,6 +15486,48 @@ EOF
         warn "Erster Scrutiny-Collector-Lauf war noch nicht erfolgreich."
     fi
 
+}
+
+install_kitchenowl() {
+    header "KITCHENOWL INSTALLIEREN"
+    [[ ! -e "/etc/pve/lxc/${KITCHENOWL_ID}.conf" && ! -e "/etc/pve/qemu-server/${KITCHENOWL_ID}.conf" ]] || die "KitchenOwl: ID bereits belegt."
+    command -v arping >/dev/null || apt-get install -y iputils-arping
+    arping -D -q -I "$BRIDGE" -c 3 -w 5 "$KITCHENOWL_IP" || die "KitchenOwl: IP belegt oder ARP-Prüfung fehlgeschlagen."
+    if grep -Fq "ip=${KITCHENOWL_IP}/" /etc/pve/lxc/*.conf /etc/pve/qemu-server/*.conf 2>/dev/null; then
+        die "KitchenOwl: IP bereits in einem Gast konfiguriert."
+    fi
+    create_docker_app_lxc "$KITCHENOWL_ID" "kitchenowl" "$KITCHENOWL_CIDR" "$KITCHENOWL_CORES" "$KITCHENOWL_MEMORY" "$KITCHENOWL_DISK"
+    pct exec "$KITCHENOWL_ID" -- bash -c '
+        set -Eeuo pipefail
+        umask 077
+        mkdir -p /opt/kitchenowl
+        cd /opt/kitchenowl
+        test -f .env || printf "JWT_SECRET_KEY=%s\n" "$(openssl rand -hex 48)" > .env
+        cat > docker-compose.yml <<\EOF
+services:
+  kitchenowl:
+    image: tombursch/kitchenowl:latest
+    container_name: kitchenowl
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?missing secret}
+      OPEN_REGISTRATION: "false"
+    volumes:
+      - kitchenowl_data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  kitchenowl_data:
+EOF
+    '
+    docker_compose_deploy_in_ct_v107 "$KITCHENOWL_ID" "/opt/kitchenowl"
+    configure_lxc_web_standard_ports_v65 "$KITCHENOWL_ID" "KitchenOwl" "http" "8080"
+    verify_web_v107 "KitchenOwl" "https://${KITCHENOWL_IP}/" 120
 }
 
 install_mealie() {
@@ -20216,6 +20311,7 @@ final_install_validation_v107() {
     (( INSTALL_SPEEDTEST )) && { final_lxc_check_v107 "Speedtest Tracker" "$SPEEDTEST_ID" || failures=$((failures+1)); final_http_check_v107 "Speedtest Tracker" "https://${SPEEDTEST_IP}/api/healthcheck" 20 || failures=$((failures+1)); }
     (( INSTALL_SCRUTINY )) && { final_lxc_check_v107 "Scrutiny" "$SCRUTINY_ID" || failures=$((failures+1)); final_http_check_v107 "Scrutiny" "https://${SCRUTINY_IP}/" 20 || failures=$((failures+1)); systemctl is-enabled --quiet scrutiny-collector.timer || { warn "FINALTEST: Scrutiny Collector Timer nicht aktiviert."; failures=$((failures+1)); }; }
     (( INSTALL_MEALIE )) && { final_lxc_check_v107 "Mealie" "$MEALIE_ID" || failures=$((failures+1)); final_http_check_v107 "Mealie" "https://${MEALIE_IP}/" 20 || failures=$((failures+1)); }
+    (( INSTALL_KITCHENOWL )) && { final_lxc_check_v107 "KitchenOwl" "$KITCHENOWL_ID" || failures=$((failures+1)); final_http_check_v107 "KitchenOwl" "https://${KITCHENOWL_IP}/" 20 || failures=$((failures+1)); }
 
     (( INSTALL_PBS )) && { final_lxc_check_v107 "PBS" "$PBS_ID" || failures=$((failures+1)); final_http_check_v107 "PBS" "https://${PBS_IP}:8007/" 20 || failures=$((failures+1)); }
     (( INSTALL_PULSE )) && { final_lxc_check_v107 "Pulse" "$PULSE_ID" || failures=$((failures+1)); final_http_check_v107 "Pulse" "https://${PULSE_IP}/" 15 || failures=$((failures+1)); }
@@ -20438,7 +20534,7 @@ run_install_step \
 if (( INSTALL_PAPERLESS || INSTALL_PIHOLE || INSTALL_NETALERTX ||
       INSTALL_UPTIME || INSTALL_VAULTWARDEN || INSTALL_CADDY || INSTALL_STIRLING ||
       INSTALL_NTFY || INSTALL_FORGEJO || INSTALL_SYNCTHING || INSTALL_SPEEDTEST ||
-      INSTALL_SCRUTINY || INSTALL_MEALIE )); then
+      INSTALL_SCRUTINY || INSTALL_MEALIE || INSTALL_KITCHENOWL )); then
     run_install_step \
         "Installationsbasis vorbereiten · Debian LXC Template" \
         prepare_lxc_template
@@ -20467,6 +20563,7 @@ fi
 (( INSTALL_SPEEDTEST )) && run_install_step "Speedtest Tracker" install_speedtest_tracker
 (( INSTALL_SCRUTINY )) && run_install_step "Scrutiny" install_scrutiny
 (( INSTALL_MEALIE )) && run_install_step "Mealie" install_mealie
+(( INSTALL_KITCHENOWL )) && run_install_step "KitchenOwl" install_kitchenowl
 
 (( INSTALL_PBS )) && run_install_step "Proxmox Backup Server" install_proxmox_backup_server
 (( INSTALL_PULSE )) && run_pulse_install_step_v86
@@ -20522,6 +20619,7 @@ fi
 (( INSTALL_SPEEDTEST )) && dashboard_link_upsert "Speedtest Tracker" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && dashboard_link_upsert "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && dashboard_link_upsert "Mealie" "https://${MEALIE_IP}/"
+(( INSTALL_KITCHENOWL )) && dashboard_link_upsert "KitchenOwl" "https://${KITCHENOWL_IP}/"
 (( INSTALL_PBS )) && dashboard_link_upsert "Proxmox Backup Server" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && dashboard_link_upsert "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && dashboard_link_upsert "PVE-UPS" "https://${PVEUPS_IP}/"
@@ -20600,7 +20698,7 @@ if (( INSTALL_DASHBOARD )) || [[ -f /opt/dashboard/static/index.html ]]; then
     (( INSTALL_DASHBOARD )) && install_dashboard_branding_v154
     install_installer_update_dashboard_v155 || warn "Installer-Monitor Dashboard-Anzeige fehlt."
     if (( INSTALL_DASHBOARD )); then
-        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V180'
+        python3 - "$TOOLS_REF" <<'PVE_DASHBOARD_V181'
 import importlib.machinery, importlib.util, sys
 from pathlib import Path
 loader=importlib.machinery.SourceFileLoader("managed", "/usr/local/sbin/proxmox-managed-updates")
@@ -20612,9 +20710,9 @@ def download(path): return mod.request(mod.RAW+ref+"/"+path)
 index=mod.DASH/"index.html"
 css=download("dashboard/branding-v154.css").decode()
 js=download("dashboard/branding-v154.js").decode()
-mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v180")
+mod.replace_files([(index,mod.dashboard_payload(index.read_text(),css,js).encode())],"dashboard-v181")
 mod.install_dashboard_ping(download)
-PVE_DASHBOARD_V180
+PVE_DASHBOARD_V181
     fi
 fi
 
@@ -20898,6 +20996,7 @@ ui_section "Weboberflächen"
 (( INSTALL_SPEEDTEST )) && ui_kv "Speedtest" "https://${SPEEDTEST_IP}/"
 (( INSTALL_SCRUTINY )) && ui_kv "Scrutiny" "https://${SCRUTINY_IP}/"
 (( INSTALL_MEALIE )) && ui_kv "Mealie" "https://${MEALIE_IP}/"
+(( INSTALL_KITCHENOWL )) && ui_kv "KitchenOwl" "https://${KITCHENOWL_IP}/"
 (( INSTALL_PBS )) && ui_kv "PBS" "https://${PBS_IP}:8007/"
 (( INSTALL_PULSE )) && ui_kv "Pulse" "https://${PULSE_IP}/"
 (( PVEUPS_INSTALLED )) && ui_kv "PVE-UPS" "https://${PVEUPS_IP}/ · HTTP → HTTPS"
